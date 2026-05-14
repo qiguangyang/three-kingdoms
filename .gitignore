@@ -1,0 +1,14 @@
+node_modules
+dist
+*.log
+.DS_Store
+.env
+.env.local
+coverage
+saves/
+.vscode
+.idea
+.gstack/
+.claude/
+# Reference corpus only — copyrighted novel, never packaged (see SCENARIOS.md)
+三国演义.txt

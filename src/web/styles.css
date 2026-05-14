@@ -1,0 +1,168 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Global typographic + paper backdrop
+   --------------------------------------------------------------------------- */
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    font-family: theme('fontFamily.serif');
+    /* Layered parchment: noise texture over a warm cream gradient */
+    background-color: theme('colors.parchment.50');
+    background-image: theme('backgroundImage.paper-noise'),
+      radial-gradient(
+        ellipse at top,
+        theme('colors.parchment.100') 0%,
+        theme('colors.parchment.200') 70%
+      );
+    background-repeat: repeat, no-repeat;
+    background-size: 160px 160px, cover;
+    color: theme('colors.ink.800');
+  }
+  ::selection {
+    background-color: theme('colors.seal.200');
+    color: theme('colors.ink.900');
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Component primitives — reusable "scroll panel" and "seal stamp"
+   --------------------------------------------------------------------------- */
+
+@layer components {
+  .panel {
+    @apply rounded-md border border-ink-300/60 bg-parchment-100/85 px-4 py-3 shadow-scroll backdrop-blur-[1px];
+  }
+  .panel-tight {
+    @apply rounded border border-ink-300/60 bg-parchment-100/90 px-2 py-1 shadow-scroll;
+  }
+  .panel-heading {
+    @apply font-display tracking-widest uppercase text-xs text-ink-500 mb-1;
+  }
+  .ink-divider {
+    @apply h-px w-full bg-gradient-to-r from-transparent via-ink-400/40 to-transparent;
+  }
+  /* 印章 — a stamp-like circular badge for faction icons */
+  .seal {
+    @apply inline-flex items-center justify-center rounded-full font-serif text-xs font-semibold text-parchment-50 shadow-seal;
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+  /* The classic 中国印 — square red box around a single character */
+  .stamp-square {
+    @apply inline-flex items-center justify-center font-serif font-bold text-parchment-50;
+    width: 1.5rem;
+    height: 1.5rem;
+    background-color: theme('colors.seal.500');
+    box-shadow: 0 0 0 2px theme('colors.parchment.50'),
+      0 0 0 3px theme('colors.seal.500');
+  }
+  .stat-bar {
+    @apply relative h-1.5 w-full overflow-hidden rounded-full bg-ink-100;
+  }
+  .stat-bar > span {
+    @apply absolute left-0 top-0 h-full;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center rounded border border-ink-400/60 bg-parchment-50 px-3 py-1 text-sm font-medium text-ink-800 transition hover:bg-parchment-200 active:translate-y-px;
+  }
+  .btn-primary {
+    @apply border-seal-600 bg-seal-500 text-parchment-50 hover:bg-seal-600;
+  }
+  .btn-ghost {
+    @apply border-transparent bg-transparent text-ink-600 hover:bg-parchment-200/60;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Map SVG styling
+   --------------------------------------------------------------------------- */
+
+.map-svg {
+  user-select: none;
+  cursor: grab;
+}
+.map-svg:active {
+  cursor: grabbing;
+}
+.map-city {
+  cursor: pointer;
+  transition: transform 120ms ease;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.map-city:hover {
+  transform: scale(1.08);
+}
+.map-city.is-selected text {
+  fill: theme('colors.seal.500');
+}
+
+/* Pulsing rings drawn around a city that is currently under attack. Two
+   concentric circles expand and fade independently to suggest a clash. */
+@keyframes mapBattlePulse {
+  0% { transform: scale(0.85); opacity: 1; }
+  70% { transform: scale(1.4); opacity: 0.0; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+.map-battle-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mapBattlePulse 1.2s ease-out infinite;
+}
+.map-battle-pulse-inner {
+  animation-delay: 0.4s;
+}
+
+/* Troop counter flashes red briefly when its rendered value drops. The
+   animation runs once and decays so consecutive small drops give a
+   pulsing impression rather than constant red. */
+@keyframes troopFlash {
+  0%   { color: #b71c1c; transform: scale(1.12); }
+  40%  { color: #b71c1c; transform: scale(1); }
+  100% { color: theme('colors.ink.800'); transform: scale(1); }
+}
+.troop-flash {
+  animation: troopFlash 280ms ease-out;
+  display: inline-block;
+  transform-origin: right center;
+}
+
+/* March-line: a dashed arrow that draws from origin to target city. The
+   stroke-dasharray value is interpolated via inline style; this rule
+   just supplies the visual flavor. */
+.march-line {
+  pointer-events: none;
+}
+.march-line-shaft {
+  fill: none;
+  stroke: #7d3a1a;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-dasharray: 6 4;
+  opacity: 0.92;
+}
+.march-line-shaft.fading {
+  opacity: 0.35;
+}
+.march-line-head {
+  fill: #7d3a1a;
+}
+
+/* Subtle bamboo-slip striping for menus */
+.bamboo {
+  background-image: repeating-linear-gradient(
+    180deg,
+    theme('colors.parchment.200') 0px,
+    theme('colors.parchment.200') 22px,
+    theme('colors.parchment.100') 22px,
+    theme('colors.parchment.100') 24px
+  );
+}
