@@ -1,6 +1,6 @@
 import { rollChance } from '../rng.js';
 import { citiesOf, enemyNeighbors } from '../map.js';
-import { factionGenerals, factionTotals } from '../selectors.js';
+import { factionGenerals, factionTotals, wildGeneralsIn } from '../selectors.js';
 import type {
   AgentContext,
   StrategicCommand,
@@ -148,9 +148,7 @@ function sumGeneralTroopsIn(ctx: AgentContext, cityId: string): number {
 type CityNeed = 'govern' | 'develop' | 'commerce' | 'search' | 'patrol';
 
 function hasWildGeneralIn(state: GameState, cityId: string): boolean {
-  return Object.values(state.generals).some(
-    (g) => g.factionId === null && g.locationCityId === cityId && g.status === 'active',
-  );
+  return wildGeneralsIn(state, cityId).length > 0;
 }
 
 // Ordered list of what a city most needs, most urgent first. De-duplicated.
@@ -161,6 +159,10 @@ function rankCityNeeds(state: GameState, city: City): CityNeed[] {
   if (city.money < city.garrison) needs.push('commerce');
   if (city.agriculture < 70) needs.push('develop');
   if (city.commerce < 70) needs.push('commerce');
+  // No zheng gate here: internalAffairsCommands assigns needs to the
+  // highest-zheng available generals first, and the search command handler
+  // already scales success probability by zheng — so a weak searcher is
+  // merely less effective, not a bug.
   if (hasWildGeneralIn(state, city.id)) needs.push('search');
   needs.push('patrol');
   return [...new Set(needs)];

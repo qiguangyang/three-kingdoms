@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildInitialState } from '../../src/engine/scenario.js';
 import { SCENARIO_DONGZHUO } from '../../src/data/scenarios/s1-dongzhuo.js';
 import { REF_DATA } from '../../src/data/index.js';
-import { strategicRules } from '../../src/engine/ai/strategic.js';
-import { internalAffairsCommands } from '../../src/engine/ai/strategic.js';
+import { strategicRules, internalAffairsCommands } from '../../src/engine/ai/strategic.js';
 import { factionGenerals } from '../../src/engine/selectors.js';
 
 describe('strategic AI', () => {
