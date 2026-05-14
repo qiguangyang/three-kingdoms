@@ -237,4 +237,17 @@ export const en: MessageCatalog = {
   'common.units': 'units',
   'common.gold': 'gold',
   'common.grain': 'grain',
+
+  'news.heading': 'Chronicle',
+  'news.filter.all': 'All',
+  'news.filter.mine': 'My Realm',
+  'news.filter.world': 'The Realm',
+  'news.empty': 'No news to report.',
+
+  'faction.rankHeading': 'Powers of the Realm',
+  'faction.you': '(you)',
+  'faction.eliminated': 'fallen',
+
+  'digest.heading': 'While you were occupied…',
+  'digest.dismiss': 'Continue',
 };

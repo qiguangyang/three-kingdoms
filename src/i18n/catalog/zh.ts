@@ -233,4 +233,17 @@ export const zh: MessageCatalog = {
   'common.units': '名',
   'common.gold': '金',
   'common.grain': '粮',
+
+  'news.heading': '编年',
+  'news.filter.all': '全部',
+  'news.filter.mine': '我方',
+  'news.filter.world': '天下',
+  'news.empty': '暂无消息。',
+
+  'faction.rankHeading': '天下群雄',
+  'faction.you': '（你）',
+  'faction.eliminated': '已灭',
+
+  'digest.heading': '此间天下事…',
+  'digest.dismiss': '继续',
 };
