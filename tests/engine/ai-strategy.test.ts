@@ -7,6 +7,8 @@ import { threatenedCityIds, isFactionThreatened } from '../../src/engine/ai/stra
 import { makeTopology, siegeOp, attackMarchOp } from './_ai-fixtures.js';
 import { factionPower, powerLeader } from '../../src/engine/selectors.js';
 import { selectExpansionTarget } from '../../src/engine/ai/strategy.js';
+import { reassessStrategy } from '../../src/engine/ai/strategy.js';
+import type { FactionStrategy } from '../../src/engine/types.js';
 
 describe('GameState.aiStrategies', () => {
   it('buildInitialState seeds an empty aiStrategies map', () => {
@@ -117,5 +119,93 @@ describe('expansion target selection', () => {
       { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 10000 },
     ]);
     expect(selectExpansionTarget(state, 'dongzhuo', PERSONALITY_PRESETS.balanced)).toBeNull();
+  });
+});
+
+describe('reassessStrategy', () => {
+  function healthyBorders() {
+    return makeTopology([
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 30000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 4000 },
+    ]);
+  }
+
+  it('returns defend when a city is under siege', () => {
+    let state = healthyBorders();
+    state = { ...state, pendingOps: [siegeOp('luoyang', 'caocao')] };
+    const s = reassessStrategy(
+      { state, factionId: 'dongzhuo' },
+      null,
+      PERSONALITY_PRESETS.balanced,
+    );
+    expect(s.posture).toBe('defend');
+  });
+
+  it('returns consolidate when a city has collapsed loyalty', () => {
+    let state = healthyBorders();
+    state = {
+      ...state,
+      cities: {
+        ...state.cities,
+        luoyang: { ...state.cities['luoyang']!, loyalty: 10 },
+      },
+    };
+    const s = reassessStrategy(
+      { state, factionId: 'dongzhuo' },
+      null,
+      PERSONALITY_PRESETS.balanced,
+    );
+    expect(s.posture).toBe('consolidate');
+  });
+
+  it('returns expand with a target when healthy and bordering an enemy', () => {
+    const state = healthyBorders();
+    const s = reassessStrategy(
+      { state, factionId: 'dongzhuo' },
+      null,
+      PERSONALITY_PRESETS.balanced,
+    );
+    expect(s.posture).toBe('expand');
+    expect(s.targetCityId).toBe('chenliu');
+    expect(s.stagingCityId).toBe('luoyang');
+  });
+
+  it('persists a still-valid expand strategy across reassessment', () => {
+    const state = healthyBorders();
+    const first = reassessStrategy(
+      { state, factionId: 'dongzhuo' },
+      null,
+      PERSONALITY_PRESETS.balanced,
+    );
+    const second = reassessStrategy(
+      { state, factionId: 'dongzhuo' },
+      first,
+      PERSONALITY_PRESETS.balanced,
+    );
+    expect(second).toBe(first);
+  });
+
+  it('drops a strategy whose target city we have already captured', () => {
+    const state = healthyBorders();
+    const stale: FactionStrategy = {
+      posture: 'expand',
+      targetFactionId: 'caocao',
+      targetCityId: 'chenliu',
+      stagingCityId: 'luoyang',
+      updatedTurn: 0,
+    };
+    const captured = {
+      ...state,
+      cities: {
+        ...state.cities,
+        chenliu: { ...state.cities['chenliu']!, factionId: 'dongzhuo' },
+      },
+    };
+    const s = reassessStrategy(
+      { state: captured, factionId: 'dongzhuo' },
+      stale,
+      PERSONALITY_PRESETS.balanced,
+    );
+    expect(s.targetCityId).not.toBe('chenliu');
   });
 });
