@@ -36,7 +36,7 @@ describe('WorldNewsFeed', () => {
   it('shows only other factions under the World filter', () => {
     const game = stateWithLog('caocao', [mineEntry, worldEntry]);
     const { container, getByRole } = render(<WorldNewsFeed game={game} />);
-    fireEvent.click(getByRole('tab', { name: /realm|天下/i }));
+    fireEvent.click(getByRole('tab', { name: /the realm|天下/i }));
     const items = container.querySelectorAll('li');
     expect(items.length).toBe(1);
   });
