@@ -1,4 +1,4 @@
-import { adjacentCities, citiesOf, manhattanDistance } from '../map.js';
+import { adjacentCities, citiesAdjacent, citiesOf, manhattanDistance } from '../map.js';
 import { factionPower, factionTotals, powerLeader } from '../selectors.js';
 import type {
   AgentContext,
@@ -155,6 +155,10 @@ export function isStrategyStillValid(
   const stagingCity = state.cities[s.stagingCityId];
   if (!targetCity || !stagingCity) return false;
   if (stagingCity.factionId !== factionId) return false;
+  // The staging city must still border the target — militaryCommands can
+  // only assault an adjacent target, so a non-adjacent pair strands the
+  // campaign (massing troops that can never attack).
+  if (!citiesAdjacent(stagingCity, targetCity)) return false;
   if (targetCity.factionId === factionId) return false; // already captured
   if (targetCity.factionId === null) return true; // neutral, still grabbable
   const targetFaction = state.factions[s.targetFactionId];

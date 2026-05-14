@@ -8,6 +8,7 @@ import {
   isFactionThreatened,
   selectExpansionTarget,
   reassessStrategy,
+  isStrategyStillValid,
 } from '../../src/engine/ai/strategy.js';
 import { makeTopology, siegeOp, attackMarchOp } from './_ai-fixtures.js';
 import { factionPower, powerLeader, factionRankings } from '../../src/engine/selectors.js';
@@ -225,6 +226,23 @@ describe('reassessStrategy', () => {
       PERSONALITY_PRESETS.balanced,
     );
     expect(s.targetCityId).not.toBe('chenliu');
+  });
+
+  it('drops an expand strategy when staging and target are no longer adjacent', () => {
+    // staging luoyang (10,10) and target chenliu (40,10) are 30 apart —
+    // well beyond ADJACENCY_THRESHOLD (18), so no assault is possible.
+    const state = makeTopology([
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 30000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 40, y: 10 }, garrison: 4000 },
+    ]);
+    const stale: FactionStrategy = {
+      posture: 'expand',
+      targetFactionId: 'caocao',
+      targetCityId: 'chenliu',
+      stagingCityId: 'luoyang',
+      updatedTurn: 0,
+    };
+    expect(isStrategyStillValid(state, 'dongzhuo', stale)).toBe(false);
   });
 });
 
