@@ -10,7 +10,7 @@ import {
   reassessStrategy,
 } from '../../src/engine/ai/strategy.js';
 import { makeTopology, siegeOp, attackMarchOp } from './_ai-fixtures.js';
-import { factionPower, powerLeader } from '../../src/engine/selectors.js';
+import { factionPower, powerLeader, factionRankings } from '../../src/engine/selectors.js';
 import type { FactionAgent, FactionStrategy, GameState } from '../../src/engine/types.js';
 import { makeDefaultAgent } from '../../src/engine/ai/index.js';
 import { advanceMonth } from '../../src/engine/turn.js';
@@ -273,6 +273,23 @@ describe('AI lifecycle wiring', () => {
     const populated = aiFactionIds.filter((id) => state.aiStrategies[id]);
     expect(populated.length).toBe(aiFactionIds.length);
     expect(aiFactionIds.length).toBeGreaterThan(0);
+  });
+});
+
+describe('factionRankings', () => {
+  it('ranks every faction by power, strongest first, with 1-based rank', () => {
+    const state = makeTopology([
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 90000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 1000 },
+    ]);
+    const rankings = factionRankings(state);
+    expect(rankings.length).toBe(Object.keys(state.factions).length);
+    expect(rankings[0]!.factionId).toBe('dongzhuo');
+    expect(rankings[0]!.rank).toBe(1);
+    // Power must be non-increasing down the list.
+    for (let i = 1; i < rankings.length; i++) {
+      expect(rankings[i - 1]!.power).toBeGreaterThanOrEqual(rankings[i]!.power);
+    }
   });
 });
 
