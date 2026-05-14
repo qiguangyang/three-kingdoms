@@ -222,6 +222,9 @@ describe('makeDefaultAgent.reassess', () => {
     ]);
     const agent = makeDefaultAgent('dongzhuo', 'balanced');
     const strategy = agent.reassess({ state, factionId: 'dongzhuo' }, null);
-    expect(['expand', 'consolidate', 'defend']).toContain(strategy.posture);
+    // dongzhuo is strong, not threatened, has an adjacent weak enemy → expand.
+    // A wrong factionId or params in the delegation would not produce this.
+    expect(strategy.posture).toBe('expand');
+    expect(strategy.targetCityId).toBe('chenliu');
   });
 });
