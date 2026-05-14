@@ -69,4 +69,14 @@ describe('threat detection', () => {
     ]);
     expect(isFactionThreatened(state, 'dongzhuo')).toBe(false);
   });
+
+  it('does not flag a city targeted by a friendly reinforce-march', () => {
+    let state = makeTopology([
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 8000 },
+      { id: 'chenliu', factionId: 'dongzhuo', pos: { x: 12, y: 10 }, garrison: 8000 },
+    ]);
+    const op = { ...attackMarchOp('chenliu', 'luoyang', 'dongzhuo'), intent: 'reinforce' as const };
+    state = { ...state, pendingOps: [op] };
+    expect(isFactionThreatened(state, 'dongzhuo')).toBe(false);
+  });
 });

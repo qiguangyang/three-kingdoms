@@ -9,7 +9,7 @@ export function threatenedCityIds(state: GameState, factionId: FactionId): CityI
   const threatened = new Set<CityId>();
 
   for (const op of state.pendingOps) {
-    if (op.kind === 'siege' && ownedIds.has(op.targetCityId)) {
+    if (op.kind === 'siege' && op.factionId !== factionId && ownedIds.has(op.targetCityId)) {
       threatened.add(op.targetCityId);
     }
     if (

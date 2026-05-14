@@ -3,11 +3,17 @@
 import { buildInitialState } from '../../src/engine/scenario.js';
 import { SCENARIO_DONGZHUO } from '../../src/data/scenarios/s1-dongzhuo.js';
 import { REF_DATA } from '../../src/data/index.js';
-import type { City, GameState, PendingOp } from '../../src/engine/types.js';
+import type { City, CityId, FactionId, GameState, PendingOp } from '../../src/engine/types.js';
+
+// Monotonic id source so multiple injected ops never collide.
+let _nextFixtureOpId = 9000;
+function nextFixtureOpId(): number {
+  return ++_nextFixtureOpId;
+}
 
 export interface PlacedCity {
-  id: string;
-  factionId: string | null;
+  id: CityId;
+  factionId: FactionId | null;
   pos: { x: number; y: number };
   garrison?: number;
   generals?: string[];
@@ -46,7 +52,7 @@ export function makeTopology(placed: PlacedCity[]): GameState {
 // Hand-crafted siege op targeting a city (for threat-detection tests).
 export function siegeOp(targetCityId: string, factionId: string): PendingOp {
   return {
-    id: 9001,
+    id: nextFixtureOpId(),
     kind: 'siege',
     factionId,
     durationDays: 10,
@@ -64,7 +70,7 @@ export function attackMarchOp(
   factionId: string,
 ): PendingOp {
   return {
-    id: 9002,
+    id: nextFixtureOpId(),
     kind: 'march',
     factionId,
     durationDays: 8,
