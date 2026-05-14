@@ -184,6 +184,26 @@ describe('concentrationCommands', () => {
   });
 });
 
+describe('strategicRules (composed)', () => {
+  it('emits a move command when handed an expand strategy with a staging city', () => {
+    const state = makeTopology([
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 8000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 8000 },
+      { id: 'anding', factionId: 'dongzhuo', pos: { x: 60, y: 30 }, garrison: 12000 },
+    ]);
+    const strategy: FactionStrategy = {
+      posture: 'expand',
+      targetFactionId: 'caocao',
+      targetCityId: 'chenliu',
+      stagingCityId: 'luoyang',
+      updatedTurn: 0,
+    };
+    const cmds = strategicRules({ state, factionId: 'dongzhuo', strategy }, 'active');
+    expect(cmds.some((c) => c.kind === 'move')).toBe(true);
+    expect(cmds[cmds.length - 1]!.kind).toBe('endTurn');
+  });
+});
+
 describe('militaryCommands', () => {
   it('assaults the target once the staging force clears the threshold', () => {
     const state = makeTopology([
