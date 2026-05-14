@@ -253,7 +253,9 @@ describe('AI lifecycle wiring', () => {
       .filter((f) => f.id !== state.playerFactionId && f.alive)
       .map((f) => f.id);
     const populated = aiFactionIds.filter((id) => state.aiStrategies[id]);
-    expect(populated.length).toBeGreaterThan(0);
+    // Every alive non-player faction must get a strategy — not just some.
+    expect(populated.length).toBe(aiFactionIds.length);
+    expect(aiFactionIds.length).toBeGreaterThan(0);
   });
 
   it('tickDays populates aiStrategies on month rollover', () => {
@@ -265,6 +267,11 @@ describe('AI lifecycle wiring', () => {
     });
     const agents = buildAgents(state);
     state = tickDays(state, 31, agents); // cross one month boundary
-    expect(Object.keys(state.aiStrategies).length).toBeGreaterThan(0);
+    const aiFactionIds = Object.values(state.factions)
+      .filter((f) => f.id !== state.playerFactionId && f.alive)
+      .map((f) => f.id);
+    const populated = aiFactionIds.filter((id) => state.aiStrategies[id]);
+    expect(populated.length).toBe(aiFactionIds.length);
+    expect(aiFactionIds.length).toBeGreaterThan(0);
   });
 });
