@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { buildInitialState } from '../../src/engine/scenario.js';
 import { SCENARIO_DONGZHUO } from '../../src/data/scenarios/s1-dongzhuo.js';
 import { REF_DATA } from '../../src/data/index.js';
-import { strategicRules, internalAffairsCommands, recruitmentCommands } from '../../src/engine/ai/strategic.js';
+import { strategicRules, internalAffairsCommands, recruitmentCommands, concentrationCommands } from '../../src/engine/ai/strategic.js';
 import { factionGenerals } from '../../src/engine/selectors.js';
 import type { FactionStrategy } from '../../src/engine/types.js';
+import { PERSONALITY_PRESETS } from '../../src/engine/ai/personality.js';
+import { makeTopology } from './_ai-fixtures.js';
 
 describe('strategic AI', () => {
   it('always emits an endTurn command at the end', () => {
@@ -118,5 +120,60 @@ describe('recruitmentCommands', () => {
       updatedTurn: 0,
     };
     expect(recruitmentCommands(state, 'dongzhuo', strategy)).toEqual([]);
+  });
+});
+
+describe('concentrationCommands', () => {
+  it('moves troops from a safe interior city toward the staging city', () => {
+    // luoyang (staging, borders enemy chenliu) + anding (interior, safe).
+    const state = makeTopology([
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 8000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 8000 },
+      { id: 'anding', factionId: 'dongzhuo', pos: { x: 60, y: 30 }, garrison: 10000 },
+    ]);
+    const generals = factionGenerals(state, 'dongzhuo');
+    const strategy: FactionStrategy = {
+      posture: 'expand',
+      targetFactionId: 'caocao',
+      targetCityId: 'chenliu',
+      stagingCityId: 'luoyang',
+      updatedTurn: 0,
+    };
+    const cmds = concentrationCommands(
+      state,
+      'dongzhuo',
+      strategy,
+      generals,
+      PERSONALITY_PRESETS.active,
+    );
+    const move = cmds.find((c) => c.kind === 'move');
+    expect(move).toBeDefined();
+    expect(move && move.kind === 'move' && move.fromCityId).toBe('anding');
+    expect(move && move.kind === 'move' && move.toCityId).toBe('luoyang');
+  });
+
+  it('grabs an adjacent neutral city when troops are spare', () => {
+    const state = makeTopology([
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 9000 },
+      { id: 'chenliu', factionId: null, pos: { x: 12, y: 10 }, garrison: 1000 },
+    ]);
+    const generals = factionGenerals(state, 'dongzhuo');
+    const strategy: FactionStrategy = {
+      posture: 'consolidate',
+      targetFactionId: null,
+      targetCityId: null,
+      stagingCityId: null,
+      updatedTurn: 0,
+    };
+    const cmds = concentrationCommands(
+      state,
+      'dongzhuo',
+      strategy,
+      generals,
+      PERSONALITY_PRESETS.balanced,
+    );
+    const grab = cmds.find((c) => c.kind === 'attack');
+    expect(grab).toBeDefined();
+    expect(grab && grab.kind === 'attack' && grab.toCityId).toBe('chenliu');
   });
 });

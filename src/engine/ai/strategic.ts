@@ -11,6 +11,7 @@ import type {
   FactionStrategy,
 } from '../types.js';
 import { PERSONALITY_PRESETS } from './personality.js';
+import type { PersonalityParams } from './personality.js';
 import { threatenedCityIds } from './strategy.js';
 
 // Decide one faction's actions for the current month. Returns an ordered
@@ -215,5 +216,59 @@ export function recruitmentCommands(
     }
     if (count > 0) cmds.push({ kind: 'recruit', cityId: city.id, count });
   }
+  return cmds;
+}
+
+// expand → funnel troops from safe interior cities to the staging city.
+// Any posture → take one adjacent neutral city when troops are spare.
+export function concentrationCommands(
+  state: GameState,
+  factionId: string,
+  strategy: FactionStrategy,
+  generals: General[],
+  params: PersonalityParams,
+): StrategicCommand[] {
+  const cmds: StrategicCommand[] = [];
+  const owned = citiesOf(state, factionId);
+
+  if (strategy.posture === 'expand' && strategy.stagingCityId) {
+    const staging = state.cities[strategy.stagingCityId];
+    if (staging) {
+      for (const city of owned) {
+        if (city.id === staging.id) continue;
+        // Only drain "interior" cities — those with no enemy/neutral neighbor.
+        if (enemyNeighbors(state, city.id, factionId).length > 0) continue;
+        const spare = Math.floor(city.garrison * params.reinforceAggressiveness);
+        if (spare < 1000) continue;
+        const escort = topGeneralsIn(generals, city.id, 1).map((g) => g.id);
+        cmds.push({
+          kind: 'move',
+          fromCityId: city.id,
+          toCityId: staging.id,
+          generalIds: escort,
+          troops: spare,
+        });
+      }
+    }
+  }
+
+  for (const city of owned) {
+    if (city.garrison < 3000) continue;
+    const neutral = enemyNeighbors(state, city.id, factionId).find(
+      (n) => n.factionId === null,
+    );
+    if (!neutral) continue;
+    const led = topGeneralsIn(generals, city.id, 1);
+    if (led.length === 0) continue;
+    cmds.push({
+      kind: 'attack',
+      fromCityId: city.id,
+      toCityId: neutral.id,
+      generalIds: led.map((g) => g.id),
+      troops: Math.min(city.garrison - 1000, 4000),
+    });
+    break; // one opportunistic grab per month
+  }
+
   return cmds;
 }
