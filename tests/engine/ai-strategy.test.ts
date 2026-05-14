@@ -102,7 +102,8 @@ describe('expansion target selection', () => {
 
   it('biases toward the power leader when the bias weight is high', () => {
     const state = bordersState();
-    // yuanshao holds the 50k-garrison city, so it is the leader.
+    // yuanshao holds the 14k-garrison city; its factionPower (19000) exceeds
+    // dongzhuo's (15000) and caocao's (5500), so it is the current power leader.
     expect(powerLeader(state)).toBe('yuanshao');
     const target = selectExpansionTarget(state, 'dongzhuo', {
       ...PERSONALITY_PRESETS.active,

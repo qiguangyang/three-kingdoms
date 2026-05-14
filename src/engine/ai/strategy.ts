@@ -71,6 +71,11 @@ export function selectExpansionTarget(
 
   // Lower score = better target. Soft city + weak faction lower it; being
   // the power leader lowers it further (gang-up bias).
+  //
+  // Weights: 0.1 scales factionPower (~10k-100k) down to garrison range
+  // (~1k-20k) so neither dominates alone. 20000 bounds the max leader bonus
+  // to ~20k troops-equivalent at leaderBiasWeight=1 — a meaningful nudge,
+  // not an absolute override.
   let best: Pair | null = null;
   let bestScore = Infinity;
   for (const p of pairs) {
