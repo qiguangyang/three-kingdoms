@@ -15,6 +15,7 @@ import type { FactionAgent, FactionStrategy, GameState } from '../../src/engine/
 import { makeDefaultAgent } from '../../src/engine/ai/index.js';
 import { advanceMonth } from '../../src/engine/turn.js';
 import { tickDays } from '../../src/engine/pendingOp.js';
+import { develop } from '../../src/engine/politics.js';
 
 describe('GameState.aiStrategies', () => {
   it('buildInitialState seeds an empty aiStrategies map', () => {
@@ -292,8 +293,6 @@ describe('factionRankings', () => {
     }
   });
 });
-
-import { develop } from '../../src/engine/politics.js';
 
 describe('log faction tagging', () => {
   it('tags an internal-affairs log entry with the city owner faction', () => {
