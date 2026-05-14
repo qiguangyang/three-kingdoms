@@ -14,7 +14,17 @@ interface TurnDigestProps {
 export const TurnDigest: React.FC<TurnDigestProps> = ({ entries, onDismiss }) => {
   if (entries.length === 0) return null;
   return (
-    <Dialog title={t('digest.heading')} onClose={onDismiss}>
+    <Dialog
+      title={t('digest.heading')}
+      onClose={onDismiss}
+      // Pass the dismiss button as the footer so Dialog doesn't also render
+      // its default "Continue" button — otherwise the modal shows two.
+      footer={
+        <button className="btn btn-primary" onClick={onDismiss}>
+          {t('digest.dismiss')}
+        </button>
+      }
+    >
       <ul className="flex flex-col gap-1 text-sm text-ink-800">
         {entries.map((entry, i) => (
           <li key={`${entry.turn}-${i}`} className="flex gap-2">
@@ -25,11 +35,6 @@ export const TurnDigest: React.FC<TurnDigestProps> = ({ entries, onDismiss }) =>
           </li>
         ))}
       </ul>
-      <div className="mt-4 flex justify-end">
-        <button className="btn btn-primary" onClick={onDismiss}>
-          {t('digest.dismiss')}
-        </button>
-      </div>
     </Dialog>
   );
 };
