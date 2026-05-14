@@ -3,11 +3,14 @@ import { buildInitialState } from '../../src/engine/scenario.js';
 import { SCENARIO_DONGZHUO } from '../../src/data/scenarios/s1-dongzhuo.js';
 import { REF_DATA } from '../../src/data/index.js';
 import { PERSONALITY_PRESETS } from '../../src/engine/ai/personality.js';
-import { threatenedCityIds, isFactionThreatened } from '../../src/engine/ai/strategy.js';
+import {
+  threatenedCityIds,
+  isFactionThreatened,
+  selectExpansionTarget,
+  reassessStrategy,
+} from '../../src/engine/ai/strategy.js';
 import { makeTopology, siegeOp, attackMarchOp } from './_ai-fixtures.js';
 import { factionPower, powerLeader } from '../../src/engine/selectors.js';
-import { selectExpansionTarget } from '../../src/engine/ai/strategy.js';
-import { reassessStrategy } from '../../src/engine/ai/strategy.js';
 import type { FactionStrategy } from '../../src/engine/types.js';
 
 describe('GameState.aiStrategies', () => {

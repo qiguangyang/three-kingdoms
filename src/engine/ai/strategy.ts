@@ -130,12 +130,14 @@ export function isInternallyWeak(state: GameState, factionId: FactionId): boolea
 
 // A persisted expand strategy stays valid while the target faction still
 // owns the target city (or it is neutral) and our staging city is still
-// ours.
+// ours. Only meaningful for expand strategies — returns false for any
+// other posture.
 export function isStrategyStillValid(
   state: GameState,
   factionId: FactionId,
   s: FactionStrategy,
 ): boolean {
+  if (s.posture !== 'expand') return false;
   if (!s.targetFactionId || !s.targetCityId || !s.stagingCityId) return false;
   const targetCity = state.cities[s.targetCityId];
   const stagingCity = state.cities[s.stagingCityId];
@@ -158,6 +160,8 @@ export function reassessStrategy(
 ): FactionStrategy {
   const { state, factionId } = ctx;
   const owned = citiesOf(state, factionId);
+  // Faction has no cities (wiped out) — return a neutral posture. The turn
+  // loop is expected to skip dead factions before calling this.
   if (owned.length === 0) return consolidate(state.turn);
 
   if (isFactionThreatened(state, factionId)) {
