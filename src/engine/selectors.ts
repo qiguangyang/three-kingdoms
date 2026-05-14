@@ -56,3 +56,25 @@ export function hasVictory(state: GameState, factionId: FactionId): boolean {
   const total = Object.keys(state.cities).length;
   return owned === total;
 }
+
+// Composite power score for a faction: troops plus 5000 per city. Used by
+// both the AI's target selection and the UI's faction power panel so the
+// two agree on "who is winning".
+export function factionPower(state: GameState, factionId: FactionId): number {
+  const totals = factionTotals(state, factionId);
+  return totals.troops + totals.cities * 5000;
+}
+
+// The strongest alive faction — the one rivals want to gang up on.
+export function powerLeader(state: GameState): FactionId | null {
+  let best: FactionId | null = null;
+  let bestPower = -1;
+  for (const f of aliveFactions(state)) {
+    const p = factionPower(state, f.id);
+    if (p > bestPower) {
+      bestPower = p;
+      best = f.id;
+    }
+  }
+  return best;
+}

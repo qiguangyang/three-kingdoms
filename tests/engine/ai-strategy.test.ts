@@ -5,6 +5,8 @@ import { REF_DATA } from '../../src/data/index.js';
 import { PERSONALITY_PRESETS } from '../../src/engine/ai/personality.js';
 import { threatenedCityIds, isFactionThreatened } from '../../src/engine/ai/strategy.js';
 import { makeTopology, siegeOp, attackMarchOp } from './_ai-fixtures.js';
+import { factionPower, powerLeader } from '../../src/engine/selectors.js';
+import { selectExpansionTarget } from '../../src/engine/ai/strategy.js';
 
 describe('GameState.aiStrategies', () => {
   it('buildInitialState seeds an empty aiStrategies map', () => {
@@ -78,5 +80,41 @@ describe('threat detection', () => {
     const op = { ...attackMarchOp('chenliu', 'luoyang', 'dongzhuo'), intent: 'reinforce' as const };
     state = { ...state, pendingOps: [op] };
     expect(isFactionThreatened(state, 'dongzhuo')).toBe(false);
+  });
+});
+
+describe('expansion target selection', () => {
+  // dongzhuo borders a weak caocao city and a strong yuanshao city.
+  function bordersState() {
+    return makeTopology([
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 10000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 500 },
+      { id: 'puyang', factionId: 'yuanshao', pos: { x: 14, y: 10 }, garrison: 50000 },
+    ]);
+  }
+
+  it('picks the softest bordering enemy city as the target', () => {
+    const state = bordersState();
+    const target = selectExpansionTarget(state, 'dongzhuo', PERSONALITY_PRESETS.turtle);
+    expect(target?.targetCityId).toBe('chenliu');
+    expect(target?.stagingCityId).toBe('luoyang');
+  });
+
+  it('biases toward the power leader when the bias weight is high', () => {
+    const state = bordersState();
+    // yuanshao holds the 50k-garrison city, so it is the leader.
+    expect(powerLeader(state)).toBe('yuanshao');
+    const target = selectExpansionTarget(state, 'dongzhuo', {
+      ...PERSONALITY_PRESETS.active,
+      leaderBiasWeight: 1,
+    });
+    expect(target?.targetFactionId).toBe('yuanshao');
+  });
+
+  it('returns null when the faction has no enemy-adjacent cities', () => {
+    const state = makeTopology([
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 10000 },
+    ]);
+    expect(selectExpansionTarget(state, 'dongzhuo', PERSONALITY_PRESETS.balanced)).toBeNull();
   });
 });
