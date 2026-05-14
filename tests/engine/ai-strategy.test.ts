@@ -89,7 +89,7 @@ describe('expansion target selection', () => {
     return makeTopology([
       { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 10000 },
       { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 500 },
-      { id: 'puyang', factionId: 'yuanshao', pos: { x: 14, y: 10 }, garrison: 50000 },
+      { id: 'puyang', factionId: 'yuanshao', pos: { x: 14, y: 10 }, garrison: 14000 },
     ]);
   }
 

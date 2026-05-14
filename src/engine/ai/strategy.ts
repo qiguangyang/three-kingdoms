@@ -76,7 +76,7 @@ export function selectExpansionTarget(
   for (const p of pairs) {
     const enemyFactionPower = factionPower(state, p.enemy.factionId as FactionId);
     const leaderBonus =
-      p.enemy.factionId === leader ? -params.leaderBiasWeight * 60000 : 0;
+      p.enemy.factionId === leader ? -params.leaderBiasWeight * 20000 : 0;
     const score = p.enemy.garrison + enemyFactionPower * 0.1 + leaderBonus;
     if (score < bestScore) {
       bestScore = score;
