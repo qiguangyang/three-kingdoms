@@ -1,5 +1,5 @@
 import { rollChance } from '../rng.js';
-import { citiesOf, enemyNeighbors } from '../map.js';
+import { adjacentCities, citiesAdjacent, citiesOf, enemyNeighbors } from '../map.js';
 import { factionGenerals, factionTotals, wildGeneralsIn } from '../selectors.js';
 import type {
   AgentContext,
@@ -76,8 +76,8 @@ export function strategicRules(
     for (const city of cities) {
       const targets = enemyNeighbors(state, city.id, factionId);
       for (const target of targets) {
-        const targetTroops = target.garrison + sumGeneralTroopsIn(ctx, target.id);
-        const ourTroops = city.garrison + sumGeneralTroopsIn(ctx, city.id);
+        const targetTroops = target.garrison + sumGeneralTroopsIn(state, target.id);
+        const ourTroops = city.garrison + sumGeneralTroopsIn(state, city.id);
         if (target.factionId === null && city.garrison > 2000) {
           // Empty city — always grab it.
           const force = Math.min(city.garrison - 1000, 5000);
@@ -140,8 +140,8 @@ function hasWildGeneral(ctx: AgentContext, cityId: string): boolean {
   );
 }
 
-function sumGeneralTroopsIn(ctx: AgentContext, cityId: string): number {
-  return Object.values(ctx.state.generals)
+function sumGeneralTroopsIn(state: GameState, cityId: string): number {
+  return Object.values(state.generals)
     .filter((g) => g.locationCityId === cityId && g.status === 'active')
     .reduce((s, g) => s + g.troops, 0);
 }
@@ -268,6 +268,64 @@ export function concentrationCommands(
       troops: Math.min(city.garrison - 1000, 4000),
     });
     break; // one opportunistic grab per month
+  }
+
+  return cmds;
+}
+
+// defend → reinforce threatened cities from safe neighbors.
+// expand → assault the target city once the staging force clears the
+// personality's concentrationThreshold advantage ratio.
+export function militaryCommands(
+  state: GameState,
+  factionId: string,
+  strategy: FactionStrategy,
+  generals: General[],
+  params: PersonalityParams,
+): StrategicCommand[] {
+  const cmds: StrategicCommand[] = [];
+
+  if (strategy.posture === 'defend') {
+    const threatened = threatenedCityIds(state, factionId);
+    for (const tid of threatened) {
+      const donor = adjacentCities(state, tid).find(
+        (c) =>
+          c.factionId === factionId &&
+          c.garrison > 2000 &&
+          !threatened.includes(c.id),
+      );
+      if (!donor) continue;
+      const escort = topGeneralsIn(generals, donor.id, 1).map((g) => g.id);
+      cmds.push({
+        kind: 'move',
+        fromCityId: donor.id,
+        toCityId: tid,
+        generalIds: escort,
+        troops: Math.floor(donor.garrison * 0.5),
+      });
+    }
+    return cmds;
+  }
+
+  if (strategy.posture === 'expand' && strategy.stagingCityId && strategy.targetCityId) {
+    const staging = state.cities[strategy.stagingCityId];
+    const target = state.cities[strategy.targetCityId];
+    if (!staging || !target) return cmds;
+    if (!citiesAdjacent(staging, target)) return cmds;
+    const stagingForce = staging.garrison + sumGeneralTroopsIn(state, staging.id);
+    const targetForce = target.garrison + sumGeneralTroopsIn(state, target.id);
+    if (stagingForce >= Math.max(2000, targetForce * params.concentrationThreshold)) {
+      const led = topGeneralsIn(generals, staging.id, 2);
+      if (led.length > 0) {
+        cmds.push({
+          kind: 'attack',
+          fromCityId: staging.id,
+          toCityId: target.id,
+          generalIds: led.map((g) => g.id),
+          troops: Math.max(1000, staging.garrison - 1000),
+        });
+      }
+    }
   }
 
   return cmds;
