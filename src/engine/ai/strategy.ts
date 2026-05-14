@@ -1,4 +1,4 @@
-import { adjacentCities, citiesOf } from '../map.js';
+import { adjacentCities, citiesOf, manhattanDistance } from '../map.js';
 import { factionPower, factionTotals, powerLeader } from '../selectors.js';
 import type {
   AgentContext,
@@ -10,8 +10,16 @@ import type {
 } from '../types.js';
 import type { PersonalityParams } from './personality.js';
 
+// Cities within this manhattan distance are treated as "directly bordering"
+// for the garrison-overmatch threat check. The full adjacency radius (18) is
+// used for marching purposes but is too broad for threat detection — on a
+// 100x40 grid with 40 cities it would flag almost every city as threatened.
+const DIRECT_BORDER_DISTANCE = 12;
+
 // A city is "threatened" when an enemy army is on its way or massed next
 // door. Reads state.pendingOps and adjacency — pure, deterministic.
+// Garrison-based threat only fires for cities within DIRECT_BORDER_DISTANCE
+// to avoid the "everyone is always threatened" problem on a dense map.
 export function threatenedCityIds(state: GameState, factionId: FactionId): CityId[] {
   const owned = citiesOf(state, factionId);
   const ownedIds = new Set(owned.map((c) => c.id));
@@ -34,6 +42,10 @@ export function threatenedCityIds(state: GameState, factionId: FactionId): CityI
   for (const city of owned) {
     for (const n of adjacentCities(state, city.id)) {
       if (n.factionId === null || n.factionId === factionId) continue;
+      // Only flag garrison-overmatch threat for truly adjacent (direct-border)
+      // cities; distant "adjacent" cities reachable via marching are not an
+      // immediate garrison threat.
+      if (manhattanDistance(city.pos, n.pos) > DIRECT_BORDER_DISTANCE) continue;
       if (n.garrison > city.garrison * 1.5) {
         threatened.add(city.id);
         break;

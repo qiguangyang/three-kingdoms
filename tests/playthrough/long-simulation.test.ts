@@ -131,4 +131,48 @@ describe('multi-month simulation', () => {
     state = { ...state, cities: conquered };
     expect(checkOutcome(state)).toBe('victory');
   });
+
+  it('AI factions run multi-month campaigns (a target persists >= 3 months)', () => {
+    let state = buildInitialState({
+      scenario: SCENARIO_DONGZHUO,
+      playerFactionId: 'liubei',
+      refData: REF_DATA,
+      seed: 303,
+    });
+    // Track, per faction, the longest run of identical non-null targetCityId.
+    const streak: Record<string, number> = {};
+    const best: Record<string, number> = {};
+    const lastTarget: Record<string, string | null> = {};
+    for (let i = 0; i < 36; i++) {
+      state = advanceMonth(state, buildAgents(state));
+      for (const [fid, strat] of Object.entries(state.aiStrategies)) {
+        const tgt = strat.targetCityId;
+        if (tgt && lastTarget[fid] === tgt) {
+          streak[fid] = (streak[fid] ?? 1) + 1;
+        } else {
+          streak[fid] = tgt ? 1 : 0;
+        }
+        lastTarget[fid] = tgt;
+        best[fid] = Math.max(best[fid] ?? 0, streak[fid] ?? 0);
+      }
+    }
+    const longest = Math.max(0, ...Object.values(best));
+    expect(longest).toBeGreaterThanOrEqual(3);
+  });
+
+  it('AI concentrates force (emits move commands over a long run)', () => {
+    let state = buildInitialState({
+      scenario: SCENARIO_DONGZHUO,
+      playerFactionId: 'liubei',
+      refData: REF_DATA,
+      seed: 304,
+    });
+    for (let i = 0; i < 36; i++) {
+      state = advanceMonth(state, buildAgents(state));
+    }
+    const aiMoves = state.actionLog.filter(
+      (a) => a.factionId !== 'liubei' && a.command.kind === 'move',
+    );
+    expect(aiMoves.length).toBeGreaterThan(0);
+  });
 });
