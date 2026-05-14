@@ -275,3 +275,22 @@ describe('AI lifecycle wiring', () => {
     expect(aiFactionIds.length).toBeGreaterThan(0);
   });
 });
+
+import { develop } from '../../src/engine/politics.js';
+
+describe('log faction tagging', () => {
+  it('tags an internal-affairs log entry with the city owner faction', () => {
+    const base = buildInitialState({
+      scenario: SCENARIO_DONGZHUO,
+      playerFactionId: 'caocao',
+      refData: REF_DATA,
+      seed: 13,
+    });
+    const luoyang = base.cities['luoyang']!;
+    const governor = luoyang.generals[0]!;
+    const next = develop(base, { cityId: 'luoyang', generalId: governor });
+    const entry = next.log[next.log.length - 1]!;
+    expect(entry.key).toBe('result.developed');
+    expect(entry.factionId).toBe(luoyang.factionId);
+  });
+});

@@ -379,7 +379,7 @@ function applyCompletedMarch(
         : { zh: '?', en: '?' },
       from: from.name,
       to: to.name,
-    });
+    }, op.factionId);
     return next;
   }
 
@@ -486,6 +486,7 @@ function addLog(
   state: GameState,
   key: string,
   vars: Record<string, unknown>,
+  factionId?: FactionId,
 ): GameState {
   const entry: LogEntry = {
     turn: state.turn,
@@ -493,6 +494,7 @@ function addLog(
     month: state.month,
     key,
     vars: vars as LogEntry['vars'],
+    factionId,
   };
   return { ...state, log: [...state.log, entry] };
 }
