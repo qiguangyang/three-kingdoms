@@ -8,8 +8,10 @@ import type {
   City,
   General,
   GameState,
+  FactionStrategy,
 } from '../types.js';
 import { PERSONALITY_PRESETS } from './personality.js';
+import { threatenedCityIds } from './strategy.js';
 
 // Decide one faction's actions for the current month. Returns an ordered
 // list of commands the turn loop will execute.
@@ -187,6 +189,31 @@ export function internalAffairsCommands(
       const general = inCity[i] ?? inCity[0]!;
       cmds.push({ kind: needs[i]!, cityId: city.id, generalId: general.id });
     }
+  }
+  return cmds;
+}
+
+// Posture-weighted recruitment. expand → mass at the staging city;
+// defend → reinforce threatened cities; otherwise routine build-up. A
+// city needs gold for at least 500 troops to recruit at all.
+export function recruitmentCommands(
+  state: GameState,
+  factionId: string,
+  strategy: FactionStrategy,
+): StrategicCommand[] {
+  const cmds: StrategicCommand[] = [];
+  const threatened = new Set(threatenedCityIds(state, factionId));
+  for (const city of citiesOf(state, factionId)) {
+    if (city.money < 500) continue;
+    let count = 0;
+    if (strategy.posture === 'expand' && city.id === strategy.stagingCityId) {
+      count = 2000;
+    } else if (strategy.posture === 'defend' && threatened.has(city.id)) {
+      count = 2000;
+    } else if (city.money > city.garrison * 2 && city.garrison < 20000) {
+      count = 1000;
+    }
+    if (count > 0) cmds.push({ kind: 'recruit', cityId: city.id, count });
   }
   return cmds;
 }

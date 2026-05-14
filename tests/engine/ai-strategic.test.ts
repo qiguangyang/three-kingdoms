@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { buildInitialState } from '../../src/engine/scenario.js';
 import { SCENARIO_DONGZHUO } from '../../src/data/scenarios/s1-dongzhuo.js';
 import { REF_DATA } from '../../src/data/index.js';
-import { strategicRules, internalAffairsCommands } from '../../src/engine/ai/strategic.js';
+import { strategicRules, internalAffairsCommands, recruitmentCommands } from '../../src/engine/ai/strategic.js';
 import { factionGenerals } from '../../src/engine/selectors.js';
+import type { FactionStrategy } from '../../src/engine/types.js';
 
 describe('strategic AI', () => {
   it('always emits an endTurn command at the end', () => {
@@ -62,5 +63,60 @@ describe('internalAffairsCommands', () => {
     expect(forLuoyang.length).toBe(2);
     expect(forLuoyang.some((c) => c.kind === 'govern')).toBe(true);
     expect(forLuoyang.some((c) => c.kind === 'develop')).toBe(true);
+  });
+});
+
+describe('recruitmentCommands', () => {
+  it('recruits hardest at the staging city when expanding', () => {
+    const base = buildInitialState({
+      scenario: SCENARIO_DONGZHUO,
+      playerFactionId: 'liubei',
+      refData: REF_DATA,
+      seed: 8,
+    });
+    // Give Dong Zhuo's cities plenty of gold so affordability never blocks.
+    const cities = { ...base.cities };
+    for (const c of Object.values(cities)) {
+      if (c.factionId === 'dongzhuo') {
+        cities[c.id] = { ...c, money: 500000, garrison: 5000 };
+      }
+    }
+    const state = { ...base, cities };
+    const stagingId = Object.values(cities).find((c) => c.factionId === 'dongzhuo')!.id;
+    const strategy: FactionStrategy = {
+      posture: 'expand',
+      targetFactionId: 'caocao',
+      targetCityId: 'chenliu',
+      stagingCityId: stagingId,
+      updatedTurn: 0,
+    };
+    const cmds = recruitmentCommands(state, 'dongzhuo', strategy);
+    const staging = cmds.find(
+      (c) => c.kind === 'recruit' && c.cityId === stagingId,
+    );
+    expect(staging).toBeDefined();
+    expect(staging && staging.kind === 'recruit' && staging.count).toBe(2000);
+  });
+
+  it('skips cities that cannot afford even a small draft', () => {
+    const base = buildInitialState({
+      scenario: SCENARIO_DONGZHUO,
+      playerFactionId: 'liubei',
+      refData: REF_DATA,
+      seed: 8,
+    });
+    const cities = { ...base.cities };
+    for (const c of Object.values(cities)) {
+      if (c.factionId === 'dongzhuo') cities[c.id] = { ...c, money: 0 };
+    }
+    const state = { ...base, cities };
+    const strategy: FactionStrategy = {
+      posture: 'consolidate',
+      targetFactionId: null,
+      targetCityId: null,
+      stagingCityId: null,
+      updatedTurn: 0,
+    };
+    expect(recruitmentCommands(state, 'dongzhuo', strategy)).toEqual([]);
   });
 });
