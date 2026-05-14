@@ -206,6 +206,10 @@ export interface AgentContext {
 }
 
 export interface FactionAgent {
+  // Recompute the faction's standing strategy. Called by the turn loop
+  // before decideStrategic each month; the result is persisted into
+  // GameState.aiStrategies and passed back via AgentContext.strategy.
+  reassess(ctx: AgentContext, current: FactionStrategy | null): FactionStrategy;
   decideStrategic(ctx: AgentContext): StrategicCommand[];
   decideTactical(battle: Battle, ctx: AgentContext): TacticalCommand[];
 }

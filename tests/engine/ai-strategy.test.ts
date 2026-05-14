@@ -12,6 +12,7 @@ import {
 import { makeTopology, siegeOp, attackMarchOp } from './_ai-fixtures.js';
 import { factionPower, powerLeader } from '../../src/engine/selectors.js';
 import type { FactionStrategy } from '../../src/engine/types.js';
+import { makeDefaultAgent } from '../../src/engine/ai/index.js';
 
 describe('GameState.aiStrategies', () => {
   it('buildInitialState seeds an empty aiStrategies map', () => {
@@ -210,5 +211,17 @@ describe('reassessStrategy', () => {
       PERSONALITY_PRESETS.balanced,
     );
     expect(s.targetCityId).not.toBe('chenliu');
+  });
+});
+
+describe('makeDefaultAgent.reassess', () => {
+  it('produces a strategy for the faction', () => {
+    const state = makeTopology([
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 30000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 4000 },
+    ]);
+    const agent = makeDefaultAgent('dongzhuo', 'balanced');
+    const strategy = agent.reassess({ state, factionId: 'dongzhuo' }, null);
+    expect(['expand', 'consolidate', 'defend']).toContain(strategy.posture);
   });
 });
