@@ -11,8 +11,10 @@ import {
 } from '../../src/engine/ai/strategy.js';
 import { makeTopology, siegeOp, attackMarchOp } from './_ai-fixtures.js';
 import { factionPower, powerLeader } from '../../src/engine/selectors.js';
-import type { FactionStrategy } from '../../src/engine/types.js';
+import type { FactionAgent, FactionStrategy, GameState } from '../../src/engine/types.js';
 import { makeDefaultAgent } from '../../src/engine/ai/index.js';
+import { advanceMonth } from '../../src/engine/turn.js';
+import { tickDays } from '../../src/engine/pendingOp.js';
 
 describe('GameState.aiStrategies', () => {
   it('buildInitialState seeds an empty aiStrategies map', () => {
@@ -226,5 +228,43 @@ describe('makeDefaultAgent.reassess', () => {
     // A wrong factionId or params in the delegation would not produce this.
     expect(strategy.posture).toBe('expand');
     expect(strategy.targetCityId).toBe('chenliu');
+  });
+});
+
+function buildAgents(state: GameState): Record<string, FactionAgent> {
+  const agents: Record<string, FactionAgent> = {};
+  for (const f of Object.values(state.factions)) {
+    if (f.id === state.playerFactionId) continue;
+    agents[f.id] = makeDefaultAgent(f.id, f.personality);
+  }
+  return agents;
+}
+
+describe('AI lifecycle wiring', () => {
+  it('advanceMonth populates aiStrategies for non-player factions', () => {
+    let state = buildInitialState({
+      scenario: SCENARIO_DONGZHUO,
+      playerFactionId: 'caocao',
+      refData: REF_DATA,
+      seed: 12,
+    });
+    state = advanceMonth(state, buildAgents(state));
+    const aiFactionIds = Object.values(state.factions)
+      .filter((f) => f.id !== state.playerFactionId && f.alive)
+      .map((f) => f.id);
+    const populated = aiFactionIds.filter((id) => state.aiStrategies[id]);
+    expect(populated.length).toBeGreaterThan(0);
+  });
+
+  it('tickDays populates aiStrategies on month rollover', () => {
+    let state = buildInitialState({
+      scenario: SCENARIO_DONGZHUO,
+      playerFactionId: 'caocao',
+      refData: REF_DATA,
+      seed: 12,
+    });
+    const agents = buildAgents(state);
+    state = tickDays(state, 31, agents); // cross one month boundary
+    expect(Object.keys(state.aiStrategies).length).toBeGreaterThan(0);
   });
 });

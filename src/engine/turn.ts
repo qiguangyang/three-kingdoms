@@ -173,7 +173,13 @@ export function advanceMonth(
     if (faction.id === next.playerFactionId) continue;
     const agent = agents[faction.id];
     if (!agent) continue;
-    const ctx: AgentContext = { state: next, factionId: faction.id };
+    const current = next.aiStrategies[faction.id] ?? null;
+    const strategy = agent.reassess({ state: next, factionId: faction.id }, current);
+    next = {
+      ...next,
+      aiStrategies: { ...next.aiStrategies, [faction.id]: strategy },
+    };
+    const ctx: AgentContext = { state: next, factionId: faction.id, strategy };
     const cmds = agent.decideStrategic(ctx);
     for (const cmd of cmds) {
       next = applyCommand(next, faction.id, cmd);
