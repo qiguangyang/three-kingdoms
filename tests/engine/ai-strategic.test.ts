@@ -2,13 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { buildInitialState } from '../../src/engine/scenario.js';
 import { SCENARIO_DONGZHUO } from '../../src/data/scenarios/s1-dongzhuo.js';
 import { REF_DATA } from '../../src/data/index.js';
-import { strategicRules, internalAffairsCommands, recruitmentCommands, concentrationCommands } from '../../src/engine/ai/strategic.js';
+import {
+  strategicRules,
+  internalAffairsCommands,
+  recruitmentCommands,
+  concentrationCommands,
+  militaryCommands,
+} from '../../src/engine/ai/strategic.js';
 import { factionGenerals } from '../../src/engine/selectors.js';
 import type { FactionStrategy } from '../../src/engine/types.js';
 import { PERSONALITY_PRESETS } from '../../src/engine/ai/personality.js';
-import { makeTopology } from './_ai-fixtures.js';
-import { militaryCommands } from '../../src/engine/ai/strategic.js';
-import { siegeOp } from './_ai-fixtures.js';
+import { makeTopology, siegeOp } from './_ai-fixtures.js';
 
 describe('strategic AI', () => {
   it('always emits an endTurn command at the end', () => {
