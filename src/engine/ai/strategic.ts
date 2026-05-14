@@ -5,7 +5,9 @@ import type {
   AgentContext,
   StrategicCommand,
   Personality,
+  City,
   General,
+  GameState,
 } from '../types.js';
 import { PERSONALITY_PRESETS } from './personality.js';
 
@@ -139,4 +141,50 @@ function sumGeneralTroopsIn(ctx: AgentContext, cityId: string): number {
   return Object.values(ctx.state.generals)
     .filter((g) => g.locationCityId === cityId && g.status === 'active')
     .reduce((s, g) => s + g.troops, 0);
+}
+
+// ----- Command helpers (consumed by the rewritten strategicRules) -----
+
+type CityNeed = 'govern' | 'develop' | 'commerce' | 'search' | 'patrol';
+
+function hasWildGeneralIn(state: GameState, cityId: string): boolean {
+  return Object.values(state.generals).some(
+    (g) => g.factionId === null && g.locationCityId === cityId && g.status === 'active',
+  );
+}
+
+// Ordered list of what a city most needs, most urgent first. De-duplicated.
+function rankCityNeeds(state: GameState, city: City): CityNeed[] {
+  const needs: CityNeed[] = [];
+  if (city.loyalty < 50) needs.push('govern');
+  if (city.food < city.garrison * 3) needs.push('develop');
+  if (city.money < city.garrison) needs.push('commerce');
+  if (city.agriculture < 70) needs.push('develop');
+  if (city.commerce < 70) needs.push('commerce');
+  if (hasWildGeneralIn(state, city.id)) needs.push('search');
+  needs.push('patrol');
+  return [...new Set(needs)];
+}
+
+// Up to two distinct internal-affairs actions per owned city per month,
+// each run by a different stationed general where possible.
+export function internalAffairsCommands(
+  state: GameState,
+  factionId: string,
+  generals: General[],
+): StrategicCommand[] {
+  const cmds: StrategicCommand[] = [];
+  for (const city of citiesOf(state, factionId)) {
+    const inCity = generals
+      .filter((g) => g.locationCityId === city.id && g.status === 'active')
+      .sort((a, b) => b.stats.zheng - a.stats.zheng);
+    if (inCity.length === 0) continue;
+    const needs = rankCityNeeds(state, city);
+    const count = Math.min(2, needs.length);
+    for (let i = 0; i < count; i++) {
+      const general = inCity[i] ?? inCity[0]!;
+      cmds.push({ kind: needs[i]!, cityId: city.id, generalId: general.id });
+    }
+  }
+  return cmds;
 }

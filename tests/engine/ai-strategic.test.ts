@@ -3,6 +3,8 @@ import { buildInitialState } from '../../src/engine/scenario.js';
 import { SCENARIO_DONGZHUO } from '../../src/data/scenarios/s1-dongzhuo.js';
 import { REF_DATA } from '../../src/data/index.js';
 import { strategicRules } from '../../src/engine/ai/strategic.js';
+import { internalAffairsCommands } from '../../src/engine/ai/strategic.js';
+import { factionGenerals } from '../../src/engine/selectors.js';
 
 describe('strategic AI', () => {
   it('always emits an endTurn command at the end', () => {
@@ -33,5 +35,33 @@ describe('strategic AI', () => {
     };
     const cmds = strategicRules({ state: broken, factionId: 'dongzhuo' }, 'balanced');
     expect(cmds.some((c) => c.kind === 'govern' && c.cityId === 'luoyang')).toBe(true);
+  });
+});
+
+describe('internalAffairsCommands', () => {
+  it('emits up to two distinct internal-affairs actions for a needy city', () => {
+    const base = buildInitialState({
+      scenario: SCENARIO_DONGZHUO,
+      playerFactionId: 'liubei',
+      refData: REF_DATA,
+      seed: 7,
+    });
+    // Make Dong Zhuo's Luoyang both disloyal and short on food.
+    const luoyang = base.cities['luoyang']!;
+    const state = {
+      ...base,
+      cities: {
+        ...base.cities,
+        luoyang: { ...luoyang, loyalty: 12, food: 10, garrison: 9000 },
+      },
+    };
+    const generals = factionGenerals(state, 'dongzhuo');
+    const cmds = internalAffairsCommands(state, 'dongzhuo', generals);
+    const forLuoyang = cmds.filter(
+      (c) => 'cityId' in c && c.cityId === 'luoyang',
+    );
+    expect(forLuoyang.length).toBe(2);
+    expect(forLuoyang.some((c) => c.kind === 'govern')).toBe(true);
+    expect(forLuoyang.some((c) => c.kind === 'develop')).toBe(true);
   });
 });
