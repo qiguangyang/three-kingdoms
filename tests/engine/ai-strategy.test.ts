@@ -90,6 +90,17 @@ describe('threat detection', () => {
     state = { ...state, pendingOps: [op] };
     expect(isFactionThreatened(state, 'dongzhuo')).toBe(false);
   });
+
+  it('does not flag garrison-overmatch for a far (distance > 12) enemy neighbor', () => {
+    // chenliu is within ADJACENCY_THRESHOLD (manhattan 16 <= 18) but beyond
+    // DIRECT_BORDER_DISTANCE (16 > 12), so its big garrison is not an
+    // imminent threat — it's a multi-month march away, not on the doorstep.
+    const state = makeTopology([
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 2000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 24, y: 12 }, garrison: 9000 },
+    ]);
+    expect(isFactionThreatened(state, 'dongzhuo')).toBe(false);
+  });
 });
 
 describe('expansion target selection', () => {
