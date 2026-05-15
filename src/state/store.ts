@@ -1,7 +1,7 @@
 import { createStore } from 'zustand/vanilla';
 import type { StoreApi } from 'zustand/vanilla';
 import { makeDefaultAgent } from '../engine/ai/index.js';
-import type { FactionAgent, GameState, Scenario, StrategicCommand } from '../engine/types.js';
+import type { FactionAgent, GameState, LogEntry, Scenario, StrategicCommand } from '../engine/types.js';
 import { buildInitialState } from '../engine/scenario.js';
 import { advanceMonth, applyCommand, checkOutcome } from '../engine/turn.js';
 import { schedulePlayerCommand, tickDays } from '../engine/pendingOp.js';
@@ -36,6 +36,9 @@ export interface UIState {
   menuIndex: number;
   message: string | null;
   locale: Locale;
+  // Significant world events that occurred during the last time-advance.
+  // Rendered by <TurnDigest>; empty when nothing significant happened.
+  turnDigest: LogEntry[];
 }
 
 export interface SessionState {
@@ -51,6 +54,7 @@ const initialUI: UIState = {
   menuIndex: 0,
   message: null,
   locale: 'zh',
+  turnDigest: [],
 };
 
 export const gameStore: StoreApi<SessionState> = createStore<SessionState>(() => ({
@@ -60,6 +64,23 @@ export const gameStore: StoreApi<SessionState> = createStore<SessionState>(() =>
 }));
 
 // ----- Helpers used by the UI to drive the engine -----
+
+// Log message keys worth surfacing in the between-turn digest. Everything
+// else (routine internal-affairs results) stays in the news feed only.
+const DIGEST_KEYS = new Set<string>([
+  'event.cityFell',
+  'event.rebellion',
+  'event.attackerRetreated',
+  'event.guandongCoalition',
+  'event.qianduChangan',
+  'event.generalDied',
+  'event.defected',
+]);
+
+// Pure: significant log entries appended at or after `beforeLen`.
+export function extractDigest(beforeLen: number, log: LogEntry[]): LogEntry[] {
+  return log.slice(beforeLen).filter((e) => DIGEST_KEYS.has(e.key));
+}
 
 export function newGame(scenario: Scenario, playerFactionId: string, seed: number): void {
   const game = buildInitialState({
@@ -92,16 +113,20 @@ export function endTurn(): void {
 export function advanceDays(days: number): void {
   const { game, agents } = gameStore.getState();
   if (!game) return;
+  const logLenBefore = game.log.length;
   // Use the new tickDays which knows how to apply pending ops; AI
   // strategic decisions fire at the top of each month from inside
   // tickDays. Note: advanceMonth is no longer the canonical path.
   const next = tickDays(game, days, agents);
   void advanceMonth; // keep import alive for tests that use it directly
+  const digest = extractDigest(logLenBefore, next.log);
   const outcome = checkOutcome(next);
   gameStore.setState((s) => ({
     ...s,
     game: next,
-    ui: outcome ? { ...s.ui, screen: { kind: 'gameOver', outcome } } : s.ui,
+    ui: outcome
+      ? { ...s.ui, screen: { kind: 'gameOver', outcome }, turnDigest: digest }
+      : { ...s.ui, turnDigest: digest },
   }));
 }
 
@@ -173,6 +198,10 @@ export function setScreen(screen: Screen): void {
 
 export function setMessage(message: string | null): void {
   gameStore.setState((s) => ({ ...s, ui: { ...s.ui, message } }));
+}
+
+export function dismissTurnDigest(): void {
+  gameStore.setState((s) => ({ ...s, ui: { ...s.ui, turnDigest: [] } }));
 }
 
 export function setCursor(x: number, y: number): void {

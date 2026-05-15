@@ -37,7 +37,7 @@ describe('App router', () => {
     newGame(SCENARIO_DONGZHUO, 'caocao', 7);
     render(<App />);
     expect(screen.getByText('189年 9月')).toBeInTheDocument();
-    expect(screen.getByText('曹操')).toBeInTheDocument();
+    expect(screen.getAllByText('曹操').length).toBeGreaterThan(0);
   });
 
   it('toggleLocale: clicking 中/EN flips the language', () => {

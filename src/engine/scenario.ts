@@ -147,5 +147,6 @@ export function buildInitialState(opts: BuildInitialStateOptions): GameState {
     actionLog: [],
     pendingOps: [],
     nextOpId: 1,
+    aiStrategies: {},
   };
 }

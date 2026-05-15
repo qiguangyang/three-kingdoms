@@ -76,6 +76,22 @@ export interface City {
 
 export type Personality = 'active' | 'balanced' | 'turtle';
 
+// ----- AI strategy (goal-oriented faction planning) -----
+//
+// Each non-player faction carries a persistent strategy that survives
+// across months so it can run coherent multi-month campaigns. It lives in
+// GameState (not the agent) so it is deterministic and round-trips through
+// save/load.
+export type AiPosture = 'expand' | 'consolidate' | 'defend';
+
+export interface FactionStrategy {
+  posture: AiPosture;
+  targetFactionId: FactionId | null; // faction we are campaigning against
+  targetCityId: CityId | null; // specific enemy city we mass toward
+  stagingCityId: CityId | null; // our city where we concentrate troops
+  updatedTurn: number; // turn the strategy was last reassessed
+}
+
 export interface Faction {
   id: FactionId;
   name: LocalizedString;
@@ -184,9 +200,16 @@ export type TacticalCommand =
 export interface AgentContext {
   state: GameState;
   factionId: FactionId;
+  // Supplied by the turn loop, which calls agent.reassess() before
+  // agent.decideStrategic(). Absent only in direct unit-test calls.
+  strategy?: FactionStrategy;
 }
 
 export interface FactionAgent {
+  // Recompute the faction's standing strategy. Called by the turn loop
+  // before decideStrategic each month; the result is persisted into
+  // GameState.aiStrategies and passed back via AgentContext.strategy.
+  reassess(ctx: AgentContext, current: FactionStrategy | null): FactionStrategy;
   decideStrategic(ctx: AgentContext): StrategicCommand[];
   decideTactical(battle: Battle, ctx: AgentContext): TacticalCommand[];
 }
@@ -263,6 +286,10 @@ export interface GameState {
   pendingOps: PendingOp[];
   // Monotonic counter for unique op ids.
   nextOpId: number;
+  // Per-faction AI strategy, keyed by FactionId. Player faction has no
+  // entry. Empty at scenario start; populated by the turn loop's
+  // reassess step. See engine/ai/strategy.ts.
+  aiStrategies: Record<FactionId, FactionStrategy>;
 }
 
 // ----- Persistent-game operations -----

@@ -267,6 +267,22 @@ export type MessageKey =
   // Generic
   | 'common.units'
   | 'common.gold'
-  | 'common.grain';
+  | 'common.grain'
+
+  // World news feed
+  | 'news.heading'
+  | 'news.filter.all'
+  | 'news.filter.mine'
+  | 'news.filter.world'
+  | 'news.empty'
+
+  // Faction power panel
+  | 'faction.rankHeading'
+  | 'faction.you'
+  | 'faction.eliminated'
+
+  // Between-turn digest
+  | 'digest.heading'
+  | 'digest.dismiss';
 
 export type MessageCatalog = Record<MessageKey, string>;

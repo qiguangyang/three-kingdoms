@@ -108,6 +108,13 @@ export function loadFromSlot(slot: string, cfg: PersistenceConfig = {}): SaveFil
   if (parsed.version !== SAVE_FORMAT_VERSION) {
     throw new Error(`Unsupported save format version: ${parsed.version}`);
   }
+  // Back-compat: saves written before aiStrategies existed load without it.
+  // SAVE_FORMAT_VERSION is intentionally not bumped — an empty map is a
+  // complete, lossless default for this field, so old saves stay loadable
+  // with no real migration needed.
+  if (!parsed.state.aiStrategies) {
+    parsed.state.aiStrategies = {};
+  }
   return parsed;
 }
 

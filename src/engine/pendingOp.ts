@@ -279,7 +279,15 @@ function runAiMonthlyDecisions(
     if (faction.id === next.playerFactionId) continue;
     const agent = agents[faction.id];
     if (!agent) continue;
-    const ctx: AgentContext = { state: next, factionId: faction.id };
+    // Reassess this faction's standing strategy, persist it, then let the
+    // agent translate the strategy into concrete commands.
+    const current = next.aiStrategies[faction.id] ?? null;
+    const strategy = agent.reassess({ state: next, factionId: faction.id }, current);
+    next = {
+      ...next,
+      aiStrategies: { ...next.aiStrategies, [faction.id]: strategy },
+    };
+    const ctx: AgentContext = { state: next, factionId: faction.id, strategy };
     const cmds = agent.decideStrategic(ctx);
     for (const cmd of cmds) {
       next = schedulePlayerCommand(next, faction.id, cmd);
@@ -371,7 +379,7 @@ function applyCompletedMarch(
         : { zh: '?', en: '?' },
       from: from.name,
       to: to.name,
-    });
+    }, op.factionId);
     return next;
   }
 
@@ -478,6 +486,7 @@ function addLog(
   state: GameState,
   key: string,
   vars: Record<string, unknown>,
+  factionId?: FactionId,
 ): GameState {
   const entry: LogEntry = {
     turn: state.turn,
@@ -485,6 +494,7 @@ function addLog(
     month: state.month,
     key,
     vars: vars as LogEntry['vars'],
+    factionId,
   };
   return { ...state, log: [...state.log, entry] };
 }

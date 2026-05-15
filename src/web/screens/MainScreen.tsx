@@ -4,6 +4,7 @@ import { selectGame, selectLocale } from '../../state/selectors.js';
 import {
   advanceDays,
   commitPrecomputedGame,
+  dismissTurnDigest,
   dispatchPlayer,
   endTurn,
   gameStore,
@@ -15,7 +16,9 @@ import {
 import { MapView } from '../components/MapView.js';
 import { StatusBar } from '../components/StatusBar.js';
 import { Sidebar } from '../components/Sidebar.js';
-import { EventLog } from '../components/EventLog.js';
+import { WorldNewsFeed } from '../components/WorldNewsFeed.js';
+import { FactionPanel } from '../components/FactionPanel.js';
+import { TurnDigest } from '../components/TurnDigest.js';
 import { CommandMenu, type MenuOption } from '../components/CommandMenu.js';
 import { Dialog } from '../components/Dialog.js';
 import { adjacentCities } from '../../engine/map.js';
@@ -60,6 +63,7 @@ export const MainScreen: React.FC = () => {
   useSession(selectLocale);
   const game = useSession(selectGame);
   const selectedCityId = useSession((s) => s.ui.selectedCityId);
+  const turnDigest = useSession((s) => s.ui.turnDigest);
   const [modal, setModal] = useState<Modal>({ kind: 'none' });
   // Derive map overlays from the engine's pendingOps. The map shows
   // every march in flight and every city under siege so the player can
@@ -343,8 +347,9 @@ export const MainScreen: React.FC = () => {
               </div>
             )}
           </div>
-          <div className="px-3 py-2">
-            <EventLog game={game} />
+          <div className="flex flex-col gap-2 px-3 py-2">
+            <WorldNewsFeed game={game} />
+            <FactionPanel game={game} />
           </div>
         </div>
         <Sidebar
@@ -567,6 +572,7 @@ export const MainScreen: React.FC = () => {
           {modal.body}
         </Dialog>
       )}
+      <TurnDigest entries={turnDigest} onDismiss={dismissTurnDigest} />
     </div>
   );
 };

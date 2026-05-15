@@ -156,11 +156,12 @@ describe('combat flow', () => {
         guanyu: { ...state.generals['guanyu']!, status: 'wounded', locationCityId: null },
       },
     };
+    // Use no AI agents for this test — it is focused on the wound-recovery
+    // mechanic, not on AI conquest. Passing active agents caused other
+    // factions to conquer liubei's sole city (via starvation-induced
+    // rebellion after heavy attacks), which would make the "re-stationed
+    // at a faction-owned city" assertion vacuously fail.
     const agents: Record<string, FactionAgent> = {};
-    for (const f of Object.values(state.factions)) {
-      if (f.id === 'liubei') continue;
-      agents[f.id] = makeDefaultAgent(f.id, f.personality);
-    }
     let recovered = false;
     for (let i = 0; i < 12 && !recovered; i++) {
       state = advanceMonth(state, agents);

@@ -1,4 +1,4 @@
-import type { City, Faction, GameState, General, GeneralId, FactionId } from './types.js';
+import type { City, Faction, GameState, General, GeneralId, FactionId, LocalizedString } from './types.js';
 import { citiesOf } from './map.js';
 
 // Derived queries on GameState. All pure, side-effect free.
@@ -55,4 +55,58 @@ export function hasVictory(state: GameState, factionId: FactionId): boolean {
   const owned = citiesOf(state, factionId).length;
   const total = Object.keys(state.cities).length;
   return owned === total;
+}
+
+// Composite power score for a faction: troops plus 5000 per city. Used by
+// both the AI's target selection and the UI's faction power panel so the
+// two agree on "who is winning".
+export function factionPower(state: GameState, factionId: FactionId): number {
+  const totals = factionTotals(state, factionId);
+  return totals.troops + totals.cities * 5000;
+}
+
+export interface FactionRanking {
+  factionId: FactionId;
+  name: LocalizedString;
+  color: string;
+  alive: boolean;
+  cities: number;
+  generals: number;
+  troops: number;
+  power: number;
+  rank: number;
+}
+
+// Every faction ranked by power, strongest first. Reuses factionPower so
+// the panel reflects exactly what the AI's target selection "sees".
+export function factionRankings(state: GameState): FactionRanking[] {
+  const rows = Object.values(state.factions).map((f) => {
+    const totals = factionTotals(state, f.id);
+    return {
+      factionId: f.id,
+      name: f.name,
+      color: f.color,
+      alive: f.alive,
+      cities: totals.cities,
+      generals: totals.generals,
+      troops: totals.troops,
+      power: factionPower(state, f.id),
+    };
+  });
+  rows.sort((a, b) => b.power - a.power);
+  return rows.map((r, i) => ({ ...r, rank: i + 1 }));
+}
+
+// The strongest alive faction — the one rivals want to gang up on.
+export function powerLeader(state: GameState): FactionId | null {
+  let best: FactionId | null = null;
+  let bestPower = -1;
+  for (const f of aliveFactions(state)) {
+    const p = factionPower(state, f.id);
+    if (p > bestPower) {
+      bestPower = p;
+      best = f.id;
+    }
+  }
+  return best;
 }

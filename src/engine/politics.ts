@@ -10,7 +10,7 @@ import {
   SEARCH_ZHENG_WEIGHT,
 } from './constants.js';
 import { rollChance, rollInt } from './rng.js';
-import type { GameState, GeneralId, LocalizedString, LogEntry } from './types.js';
+import type { FactionId, GameState, GeneralId, LocalizedString, LogEntry } from './types.js';
 
 // Each politics command is a pure (state, args) => state function. It
 // records a LogEntry but does not advance the month — the turn loop owns
@@ -24,6 +24,7 @@ function addLog(
   state: GameState,
   key: string,
   vars?: Record<string, string | number | LocalizedString>,
+  factionId?: FactionId,
 ): GameState {
   const entry: LogEntry = {
     turn: state.turn,
@@ -31,6 +32,7 @@ function addLog(
     month: state.month,
     key,
     vars,
+    factionId,
   };
   return { ...state, log: [...state.log, entry] };
 }
@@ -49,7 +51,7 @@ export function develop(state: GameState, args: CommandArgs): GameState {
   const gain = Math.max(1, Math.floor(2 + gen.stats.zheng / 12));
   const updated = { ...city, agriculture: clamp(city.agriculture + gain, 0, 100) };
   let next: GameState = { ...state, cities: { ...state.cities, [city.id]: updated } };
-  next = addLog(next, 'result.developed', { city: city.name, amount: gain });
+  next = addLog(next, 'result.developed', { city: city.name, amount: gain }, city.factionId ?? undefined);
   return next;
 }
 
@@ -61,7 +63,7 @@ export function commerce(state: GameState, args: CommandArgs): GameState {
   const gain = Math.max(1, Math.floor(2 + gen.stats.zheng / 12));
   const updated = { ...city, commerce: clamp(city.commerce + gain, 0, 100) };
   let next: GameState = { ...state, cities: { ...state.cities, [city.id]: updated } };
-  next = addLog(next, 'result.commerceUp', { city: city.name, amount: gain });
+  next = addLog(next, 'result.commerceUp', { city: city.name, amount: gain }, city.factionId ?? undefined);
   return next;
 }
 
@@ -73,7 +75,7 @@ export function govern(state: GameState, args: CommandArgs): GameState {
   const gain = Math.max(1, Math.floor(3 + gen.stats.zheng / 10));
   const updated = { ...city, loyalty: clamp(city.loyalty + gain, 0, 100) };
   let next: GameState = { ...state, cities: { ...state.cities, [city.id]: updated } };
-  next = addLog(next, 'result.governed', { city: city.name, amount: gain });
+  next = addLog(next, 'result.governed', { city: city.name, amount: gain }, city.factionId ?? undefined);
   return next;
 }
 
@@ -89,7 +91,7 @@ export function patrol(state: GameState, args: CommandArgs): GameState {
     loyalty: clamp(city.loyalty + 1, 0, 100),
   };
   let next: GameState = { ...state, cities: { ...state.cities, [city.id]: updated } };
-  next = addLog(next, 'result.patrolled', { city: city.name });
+  next = addLog(next, 'result.patrolled', { city: city.name }, city.factionId ?? undefined);
   return next;
 }
 
@@ -142,24 +144,24 @@ export function search(state: GameState, args: CommandArgs): GameState {
     (g) => g.factionId === null && g.locationCityId === city.id && g.status === 'active',
   );
   if (!wild) {
-    return addLog(state, 'result.searched', { city: city.name });
+    return addLog(state, 'result.searched', { city: city.name }, city.factionId ?? undefined);
   }
   const prob = SEARCH_BASE_PROB + gen.stats.zheng * SEARCH_ZHENG_WEIGHT;
   const { hit, state: rngState } = rollChance(state.rngState, prob);
   if (!hit) {
-    return addLog({ ...state, rngState }, 'result.searched', { city: city.name });
+    return addLog({ ...state, rngState }, 'result.searched', { city: city.name }, city.factionId ?? undefined);
   }
   // Tribute Easter eggs only respond to specific searcher/city combinations.
   if (wild.id === 'tongxiao' && (gen.id !== 'mizhu' || city.id !== 'yunnan' || state.month !== 10)) {
-    return addLog({ ...state, rngState }, 'result.searched', { city: city.name });
+    return addLog({ ...state, rngState }, 'result.searched', { city: city.name }, city.factionId ?? undefined);
   }
   if (wild.id === 'nanfang' && (gen.id !== 'mizhu' || city.id !== 'yunnan' || state.month !== 10)) {
-    return addLog({ ...state, rngState }, 'result.searched', { city: city.name });
+    return addLog({ ...state, rngState }, 'result.searched', { city: city.name }, city.factionId ?? undefined);
   }
 
   const factionId = gen.factionId;
   if (!factionId) {
-    return addLog({ ...state, rngState }, 'result.searched', { city: city.name });
+    return addLog({ ...state, rngState }, 'result.searched', { city: city.name }, city.factionId ?? undefined);
   }
   const updatedWild = { ...wild, factionId, locationCityId: city.id };
   const updatedCity = { ...city, generals: [...city.generals, wild.id] };
@@ -179,7 +181,7 @@ export function search(state: GameState, args: CommandArgs): GameState {
     general: gen.name,
     city: city.name,
     target: wild.name,
-  });
+  }, gen.factionId ?? undefined);
   return next;
 }
 
@@ -206,7 +208,7 @@ export function recruit(
     city: city.name,
     amount: actual,
     garrison: updated.garrison,
-  });
+  }, city.factionId ?? undefined);
   return next;
 }
 
@@ -243,6 +245,7 @@ export function applyMonthlySettlement(state: GameState): GameState {
         month: state.month,
         key: 'event.rebellion',
         vars: { city: city.name },
+        factionId: city.factionId ?? undefined,
       });
     } else {
       newCities[city.id] = {
@@ -325,6 +328,7 @@ export function applyYearlyAging(state: GameState): GameState {
           month: next.month,
           key: 'event.generalDied',
           vars: { general: updated.name, age: updated.age },
+          factionId: updated.factionId ?? undefined,
         });
       }
     }
