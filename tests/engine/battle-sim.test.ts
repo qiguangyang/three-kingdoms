@@ -62,7 +62,7 @@ describe('stepBattle — movement + melee', () => {
     const { battle: next } = stepBattle({ battle: b, commands: [] });
     const a = next.units.find((u) => u.id === 'a')!;
     const e = next.units.find((u) => u.id === 'e')!;
-    expect(6000 - a.troops).toBeLessThan(2000); // attacker barely dented
+    expect(12000 - a.troops).toBeLessThan(2000); // attacker barely dented (<~17% loss)
     expect(e.troops).toBeLessThan(2000); // defender mauled
   });
 
