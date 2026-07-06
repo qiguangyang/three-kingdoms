@@ -9,3 +9,4 @@ export const selectCursor = (s: SessionState) => s.ui.cursor;
 export const selectLocale = (s: SessionState) => s.ui.locale;
 export const selectMessage = (s: SessionState) => s.ui.message;
 export const selectMenuIndex = (s: SessionState) => s.ui.menuIndex;
+export const selectBattle = (s: SessionState) => s.battle;
