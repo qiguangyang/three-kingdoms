@@ -10,6 +10,7 @@ import { GameOverScreen } from './screens/GameOverScreen.js';
 import { SaveLoadScreen } from './screens/SaveLoadScreen.js';
 import { AboutScreen } from './screens/AboutScreen.js';
 import { GeneralsScreen } from './screens/GeneralsScreen.js';
+import { BattleScreen } from './battle/BattleScreen.js';
 
 export const App: React.FC = () => {
   // On first mount, try to restore the continuous autosave so a browser
@@ -51,6 +52,9 @@ export const App: React.FC = () => {
       break;
     case 'generals':
       body = <GeneralsScreen />;
+      break;
+    case 'battle':
+      body = <BattleScreen />;
       break;
     default:
       body = null;
