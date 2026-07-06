@@ -160,6 +160,11 @@ export interface BattleUnit {
   hasActed: boolean;
   state: BattleUnitState; // fielded | reserve | routing | gone
   formationRole: FormationRole; // van | center | rear | flank
+  // Leadership snapshot copied from the commanding general at createBattle
+  // time, so stepBattle stays pure (no GameState lookup). Absent for garrison
+  // blocks / unled mobs.
+  wu?: number; // 武力
+  command?: number; // 统率 (tong)
 }
 
 export interface Battle {

@@ -73,6 +73,7 @@ export function createBattle(state: GameState, input: BattleSetupInput): Battle 
       units.push({
         id: mkId(), generalId: g.id, factionId: input.attackerFactionId,
         troops: atkShares[i] ?? 0, troopType: g.troopType,
+        wu: g.stats.wu, command: g.stats.tong,
         pos: { x: Math.min(BATTLE_WIDTH - 1, spread * (i + 1)), y: atkY },
         morale: 100, hasActed: false, state: 'fielded',
         formationRole: ROLE_BY_TROOP[g.troopType],
@@ -88,6 +89,7 @@ export function createBattle(state: GameState, input: BattleSetupInput): Battle 
     units.push({
       id: mkId(), generalId: g.id, factionId: input.defenderFactionId,
       troops: g.troops, troopType: g.troopType,
+      wu: g.stats.wu, command: g.stats.tong,
       pos: { x: Math.min(BATTLE_WIDTH - 1, defSpread * (i + 1)), y: defY },
       morale: 100, hasActed: false, state: 'fielded',
       formationRole: ROLE_BY_TROOP[g.troopType],
