@@ -6,3 +6,4 @@ export * as movement from './movement.js';
 export * as selectors from './selectors.js';
 export { buildInitialState } from './scenario.js';
 export type { ReferenceData, BuildInitialStateOptions } from './scenario.js';
+export * as battle from './battle/index.js';
