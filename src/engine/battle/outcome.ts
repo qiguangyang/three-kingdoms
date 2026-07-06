@@ -45,14 +45,22 @@ export function battleToResult(state: GameState, battle: Battle): QuickBattleRes
     return { state, attackerWon: false, attackerCasualties: 0, defenderCasualties: 0, log: [] };
   }
 
-  // Winner: attacker wins iff it still has fighting troops and the defender has
-  // none (mirrors the sim's end-check).
-  const atkTroops = sumTroops(battle, battle.attackerFactionId);
-  const defTroops = sumTroops(battle, battle.defenderFactionId);
-  const timedOut = battle.daysElapsed >= BATTLE_DAY_LIMIT;
-  const attackerWon = defTroops <= 0 && atkTroops > 0 && !(timedOut && defTroops > 0);
+  // Surviving troops for a general's block(s), reconstructed from the finished
+  // battle's units (a general has exactly one block, but sum defensively).
+  const survOf = (gid: string): number =>
+    battle.units.filter((u) => u.generalId === gid).reduce((n, u) => n + Math.max(0, u.troops), 0);
+  // Surviving defender garrison blocks (unled units: generalId === '').
+  const survGarrison = battle.units
+    .filter((u) => u.factionId === battle.defenderFactionId && !u.generalId)
+    .reduce((n, u) => n + Math.max(0, u.troops), 0);
 
-  // Casualties = starting - surviving, reconstructed from the units.
+  // Winner: decided on FIELDED-ONLY troops (a never-committed reserve does not
+  // keep a city in contention). When defTroops<=0 the timeout term is moot, so
+  // the win test is simply "defender's field is gone, attacker still has one".
+  const atkFielded = sumTroops(battle, battle.attackerFactionId);
+  const defFielded = sumTroops(battle, battle.defenderFactionId);
+  const attackerWon = defFielded <= 0 && atkFielded > 0;
+
   const attackerGenerals = battle.units
     .filter((u) => u.factionId === battle.attackerFactionId && u.generalId)
     .map((u) => state.generals[u.generalId])
@@ -61,12 +69,16 @@ export function battleToResult(state: GameState, battle: Battle): QuickBattleRes
     .map((id) => state.generals[id])
     .filter((g): g is General => Boolean(g));
 
-  // We do not carry pre-battle totals on the finished battle, so derive
-  // casualties from the city + committed-force snapshot in `state`.
-  const committedAtk = attackerGenerals.reduce((n, g) => n + g.troops, 0) || atkTroops;
-  const attackerCasualties = Math.max(0, committedAtk - atkTroops);
-  const defStart = city.garrison + defenderGenerals.reduce((n, g) => n + g.troops, 0);
-  const defenderCasualties = Math.max(0, defStart - defTroops);
+  // Casualties = committed start - surviving, over ALL units (fielded+reserve),
+  // against the battle's recorded start totals when available.
+  const atkSurv = battle.units
+    .filter((u) => u.factionId === battle.attackerFactionId)
+    .reduce((n, u) => n + Math.max(0, u.troops), 0);
+  const defSurv = battle.units
+    .filter((u) => u.factionId === battle.defenderFactionId)
+    .reduce((n, u) => n + Math.max(0, u.troops), 0);
+  const attackerCasualties = Math.max(0, (battle.startTroops?.attacker ?? atkSurv) - atkSurv);
+  const defenderCasualties = Math.max(0, (battle.startTroops?.defender ?? defSurv) - defSurv);
 
   const updatedCities = { ...state.cities };
   const updatedGenerals = { ...state.generals };
@@ -79,13 +91,14 @@ export function battleToResult(state: GameState, battle: Battle): QuickBattleRes
       ...updatedCity,
       factionId: battle.attackerFactionId,
       loyalty: Math.max(20, Math.floor(updatedCity.loyalty * 0.6)),
+      garrison: survGarrison,
       generals: attackerGenerals.map((g) => g.id),
     };
     for (const g of defenderGenerals) {
-      updatedGenerals[g.id] = { ...g, locationCityId: null, status: 'wounded' };
+      updatedGenerals[g.id] = { ...g, locationCityId: null, status: 'wounded', troops: survOf(g.id) };
     }
     for (const g of attackerGenerals) {
-      updatedGenerals[g.id] = { ...g, locationCityId: city.id };
+      updatedGenerals[g.id] = { ...g, locationCityId: city.id, troops: survOf(g.id) };
     }
     const faction = state.factions[battle.attackerFactionId];
     log.push({
@@ -94,13 +107,19 @@ export function battleToResult(state: GameState, battle: Battle): QuickBattleRes
       factionId: battle.attackerFactionId,
     });
   } else {
-    // Attackers retreat to a friendly neighbor of the target, if any.
+    // Attackers retreat to a friendly neighbor of the target, if any, at their
+    // surviving strength. The defender keeps the city with its post-siege
+    // garrison + surviving generals.
     const nearbyFriendly = adjacentCities(state, city.id).find((c) => c.factionId === battle.attackerFactionId);
     for (const g of attackerGenerals) {
       if (g.status === 'active') {
-        updatedGenerals[g.id] = { ...g, locationCityId: nearbyFriendly ? nearbyFriendly.id : null };
+        updatedGenerals[g.id] = { ...g, locationCityId: nearbyFriendly ? nearbyFriendly.id : null, troops: survOf(g.id) };
       }
     }
+    for (const g of defenderGenerals) {
+      updatedGenerals[g.id] = { ...g, troops: survOf(g.id) };
+    }
+    updatedCity = { ...updatedCity, garrison: survGarrison };
     if (nearbyFriendly) {
       updatedCities[nearbyFriendly.id] = {
         ...nearbyFriendly,

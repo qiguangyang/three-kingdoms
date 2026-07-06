@@ -177,6 +177,7 @@ export interface Battle {
   seed: number; // battle terrain/rng seed (derived from GameState.rngState)
   rngCursor: number; // advances as the sim rolls; written back on resolve
   wind?: { dir: { x: number; y: number }; strength: number }; // for fire gambit
+  startTroops?: { attacker: number; defender: number }; // committed totals at battle start, for casualty accounting
   log: LogEntry[];
 }
 

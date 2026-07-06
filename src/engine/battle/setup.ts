@@ -125,6 +125,10 @@ export function createBattle(state: GameState, input: BattleSetupInput): Battle 
     field,
     seed: field.seed,
     rngCursor: field.seed,
+    startTroops: {
+      attacker: input.attackingTroops,
+      defender: city.garrison + defenderGenerals.reduce((n, g) => n + g.troops, 0),
+    },
     log: [],
   };
 }
