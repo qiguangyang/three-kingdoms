@@ -24,7 +24,6 @@ import { adjacentCities } from '../../engine/map.js';
 import { factionGenerals } from '../../engine/selectors.js';
 import type { City, GameState, General, StrategicCommand } from '../../engine/types.js';
 import { pickName, t } from '../../i18n/locale.js';
-import { BattleReport, type BattleReportData } from '../components/BattleReport.js';
 import { ActionResult, type ActionResultData, type StatDelta } from '../components/ActionResult.js';
 import { DefectDialog } from '../components/DefectDialog.js';
 import { TransferDialog } from '../components/TransferDialog.js';
@@ -36,7 +35,6 @@ type Modal =
   | { kind: 'attackTarget'; from: City; targets: City[] }
   | { kind: 'help' }
   | { kind: 'info'; title: string; body: React.ReactNode }
-  | { kind: 'battleReport'; data: BattleReportData }
   | { kind: 'actionResult'; data: ActionResultData }
   | { kind: 'defect'; target: General }
   | { kind: 'transfer'; general: General }
@@ -102,19 +100,6 @@ export const MainScreen: React.FC = () => {
     for (const [cityId, info] of byCity) out.push({ cityId, ...info });
     return out;
   }, [game]);
-  // Live map overlay state for an in-progress battle animation. Kept out
-  // of the modal union because it would update every frame and force a
-  // heavy re-render of the modal subtree. Currently unset: the persistent-
-  // game attack flow routes through the battle screen (see schedulePlayer
-  // + advanceDays) rather than a one-shot animation modal.
-  const [marchLine, setMarchLine] = useState<{
-    fromCityId: string;
-    toCityId: string;
-    progress: number;
-    faded: boolean;
-  } | null>(null);
-  const [battleCityId, setBattleCityId] = useState<string | null>(null);
-
   // Step the selection to the next city in a given compass direction. If no
   // city is selected, pick the player's capital (first owned city) so the
   // very first arrow press always lands somewhere useful.
@@ -306,8 +291,6 @@ export const MainScreen: React.FC = () => {
               game={game}
               selectedCityId={selectedCityId}
               onSelectCity={setSelectedCity}
-              battleCityId={battleCityId}
-              marchLine={marchLine}
               pendingMarches={pendingMarches}
               siegeCityIds={siegeCityIds}
               internalOps={internalOpsByCity}
@@ -422,10 +405,6 @@ export const MainScreen: React.FC = () => {
             setModal({ kind: 'none' });
           }}
         />
-      )}
-
-      {modal.kind === 'battleReport' && (
-        <BattleReport data={modal.data} onClose={() => setModal({ kind: 'none' })} />
       )}
 
       {modal.kind === 'actionResult' && (
