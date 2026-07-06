@@ -1,0 +1,25 @@
+import { describe, expect, it } from 'vitest';
+import { t, setLocale } from '../../src/i18n/locale.js';
+
+const KEYS = [
+  'battle.heading', 'battle.morale', 'battle.advanceDay', 'battle.play', 'battle.pause',
+  'battle.quickResolve', 'battle.speed', 'battle.yourOrders', 'battle.gambits',
+  'battle.commitReserves', 'battle.charge', 'battle.hold', 'battle.advance', 'battle.finish',
+  'battle.victoryTitle', 'battle.defeatTitle', 'battle.gambit.cavalryCharge',
+  'battle.gambit.fireAttack', 'battle.gambit.duelChallenge', 'battle.gambit.fordCrossing',
+  'battle.gambit.ambush',
+] as const;
+
+describe('battle screen i18n keys', () => {
+  it('resolve to non-empty, distinct strings in both locales', () => {
+    for (const loc of ['zh', 'en'] as const) {
+      setLocale(loc);
+      for (const k of KEYS) {
+        const v = t(k as never);
+        expect(v, `${loc} ${k}`).toBeTruthy();
+        expect(v, `${loc} ${k} not resolved`).not.toBe(k);
+      }
+    }
+    setLocale('zh');
+  });
+});
