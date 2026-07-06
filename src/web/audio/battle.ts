@@ -179,3 +179,37 @@ export function playRetreat(): void {
     glideTo: 80,
   });
 }
+
+// Rising rush for a cavalry charge.
+export function playCharge(): void {
+  if (isMuted()) return;
+  playTone({ freq: 160, type: 'sawtooth', durationMs: 260, peakGain: 0.14, attackMs: 8, releaseMs: 120, glideTo: 320 });
+}
+
+// Short hiss cluster for an arrow volley.
+export function playVolley(): void {
+  if (isMuted()) return;
+  for (const offsetMs of [0, 40, 80]) {
+    setTimeout(() => playTone({ freq: 1400, type: 'triangle', durationMs: 90, peakGain: 0.05, attackMs: 2, releaseMs: 70, glideTo: 700 }), offsetMs);
+  }
+}
+
+// Low roar for a fire attack.
+export function playFire(): void {
+  if (isMuted()) return;
+  playTone({ freq: 90, type: 'sawtooth', durationMs: 420, peakGain: 0.16, attackMs: 20, releaseMs: 260, glideTo: 60 });
+  playTone({ freq: 300, type: 'square', durationMs: 300, peakGain: 0.05, attackMs: 10, releaseMs: 200, glideTo: 140 });
+}
+
+// Two-note clash for a general's duel.
+export function playDuel(): void {
+  if (isMuted()) return;
+  playTone({ freq: 990, type: 'square', durationMs: 120, peakGain: 0.1, attackMs: 2, releaseMs: 90, glideTo: 660 });
+  setTimeout(() => playTone({ freq: 1240, type: 'square', durationMs: 140, peakGain: 0.1, attackMs: 2, releaseMs: 110, glideTo: 520 }), 130);
+}
+
+// Falling tone for a rout.
+export function playRout(): void {
+  if (isMuted()) return;
+  playTone({ freq: 420, type: 'sine', durationMs: 380, peakGain: 0.12, attackMs: 6, releaseMs: 260, glideTo: 90 });
+}
