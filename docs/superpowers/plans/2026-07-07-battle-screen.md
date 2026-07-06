@@ -528,7 +528,6 @@ export function generateField(city: City, seed: number): BattleField {
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const d2 = (x - cx) ** 2 + (y - cy) ** 2;
-        heights[idx(x, y)]! + 0; // no-op to satisfy strict indexing lint
         heights[idx(x, y)] = Math.min(1, (heights[idx(x, y)] ?? 0) + amp * Math.exp(-d2 / (2 * sigma * sigma)));
       }
     }
@@ -966,7 +965,7 @@ describe('stepBattle — movement + melee', () => {
     const { battle: next } = stepBattle({ battle: b, commands: [] });
     const a = next.units.find((u) => u.id === 'a')!;
     const e = next.units.find((u) => u.id === 'e')!;
-    expect(6000 - a.troops).toBeLessThan(2000); // attacker barely dented
+    expect(12000 - a.troops).toBeLessThan(2000); // attacker barely dented (<~17% loss)
     expect(e.troops).toBeLessThan(2000); // defender mauled
   });
 
@@ -1006,7 +1005,6 @@ import { rollInt } from '../rng.js';
 import type {
   Battle,
   BattleUnit,
-  General,
   TacticalCommand,
   Terrain,
 } from '../types.js';
@@ -1068,13 +1066,6 @@ function nearestEnemy(u: BattleUnit, units: BattleUnit[]): BattleUnit | undefine
   return best;
 }
 
-// Leadership multiplier from the commanding general (mirrors combat.ts).
-function leadership(general: General | undefined): number {
-  if (!general) return 0.5; // unled mob
-  const { wu, tong, zhi } = general.stats;
-  return (wu * 0.4 + tong * 0.5 + zhi * 0.1) / 50;
-}
-
 // One step of movement toward `target`, capped by the unit's daily range and
 // blocked by impassable cells (deep river for land units).
 function stepToward(battle: Battle, u: BattleUnit, target: Vec2): Vec2 {
@@ -1106,14 +1097,6 @@ export function stepBattle(input: StepInput): StepResult {
   // Deep-clone the units we will mutate (immutable outward contract).
   let units: BattleUnit[] = input.battle.units.map((u) => ({ ...u, pos: { ...u.pos }, hasActed: false }));
   const byId = (id: string): BattleUnit | undefined => units.find((u) => u.id === id);
-  const generalOf = (u: BattleUnit): General | undefined =>
-    u.generalId ? (input.battle as unknown as { _g?: never }) && undefined : undefined;
-  // We look generals up from GameState at power time via a closure captured in
-  // outcome/session; within pure stepBattle we approximate leadership using a
-  // baseline when no general stats are supplied. To keep stepBattle pure and
-  // self-contained, general stats are folded into the unit at setup time is a
-  // future optimization; here we treat generalId presence as a small bonus.
-  void generalOf;
 
   // --- Order map: unitId -> command (explicit orders win; default otherwise).
   const orders = new Map<string, TacticalCommand>();
@@ -1230,7 +1213,7 @@ export function stepBattle(input: StepInput): StepResult {
 }
 ```
 
-Note: the `generalOf`/`leadership` scaffolding above is intentionally minimal — full general-stat power (looking up `state.generals`) is folded in at Task 0.5 by carrying a `generalStats` snapshot on each `BattleUnit` at `createBattle` time. For Task 0.4, led-vs-mob is approximated by the `1.0` vs `0.6` factor, which satisfies the directional tests. **Remove the dead `leadership`/`generalOf` stubs when Task 0.5 introduces the real stat model.**
+Note: in Task 0.4, led-vs-mob strength is approximated by the inline `1.0` vs `0.6` factor inside `meleePower`, which satisfies the directional tests. Task 0.5 replaces this with a real general-stat model (a `wu`/`command` snapshot carried on each `BattleUnit`), so `meleePower` becomes stat-aware there.
 
 - [ ] **Step 4: Append the barrel export** in `src/engine/battle/index.ts`:
 
@@ -1338,8 +1321,8 @@ Expected: FAIL on the volley/duel/morale cases (no `wu` field, no ranged/duel/mo
   // Leadership snapshot copied from the commanding general at createBattle
   // time, so stepBattle stays pure (no GameState lookup). Absent for garrison
   // blocks / unled mobs.
-  wu?: number; // 武力
-  command?: number; // 统率 (tong)
+  wu?: number; // martial (wu)
+  command?: number; // command (tong)
 ```
 
 - [ ] **Step 4: Populate the snapshot in `src/engine/battle/setup.ts`**
@@ -1348,7 +1331,7 @@ In the attacker general block and defender general block object literals, add `w
 
 - [ ] **Step 5: Replace the melee power + add ranged/duel/morale in `src/engine/battle/simulate.ts`**
 
-Replace the `meleePower` helper with a stat-aware version and delete the dead `leadership`/`generalOf` stubs from Task 0.4:
+Replace the `meleePower` helper with a stat-aware version (and add a `unitLeadership` helper alongside it):
 
 ```ts
 // Leadership multiplier from the unit's general snapshot (mirrors combat.ts's
@@ -1820,16 +1803,10 @@ export function battleToResult(state: GameState, battle: Battle): QuickBattleRes
     .map((id) => state.generals[id])
     .filter((g): g is General => Boolean(g));
 
-  const survivingAtk = atkTroops;
-  const startingAtk = battle.units
-    .filter((u) => u.factionId === battle.attackerFactionId)
-    .reduce((n, u) => n + (u.troops < 0 ? 0 : u.troops), 0);
-  void startingAtk;
-
-  // We do not have the pre-battle totals on the finished battle, so derive
-  // casualties from the city + committed force snapshot at apply time.
-  const committedAtk = attackerGenerals.reduce((n, g) => n + g.troops, 0) || survivingAtk;
-  const attackerCasualties = Math.max(0, committedAtk - survivingAtk);
+  // We do not carry pre-battle totals on the finished battle, so derive
+  // casualties from the city + committed-force snapshot in `state`.
+  const committedAtk = attackerGenerals.reduce((n, g) => n + g.troops, 0) || atkTroops;
+  const attackerCasualties = Math.max(0, committedAtk - atkTroops);
   const defStart = city.garrison + defenderGenerals.reduce((n, g) => n + g.troops, 0);
   const defenderCasualties = Math.max(0, defStart - defTroops);
 

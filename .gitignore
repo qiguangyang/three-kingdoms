@@ -12,3 +12,6 @@ saves/
 .claude/
 # Reference corpus only — copyrighted novel, never packaged (see SCENARIOS.md)
 三国演义.txt
+
+# subagent-driven-development scratch
+.superpowers/
