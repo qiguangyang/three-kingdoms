@@ -83,8 +83,13 @@ function nearestEnemy(u: BattleUnit, units: BattleUnit[]): BattleUnit | undefine
 }
 
 // One step of movement toward `target`, capped by the unit's daily range and
-// blocked by impassable cells (deep river for land units).
-function stepToward(battle: Battle, u: BattleUnit, target: Vec2): Vec2 {
+// blocked by impassable cells (deep river for land units) or by a cell an
+// active unit already held at the start of this phase. The occupancy check
+// keeps two closing forces from stepping through one another onto each
+// other's starting cell in the same day (which would otherwise let them
+// swap places and perpetually miss each other); they instead stop adjacent
+// and fight next phase.
+function stepToward(battle: Battle, u: BattleUnit, target: Vec2, blocked: Vec2[] = []): Vec2 {
   const range = BATTLE_TUNING.moveRange[u.troopType] ?? 2;
   let cur = { ...u.pos };
   for (let s = 0; s < range; s++) {
@@ -96,6 +101,7 @@ function stepToward(battle: Battle, u: BattleUnit, target: Vec2): Vec2 {
     const landUnit = u.troopType !== 'navy';
     if (cell === 'river' && landUnit) break; // must go around / use a ford
     if (cell === 'wall') break; // cannot walk through a wall
+    if (blocked.some((p) => p.x === nxt.x && p.y === nxt.y)) break; // occupied: halt adjacent
     cur = nxt;
   }
   return cur;
@@ -138,6 +144,9 @@ export function stepBattle(input: StepInput): StepResult {
   }
 
   // ---------------- MOVEMENT PHASE ----------------
+  // Snapshot of active units' cells before anyone moves this phase; passed to
+  // stepToward as the occupancy set (see its comment for why this matters).
+  const occupiedAtPhaseStart: Vec2[] = units.filter(isActive).map((u) => ({ ...u.pos }));
   for (const u of units) {
     if (!isActive(u)) continue;
     const order = orders.get(u.id);
@@ -155,7 +164,7 @@ export function stepBattle(input: StepInput): StepResult {
     }
     if (!target) continue;
     const from = { ...u.pos };
-    const to = stepToward(input.battle, u, target);
+    const to = stepToward(input.battle, u, target, occupiedAtPhaseStart);
     if (to.x !== from.x || to.y !== from.y) {
       u.pos = to;
       events.push({ kind: 'move', unitId: u.id, from, to });
