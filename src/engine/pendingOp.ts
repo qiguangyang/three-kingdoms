@@ -9,6 +9,7 @@
 // point used by completion handlers, replay tests, and AI internals
 // that need synchronous state transitions.
 
+import { createBattle } from './battle/index.js';
 import { resolveQuickBattle } from './combat.js';
 import { runScenarioEvents } from './events.js';
 import {
@@ -202,10 +203,12 @@ export function tickDays(
   state: GameState,
   daysToAdvance: number,
   agents: Record<string, FactionAgent>,
+  options?: { deferPlayerBattles?: boolean },
 ): GameState {
   let next = state;
   for (let i = 0; i < daysToAdvance; i++) {
-    next = tickOneDay(next, agents);
+    if (next.pendingBattle) break; // a player battle is owed; stop advancing
+    next = tickOneDay(next, agents, options);
   }
   return next;
 }
@@ -213,6 +216,7 @@ export function tickDays(
 function tickOneDay(
   state: GameState,
   agents: Record<string, FactionAgent>,
+  options?: { deferPlayerBattles?: boolean },
 ): GameState {
   let next = state;
 
@@ -226,14 +230,27 @@ function tickOneDay(
   const surviving: PendingOp[] = [];
   for (const op of beforeOps) {
     const ticked = { ...op, daysRemaining: op.daysRemaining - 1 } as PendingOp;
+    if (next.pendingBattle) {
+      // A battle became pending from an earlier completion this same
+      // day; stop applying further completions and preserve the rest
+      // of the queue untouched (still decremented) for when we resume.
+      surviving.push(ticked);
+      continue;
+    }
     if (ticked.daysRemaining <= 0) {
-      next = applyCompletedOp(next, ticked);
+      next = applyCompletedOp(next, ticked, options);
     } else {
       surviving.push(ticked);
     }
   }
   const newlyScheduled = next.pendingOps.filter((op) => !beforeIds.has(op.id));
   next = { ...next, pendingOps: [...surviving, ...newlyScheduled] };
+
+  // A battle is now pending: stop here so nothing runs behind the
+  // player's battle (no calendar advance, no AI monthly decisions).
+  if (next.pendingBattle) {
+    return next;
+  }
 
   // Step 2: advance the calendar.
   if (next.day < 30) {
@@ -309,7 +326,11 @@ function runAiMonthlyDecisions(
 // coverage of the underlying logic carries over) and may spawn a
 // follow-up op.
 
-function applyCompletedOp(state: GameState, op: PendingOp): GameState {
+function applyCompletedOp(
+  state: GameState,
+  op: PendingOp,
+  options?: { deferPlayerBattles?: boolean },
+): GameState {
   switch (op.kind) {
     case 'develop':
       return develop(state, { cityId: op.cityId, generalId: op.generalId });
@@ -336,7 +357,7 @@ function applyCompletedOp(state: GameState, op: PendingOp): GameState {
     case 'march':
       return applyCompletedMarch(state, op);
     case 'siege':
-      return applyCompletedSiege(state, op);
+      return applyCompletedSiege(state, op, options);
   }
 }
 
@@ -408,10 +429,30 @@ function estimateDefenderTroops(state: GameState, city: City): number {
 function applyCompletedSiege(
   state: GameState,
   op: Extract<PendingOp, { kind: 'siege' }>,
+  options?: { deferPlayerBattles?: boolean },
 ): GameState {
   const target = state.cities[op.targetCityId];
   if (!target) return state;
   const defenderFactionId = target.factionId ?? '__neutral__';
+
+  // Player is a participant and the caller asked to defer -> hand off to
+  // the tactical BattleScreen instead of auto-resolving. The march already
+  // detached the expedition force, so createBattle seeds units from
+  // op.generalIds + the target's garrison/generals.
+  if (
+    options?.deferPlayerBattles &&
+    (op.factionId === state.playerFactionId || defenderFactionId === state.playerFactionId)
+  ) {
+    const battle = createBattle(state, {
+      cityId: op.targetCityId,
+      attackerFactionId: op.factionId,
+      defenderFactionId,
+      attackingGeneralIds: op.generalIds,
+      attackingTroops: op.troops,
+    });
+    return { ...state, pendingBattle: battle };
+  }
+
   const result = resolveQuickBattle({
     state,
     attackerFactionId: op.factionId,
