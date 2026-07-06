@@ -163,8 +163,8 @@ export interface BattleUnit {
   // Leadership snapshot copied from the commanding general at createBattle
   // time, so stepBattle stays pure (no GameState lookup). Absent for garrison
   // blocks / unled mobs.
-  wu?: number; // 武力
-  command?: number; // 统率 (tong)
+  wu?: number; // martial (wu)
+  command?: number; // command (tong)
 }
 
 export interface Battle {
