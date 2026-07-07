@@ -17,6 +17,15 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     } as unknown as typeof ResizeObserver;
 }
 
+// jsdom does not implement canvas getContext (it throws a noisy "Not
+// implemented" error). Stub it to return null so WebGL-capability detection
+// (hasWebGL) resolves cleanly to "unavailable" and the battle view falls back
+// to its SVG renderer under test, with no console noise.
+if (typeof HTMLCanvasElement !== 'undefined') {
+  HTMLCanvasElement.prototype.getContext = (() =>
+    null) as unknown as HTMLCanvasElement['getContext'];
+}
+
 // Always start each test with a clean localStorage so save/load tests don't
 // leak across files.
 beforeEach(() => {

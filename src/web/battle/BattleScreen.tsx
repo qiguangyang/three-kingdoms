@@ -7,7 +7,7 @@ import {
 } from '../../state/store.js';
 import { t } from '../../i18n/locale.js';
 import { factionColor } from '../theme.js';
-import { BattleField2D } from './BattleField2D.js';
+import { BattleView } from './BattleView.js';
 import type { BattleSession } from '../../state/battleSession.js';
 import type { MessageKey } from '../../i18n/types.js';
 
@@ -54,7 +54,7 @@ export const BattleScreen: React.FC = () => {
 
       {/* Field */}
       <div className="relative flex-1 overflow-hidden rounded border border-ink-300/40 bg-parchment-100">
-        <BattleField2D session={session} />
+        <BattleView session={session} />
       </div>
 
       {/* Controls */}
