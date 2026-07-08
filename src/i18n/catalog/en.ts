@@ -191,6 +191,7 @@ export const en: MessageCatalog = {
   'battle.defeatTitle': 'Defeat',
   'battle.gambit.cavalryCharge': 'Cavalry Charge',
   'battle.gambit.fireAttack': 'Fire Attack',
+  'battle.gambit.floodAttack': 'Flood Attack',
   'battle.gambit.duelChallenge': 'Duel Challenge',
   'battle.gambit.fordCrossing': 'Ford Crossing',
   'battle.gambit.ambush': 'Ambush',

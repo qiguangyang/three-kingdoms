@@ -210,6 +210,7 @@ export type MessageKey =
   | 'battle.defeatTitle'
   | 'battle.gambit.cavalryCharge'
   | 'battle.gambit.fireAttack'
+  | 'battle.gambit.floodAttack'
   | 'battle.gambit.duelChallenge'
   | 'battle.gambit.fordCrossing'
   | 'battle.gambit.ambush'

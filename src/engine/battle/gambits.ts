@@ -34,6 +34,17 @@ export function detectGambits(battle: Battle): Gambit[] {
     }
   }
 
+  // floodAttack: a land unit next to a river bank, with an enemy in flood range
+  // downstream to drown. (Water spread itself is computed in the sim.)
+  for (const u of units) {
+    if (!active(u) || u.troopType === 'navy') continue;
+    const nextToRiver = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]
+      .some((d) => cellAt(battle, { x: u.pos.x + d.x, y: u.pos.y + d.y }) === 'river');
+    if (!nextToRiver) continue;
+    const foe = units.find((e) => e.factionId !== u.factionId && active(e) && chebyshev(u.pos, e.pos) <= 4);
+    if (foe) { out.push({ id: 'floodAttack', unitIds: [u.id], labelKey: 'battle.gambit.floodAttack' }); break; }
+  }
+
   // duelChallenge: two adjacent generals both above the wu threshold.
   for (const u of units) {
     if (!active(u) || u.wu === undefined || u.wu < BATTLE_TUNING.duelWuMin) continue;

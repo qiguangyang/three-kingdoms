@@ -187,6 +187,7 @@ export const zh: MessageCatalog = {
   'battle.defeatTitle': '败退',
   'battle.gambit.cavalryCharge': '骑兵突击',
   'battle.gambit.fireAttack': '火计',
+  'battle.gambit.floodAttack': '水攻',
   'battle.gambit.duelChallenge': '单挑',
   'battle.gambit.fordCrossing': '涉渡',
   'battle.gambit.ambush': '伏击',

@@ -51,4 +51,23 @@ describe('detectGambits', () => {
     const b = mk([u({ id: 'a', factionId: 'A', pos: { x: 2, y: 1 } })], f);
     expect(detectGambits(b).map((g) => g.id)).toContain('fordCrossing');
   });
+
+  it('offers floodAttack when a land unit is beside a river with an enemy in range', () => {
+    const plain = new Array(24).fill('plain');
+    const noRiver = field([...plain]);
+    const bDry = mk([
+      u({ id: 'a', factionId: 'A', pos: { x: 2, y: 1 } }),
+      u({ id: 'e', factionId: 'B', pos: { x: 3, y: 1 } }),
+    ], noRiver);
+    expect(detectGambits(bDry).map((g) => g.id)).not.toContain('floodAttack');
+
+    const cells = [...plain];
+    cells[1 * 6 + 3] = 'river'; // (x=3,y=1) is a river cell
+    const wet = field(cells);
+    const bWet = mk([
+      u({ id: 'a', factionId: 'A', pos: { x: 2, y: 1 } }), // beside the river cell
+      u({ id: 'e', factionId: 'B', pos: { x: 4, y: 1 } }), // enemy within 4
+    ], wet);
+    expect(detectGambits(bWet).map((g) => g.id)).toContain('floodAttack');
+  });
 });

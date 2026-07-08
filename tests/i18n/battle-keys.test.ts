@@ -6,7 +6,7 @@ const KEYS = [
   'battle.quickResolve', 'battle.speed', 'battle.yourOrders', 'battle.gambits',
   'battle.commitReserves', 'battle.charge', 'battle.hold', 'battle.advance', 'battle.finish',
   'battle.victoryTitle', 'battle.defeatTitle', 'battle.gambit.cavalryCharge',
-  'battle.gambit.fireAttack', 'battle.gambit.duelChallenge', 'battle.gambit.fordCrossing',
+  'battle.gambit.fireAttack', 'battle.gambit.floodAttack', 'battle.gambit.duelChallenge', 'battle.gambit.fordCrossing',
   'battle.gambit.ambush',
 ] as const;
 

@@ -260,6 +260,62 @@ export function stepBattle(input: StepInput): StepResult {
     }
   }
 
+  // ---------------- FLOOD PHASE ----------------
+  // Handles the floodAttack gambit: breach the adjacent river bank and send water
+  // across the low ground, drowning enemy units caught in the flooded cells.
+  // Gate-checking (unit beside a river) is the caller's job; the sim trusts it.
+  {
+    const field = input.battle.field;
+    const W = field.width;
+    const H = field.height;
+    const inBounds = (p: Vec2): boolean => p.x >= 0 && p.x < W && p.y >= 0 && p.y < H;
+    const cellOf = (p: Vec2): BattleCell => field.cells[p.y * W + p.x] ?? 'plain';
+    const heightOf = (p: Vec2): number => field.heights[p.y * W + p.x] ?? 0;
+    const adjacentRiver = (p: Vec2): Vec2 | null => {
+      for (const d of [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]) {
+        const q = { x: p.x + d.x, y: p.y + d.y };
+        if (inBounds(q) && cellOf(q) === 'river') return q;
+      }
+      return null;
+    };
+    // River channel + surrounding low ground within a fixed radius of the breach.
+    const FLOOD_RADIUS = 3;
+    const floodCells = (breach: Vec2): Vec2[] => {
+      const bh = heightOf(breach);
+      const out: Vec2[] = [];
+      for (let dy = -FLOOD_RADIUS; dy <= FLOOD_RADIUS; dy++) {
+        for (let dx = -FLOOD_RADIUS; dx <= FLOOD_RADIUS; dx++) {
+          const q = { x: breach.x + dx, y: breach.y + dy };
+          if (!inBounds(q)) continue;
+          if (Math.max(Math.abs(dx), Math.abs(dy)) > FLOOD_RADIUS) continue;
+          const cell = cellOf(q);
+          if (cell === 'river' || cell === 'ford' || heightOf(q) <= bh + 0.15) out.push(q);
+        }
+      }
+      return out;
+    };
+    for (const c of input.commands) {
+      if (c.kind !== 'gambit' || c.gambitId !== 'floodAttack') continue;
+      for (const uid of c.unitIds) {
+        const src = byId(uid);
+        if (!src || !isActive(src)) continue;
+        const breach = adjacentRiver(src.pos);
+        if (!breach) continue;
+        const cells = floodCells(breach);
+        events.push({ kind: 'flood', from: breach, cells });
+        const flooded = new Set(cells.map((p) => p.y * W + p.x));
+        for (const e of units) {
+          if (e.factionId === src.factionId || !isActive(e)) continue;
+          if (flooded.has(e.pos.y * W + e.pos.x)) {
+            const loss = Math.min(e.troops, Math.floor(e.troops * 0.3));
+            e.troops -= loss;
+            e.morale = Math.max(0, e.morale - 35);
+          }
+        }
+      }
+    }
+  }
+
   // ---------------- MORALE / ROUT PHASE ----------------
   // Apply casualty-driven morale using the day's clash/volley losses. A unit
   // annihilated this turn (troops driven to 0 by clash/duel/fire) is folded

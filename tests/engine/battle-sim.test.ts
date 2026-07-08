@@ -108,6 +108,20 @@ describe('stepBattle — ranged, duel, morale, end', () => {
     expect(events.some((ev) => ev.kind === 'fire')).toBe(true);
   });
 
+  it('a floodAttack gambit drowns enemies in the flooded cells and emits a flood event', () => {
+    const b = battle([
+      unit({ id: 'a', factionId: 'A', pos: { x: 3, y: 4 } }),
+      unit({ id: 'e', factionId: 'B', pos: { x: 4, y: 4 }, troops: 8000 }),
+    ]);
+    // (x=2,y=4) is adjacent to a's pos (3,4); the flat field's heights are all 0,
+    // so breaching here floods every cell within FLOOD_RADIUS (incl. e's cell).
+    b.field.cells[4 * 10 + 2] = 'river';
+    const { battle: next, events } = stepBattle({ battle: b, commands: [{ kind: 'gambit', gambitId: 'floodAttack', unitIds: ['a'] }] });
+    const e = next.units.find((u) => u.id === 'e')!;
+    expect(e.troops).toBeLessThan(8000);
+    expect(events.some((ev) => ev.kind === 'flood')).toBe(true);
+  });
+
   it('a routed unit is flagged and flees (moraleBreak + rout events)', () => {
     const b = battle([
       unit({ id: 'a', factionId: 'A', pos: { x: 4, y: 4 }, troops: 20000, wu: 95, command: 95 }),
