@@ -25,6 +25,15 @@ const UP = new THREE.Vector3(0, 1, 0);
 const MAX_SOLDIERS = 48;
 const WATER_Y = 0.2;
 
+// Time-of-day / weather looks, chosen deterministically per battle so different
+// fields feel distinct. Values (sky/fog/sun/ambient) are tuned here, not copied.
+const ENV_PRESETS = {
+  dusk: { skyTop: 0x2a3b60, skyHz: 0x93a0b4, fog: 0x93a0b4, sun: 0xffd9a0, sunI: 2.1, hemiSky: 0xaec4e8, hemiI: 0.55, amb: 0.4 },
+  day: { skyTop: 0x3d6ea8, skyHz: 0xbccadc, fog: 0xbccadc, sun: 0xfff4e0, sunI: 2.5, hemiSky: 0xc4d6f0, hemiI: 0.7, amb: 0.5 },
+  dawn: { skyTop: 0x3a4a70, skyHz: 0xcaa678, fog: 0xc0a888, sun: 0xffdca8, sunI: 1.9, hemiSky: 0xd0c4c0, hemiI: 0.6, amb: 0.45 },
+  overcast: { skyTop: 0x6a7280, skyHz: 0x9aa2ac, fog: 0x9aa2ac, sun: 0xdadfe4, sunI: 1.25, hemiSky: 0xb2bac4, hemiI: 0.9, amb: 0.6 },
+} as const;
+
 let SOLDIER_GEO: THREE.BufferGeometry | null = null;
 function soldierGeometry(): THREE.BufferGeometry {
   if (SOLDIER_GEO) return SOLDIER_GEO;
@@ -66,6 +75,11 @@ export class BattleScene {
   // A small fixed pool of fire lights kept permanently in the scene so the WebGL
   // light count never changes (adding/removing lights recompiles materials).
   private readonly fireLights: THREE.PointLight[] = [];
+  private skyMat!: THREE.ShaderMaterial;
+  private sun!: THREE.DirectionalLight;
+  private hemi!: THREE.HemisphereLight;
+  private ambient!: THREE.AmbientLight;
+  private waterMat: THREE.ShaderMaterial | null = null;
   private field: BattleField | null = null;
   private raf = 0;
   private disposed = false;
@@ -102,21 +116,23 @@ export class BattleScene {
     this.controls.addEventListener('start', () => { this.autoPausedUntil = Number.POSITIVE_INFINITY; });
     this.controls.addEventListener('end', () => { this.autoPausedUntil = nowMs() + 6000; });
 
-    this.scene.add(new THREE.HemisphereLight(0xaec4e8, 0x4a3d28, 0.55));
-    const sun = new THREE.DirectionalLight(0xffd9a0, 2.1);
-    sun.position.set(-26, 30, 34);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.near = 1;
-    sun.shadow.camera.far = 140;
+    this.hemi = new THREE.HemisphereLight(0xaec4e8, 0x4a3d28, 0.55);
+    this.scene.add(this.hemi);
+    this.sun = new THREE.DirectionalLight(0xffd9a0, 2.1);
+    this.sun.position.set(-26, 30, 34);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.camera.near = 1;
+    this.sun.shadow.camera.far = 140;
     const s = 34;
-    sun.shadow.camera.left = -s;
-    sun.shadow.camera.right = s;
-    sun.shadow.camera.top = s;
-    sun.shadow.camera.bottom = -s;
-    sun.shadow.bias = -0.0006;
-    this.scene.add(sun);
-    this.scene.add(new THREE.AmbientLight(0x30364a, 0.4));
+    this.sun.shadow.camera.left = -s;
+    this.sun.shadow.camera.right = s;
+    this.sun.shadow.camera.top = s;
+    this.sun.shadow.camera.bottom = -s;
+    this.sun.shadow.bias = -0.0006;
+    this.scene.add(this.sun);
+    this.ambient = new THREE.AmbientLight(0x30364a, 0.4);
+    this.scene.add(this.ambient);
     for (let i = 0; i < 3; i++) {
       const l = new THREE.PointLight(0xff6a1c, 0, 16, 2);
       this.scene.add(l);
@@ -140,6 +156,7 @@ export class BattleScene {
       fragmentShader:
         'varying vec3 vP; uniform vec3 top; uniform vec3 horizon; void main(){ float h = clamp((normalize(vP).y+0.04)/0.5, 0.0, 1.0); gl_FragColor = vec4(mix(horizon, top, pow(h, 0.8)), 1.0); }',
     });
+    this.skyMat = mat;
     this.scene.add(new THREE.Mesh(geo, mat));
   }
 
@@ -153,6 +170,7 @@ export class BattleScene {
 
   setField(field: BattleField): void {
     this.field = field;
+    this.applyEnv(field.seed);
     const geo = buildTerrainBufferGeometry(field);
     const ground = new THREE.Mesh(
       geo,
@@ -163,13 +181,26 @@ export class BattleScene {
 
     if (field.river) {
       const size = fieldWorldSize(field);
-      const water = new THREE.Mesh(
-        new THREE.PlaneGeometry(size.w, size.h),
-        new THREE.MeshStandardMaterial({ color: 0x2f5a72, transparent: true, opacity: 0.72, roughness: 0.15, metalness: 0.3 }),
-      );
-      water.rotation.x = -Math.PI / 2;
+      const wgeo = new THREE.PlaneGeometry(size.w, size.h, 48, 32);
+      wgeo.rotateX(-Math.PI / 2);
+      this.waterMat = new THREE.ShaderMaterial({
+        transparent: true,
+        uniforms: { uT: { value: 0 }, uCol: { value: new THREE.Color(0x244b60) } },
+        vertexShader:
+          'uniform float uT; varying float vR; varying vec3 vW;' +
+          'void main(){ vec3 p = position;' +
+          ' float r = sin(p.x*0.16 + uT*1.4)*0.13 + sin(p.z*0.21 - uT*1.05)*0.10 + sin((p.x+p.z)*0.09 + uT*0.7)*0.08;' +
+          ' p.y += r; vR = r; vec4 wp = modelMatrix*vec4(p,1.0); vW = wp.xyz;' +
+          ' gl_Position = projectionMatrix * viewMatrix * wp; }',
+        fragmentShader:
+          'uniform float uT; uniform vec3 uCol; varying float vR; varying vec3 vW;' +
+          'void main(){ float sh = 0.5 + 0.5*sin(vR*22.0 + uT*3.0);' +
+          ' float spk = smoothstep(0.85, 1.0, sin(vW.x*0.4 + uT*2.0)*sin(vW.z*0.5 - uT*1.7));' +
+          ' vec3 col = uCol + vec3(0.10,0.16,0.20)*sh + vec3(0.45)*spk;' +
+          ' gl_FragColor = vec4(col, 0.86); }',
+      });
+      const water = new THREE.Mesh(wgeo, this.waterMat);
       water.position.y = WATER_Y;
-      water.receiveShadow = true;
       this.scene.add(water);
     }
 
@@ -274,6 +305,22 @@ export class BattleScene {
     flag.castShadow = true;
     pole.add(flag);
     return pole;
+  }
+
+  // Deterministically pick a time-of-day look for this battle and push it into
+  // the sky/fog/sun/ambient (a lightweight version of a scene environment).
+  private applyEnv(seed: number): void {
+    const keys = Object.keys(ENV_PRESETS) as (keyof typeof ENV_PRESETS)[];
+    const env = ENV_PRESETS[keys[Math.abs(seed) % keys.length]!]!;
+    (this.skyMat.uniforms.top!.value as THREE.Color).setHex(env.skyTop);
+    (this.skyMat.uniforms.horizon!.value as THREE.Color).setHex(env.skyHz);
+    (this.scene.background as THREE.Color).setHex(env.skyTop);
+    (this.scene.fog as THREE.Fog).color.setHex(env.fog);
+    this.sun.color.setHex(env.sun);
+    this.sun.intensity = env.sunI;
+    this.hemi.color.setHex(env.hemiSky);
+    this.hemi.intensity = env.hemiI;
+    this.ambient.intensity = env.amb;
   }
 
   // Track the battle's focus; the director in the loop eases the camera toward
@@ -501,6 +548,7 @@ export class BattleScene {
     const t = nowMs();
     const dt = this.lastT ? Math.min(60, t - this.lastT) : 16;
     this.lastT = t;
+    if (this.waterMat) this.waterMat.uniforms.uT!.value = t / 1000;
 
     for (const v of this.units.values()) {
       v.basePos.lerp(v.target, 0.12);
