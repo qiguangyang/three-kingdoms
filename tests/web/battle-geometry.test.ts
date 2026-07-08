@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  HEIGHT_SCALE, cellColor, cellWorldXZ, terrainHeight, unitWorldPosition,
+  HEIGHT_SCALE, TERRAIN_RES, cellColor, cellWorldXZ, terrainHeight, unitWorldPosition,
   blockScale, buildTerrainGeometry, battleCentroidXZ, fieldWorldSize,
   soldierCount, formationOffsets,
 } from '../../src/web/battle/geometry.js';
@@ -23,22 +23,30 @@ function unit(over: Partial<BattleUnit> & Pick<BattleUnit, 'id' | 'factionId' | 
 }
 
 describe('battle geometry', () => {
-  it('builds a vertex grid sized width*height with (w-1)(h-1)*6 indices', () => {
+  it('builds a subdivided vertex grid with matching color + index counts', () => {
     const g = buildTerrainGeometry(field(4, 3));
-    expect(g.positions.length).toBe(4 * 3 * 3);
-    expect(g.colors.length).toBe(4 * 3 * 3);
-    expect(g.indices.length).toBe((4 - 1) * (3 - 1) * 6);
+    const nx = (4 - 1) * TERRAIN_RES + 1;
+    const nz = (3 - 1) * TERRAIN_RES + 1;
+    expect(g.positions.length).toBe(nx * nz * 3);
+    expect(g.colors.length).toBe(nx * nz * 3);
+    expect(g.indices.length).toBe((nx - 1) * (nz - 1) * 6);
   });
 
-  it('vertex Y tracks terrain height', () => {
+  it('vertex Y tracks terrain height (raised center higher than flat corner)', () => {
     const heights = new Array(9).fill(0);
     heights[4] = 1;
     const f = field(3, 3, heights);
     expect(terrainHeight(1, 1, f)).toBeCloseTo(HEIGHT_SCALE);
     expect(terrainHeight(0, 0, f)).toBe(0);
     const g = buildTerrainGeometry(f);
-    const centerIdx = (1 * 3 + 1) * 3;
-    expect(g.positions[centerIdx + 1]).toBeCloseTo(HEIGHT_SCALE);
+    const nx = (3 - 1) * TERRAIN_RES + 1;
+    const center = (TERRAIN_RES * nx + TERRAIN_RES) * 3; // vertex at cell (1,1)
+    const corner = 0; // vertex at cell (0,0)
+    expect(g.positions[center + 1]!).toBeGreaterThan(g.positions[corner + 1]! + HEIGHT_SCALE * 0.5);
+  });
+
+  it('is deterministic for a given field seed', () => {
+    expect(buildTerrainGeometry(field(5, 4))).toEqual(buildTerrainGeometry(field(5, 4)));
   });
 
   it('centers the grid on the origin', () => {

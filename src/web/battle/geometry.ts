@@ -54,25 +54,132 @@ export function blockScale(troops: number): number {
   return Math.max(MIN, Math.min(MAX, Math.sqrt(Math.max(0, troops)) / K));
 }
 
+// Sub-quads per battlefield cell edge — subdividing the coarse cell grid into a
+// fine mesh so terrain reads as smooth relief rather than blocky facets.
+export const TERRAIN_RES = 5;
+
+// fbm value-noise + a height color-ramp blended with each cell's terrain tint.
+// Technique adapted from the MIT-licensed battlefield-editor
+// (github.com/yazelin/battlefield-editor) — original implementation here.
+function hash2(ix: number, iy: number, seed: number): number {
+  let h = (Math.imul(ix, 374761393) + Math.imul(iy, 668265263) + Math.imul(seed, 2246822519)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+function vnoise(x: number, y: number, seed: number): number {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const xf = x - xi;
+  const yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf);
+  const v = yf * yf * (3 - 2 * yf);
+  const a = hash2(xi, yi, seed);
+  const b = hash2(xi + 1, yi, seed);
+  const c = hash2(xi, yi + 1, seed);
+  const d = hash2(xi + 1, yi + 1, seed);
+  return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+}
+function fbm(x: number, y: number, seed: number): number {
+  let sum = 0;
+  let amp = 1;
+  let freq = 1;
+  let tot = 0;
+  for (let i = 0; i < 4; i++) {
+    sum += vnoise(x * freq, y * freq, seed) * amp;
+    tot += amp;
+    amp *= 0.5;
+    freq *= 2;
+  }
+  return sum / tot;
+}
+
+// Height (world Y) -> natural base color: dry lowland -> grass -> rock.
+const RAMP: Array<{ h: number; c: [number, number, number] }> = [
+  { h: 0.0, c: [0.66, 0.6, 0.44] },
+  { h: 0.7, c: [0.42, 0.49, 0.31] },
+  { h: 1.7, c: [0.49, 0.46, 0.34] },
+  { h: 3.2, c: [0.62, 0.58, 0.52] },
+];
+function rampColor(h: number): [number, number, number] {
+  if (h <= RAMP[0]!.h) return [RAMP[0]!.c[0], RAMP[0]!.c[1], RAMP[0]!.c[2]];
+  for (let i = 1; i < RAMP.length; i++) {
+    const b = RAMP[i]!;
+    if (h <= b.h) {
+      const a = RAMP[i - 1]!;
+      const t = (h - a.h) / (b.h - a.h);
+      return [a.c[0] + (b.c[0] - a.c[0]) * t, a.c[1] + (b.c[1] - a.c[1]) * t, a.c[2] + (b.c[2] - a.c[2]) * t];
+    }
+  }
+  const last = RAMP[RAMP.length - 1]!;
+  return [last.c[0], last.c[1], last.c[2]];
+}
+
+// How strongly a cell's terrain-type tint overrides the natural ramp color.
+function tintStrength(cell: BattleCell): number {
+  switch (cell) {
+    case 'river':
+    case 'ford':
+      return 0.85;
+    case 'wall':
+    case 'gate':
+    case 'ramp':
+      return 0.7;
+    case 'forest':
+      return 0.6;
+    case 'hill':
+      return 0.25;
+    default:
+      return 0.12;
+  }
+}
+
+function bilinearHeight(field: BattleField, cx: number, cz: number): number {
+  const { width: W, height: H } = field;
+  const x0 = Math.max(0, Math.min(W - 1, Math.floor(cx)));
+  const z0 = Math.max(0, Math.min(H - 1, Math.floor(cz)));
+  const x1 = Math.min(W - 1, x0 + 1);
+  const z1 = Math.min(H - 1, z0 + 1);
+  const fx = cx - x0;
+  const fz = cz - z0;
+  const h00 = field.heights[z0 * W + x0] ?? 0;
+  const h10 = field.heights[z0 * W + x1] ?? 0;
+  const h01 = field.heights[z1 * W + x0] ?? 0;
+  const h11 = field.heights[z1 * W + x1] ?? 0;
+  return (h00 * (1 - fx) + h10 * fx) * (1 - fz) + (h01 * (1 - fx) + h11 * fx) * fz;
+}
+
 export function buildTerrainGeometry(
   field: BattleField,
 ): { positions: number[]; colors: number[]; indices: number[] } {
+  const { width: W, height: H, seed } = field;
+  const nx = (W - 1) * TERRAIN_RES + 1;
+  const nz = (H - 1) * TERRAIN_RES + 1;
   const positions: number[] = [];
   const colors: number[] = [];
-  for (let y = 0; y < field.height; y++) {
-    for (let x = 0; x < field.width; x++) {
-      const { x: wx, z: wz } = cellWorldXZ(x, y, field);
-      positions.push(wx, terrainHeight(x, y, field), wz);
-      const [r, g, b] = cellColor(field.cells[y * field.width + x] ?? 'plain');
-      colors.push(r, g, b);
+  for (let gz = 0; gz < nz; gz++) {
+    for (let gx = 0; gx < nx; gx++) {
+      const cx = gx / TERRAIN_RES;
+      const cz = gz / TERRAIN_RES;
+      const y = bilinearHeight(field, cx, cz) * HEIGHT_SCALE + (fbm(cx * 1.7, cz * 1.7, seed) - 0.5) * 0.6;
+      positions.push((cx - (W - 1) / 2) * CELL_SIZE, y, (cz - (H - 1) / 2) * CELL_SIZE);
+      const cell = field.cells[Math.min(H - 1, Math.round(cz)) * W + Math.min(W - 1, Math.round(cx))] ?? 'plain';
+      const base = rampColor(y);
+      const tint = cellColor(cell);
+      const s = tintStrength(cell);
+      const shade = 0.82 + fbm(cx * 3.1, cz * 3.1, seed + 97) * 0.32;
+      colors.push(
+        (base[0] * (1 - s) + tint[0] * s) * shade,
+        (base[1] * (1 - s) + tint[1] * s) * shade,
+        (base[2] * (1 - s) + tint[2] * s) * shade,
+      );
     }
   }
   const indices: number[] = [];
-  for (let y = 0; y < field.height - 1; y++) {
-    for (let x = 0; x < field.width - 1; x++) {
-      const a = y * field.width + x;
+  for (let gz = 0; gz < nz - 1; gz++) {
+    for (let gx = 0; gx < nx - 1; gx++) {
+      const a = gz * nx + gx;
       const b = a + 1;
-      const c = a + field.width;
+      const c = a + nx;
       const d = c + 1;
       indices.push(a, c, b, b, c, d);
     }
