@@ -146,7 +146,9 @@ export class BattleScene {
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x1e2a48);
-    this.scene.fog = new THREE.Fog(0x93a0b4, 30, 118);
+    // Exponential fog: keeps the playfield crisp but hazes the distant hills and
+    // mountain ridges into the sky, giving the world atmospheric depth.
+    this.scene.fog = new THREE.FogExp2(0x93a0b4, 0.0062);
     this.addSky();
 
     this.camera = new THREE.PerspectiveCamera(46, 1, 0.1, 500);
@@ -216,6 +218,7 @@ export class BattleScene {
   setField(field: BattleField): void {
     this.field = field;
     this.applyEnv(field.seed);
+    this.addEnvironment(field);
     const geo = buildTerrainBufferGeometry(field);
     const ground = new THREE.Mesh(
       geo,
@@ -266,6 +269,145 @@ export class BattleScene {
         this.scene.add(box);
       }
     }
+  }
+
+  // Wraps the bare playfield in a landscape: a rolling-hills basin the battle sits
+  // in, a ridge of distant mountains on the horizon, scattered forests and rocks.
+  // Everything is deterministic (seeded) and instanced, and is disposed by the
+  // scene traversal in dispose(). This is what turns the diorama into a place.
+  private addEnvironment(field: BattleField): void {
+    const seed = Math.abs(field.seed) | 0;
+    const fw = fieldWorldSize(field);
+    const clearing = Math.max(fw.w, fw.h) / 2 + 4; // the flat arena the armies fight on
+
+    // --- surrounding rolling-hills ground (a basin around the playfield) ---
+    const GEXT = 360;
+    const gGeo = new THREE.PlaneGeometry(GEXT, GEXT, 128, 128);
+    gGeo.rotateX(-Math.PI / 2);
+    const gp = gGeo.attributes.position as THREE.BufferAttribute;
+    const gcol: number[] = [];
+    for (let i = 0; i < gp.count; i++) {
+      const x = gp.getX(i);
+      const z = gp.getZ(i);
+      const y = surroundHeight(x, z, clearing, seed);
+      gp.setY(i, y);
+      const c = groundRamp(y);
+      gcol.push(c[0], c[1], c[2]);
+    }
+    gGeo.setAttribute('color', new THREE.Float32BufferAttribute(gcol, 3));
+    gGeo.computeVertexNormals();
+    const groundMesh = new THREE.Mesh(gGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+    groundMesh.receiveShadow = true;
+    this.scene.add(groundMesh);
+
+    const M = new THREE.Matrix4();
+    const Q = new THREE.Quaternion();
+    const S = new THREE.Vector3();
+    const P = new THREE.Vector3();
+    const CT = new THREE.Color();
+
+    // --- distant mountain ridge (a ring of instanced peaks rising above the tree
+    // line and fading into the fog to anchor the horizon) ---
+    const peakGeo = new THREE.ConeGeometry(1, 1, 5);
+    const peaks = new THREE.InstancedMesh(peakGeo, new THREE.MeshStandardMaterial({ color: 0x4a5468, roughness: 1, flatShading: true }), 80);
+    let pk = 0;
+    for (let i = 0; i < 80; i++) {
+      const ang = (i / 80) * Math.PI * 2 + (envHash(i, 5, seed) - 0.5) * 0.07;
+      const rad = 132 + (envHash(i, 9, seed) - 0.5) * 46;
+      const x = Math.cos(ang) * rad;
+      const z = Math.sin(ang) * rad;
+      const hgt = 48 + envHash(i, 17, seed) * 68;
+      const wid = 34 + envHash(i, 23, seed) * 30;
+      const baseY = surroundHeight(x, z, clearing, seed) - 6;
+      P.set(x, baseY + hgt / 2, z);
+      S.set(wid, hgt, wid);
+      M.compose(P, Q, S);
+      peaks.setMatrixAt(pk++, M);
+      // haze the farther peaks toward the fog colour so the ridge recedes
+      const t = Math.min(1, (rad - 110) / 70);
+      CT.setRGB(0.29 + 0.14 * t, 0.33 + 0.13 * t, 0.41 + 0.12 * t);
+      peaks.setColorAt(pk - 1, CT);
+    }
+    peaks.count = pk;
+    peaks.instanceMatrix.needsUpdate = true;
+    this.scene.add(peaks);
+
+    // --- forests: instanced fir cones on the hills + on the field's forest cells ---
+    const treeGeo = new THREE.ConeGeometry(1.7, 5.4, 5);
+    treeGeo.translate(0, 2.7, 0);
+    const trees = new THREE.InstancedMesh(treeGeo, new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), 640);
+    let tk = 0;
+    // woodland around the clearing, clumped into groves (fbm density) and thinning
+    // toward the mountains, so it reads as a real forest rather than a blanket
+    for (let i = 0; i < 5200 && tk < 560; i++) {
+      const ang = envHash(i, 2, seed) * Math.PI * 2;
+      const rad = clearing + 2 + envHash(i, 4, seed) * (118 - clearing);
+      const x = Math.cos(ang) * rad + (envHash(i, 6, seed) - 0.5) * 12;
+      const z = Math.sin(ang) * rad + (envHash(i, 8, seed) - 0.5) * 12;
+      const r = Math.hypot(x, z);
+      if (r < clearing || r > 122) continue;
+      // grove density: fbm carves clearings and copses instead of an even fill
+      if (envFbm(x * 0.05, z * 0.05, seed + 31) < 0.46) continue;
+      const y = surroundHeight(x, z, clearing, seed);
+      const sc = 0.7 + envHash(i, 12, seed) * 1.5;
+      P.set(x, y, z);
+      S.set(sc, sc, sc);
+      M.compose(P, Q, S);
+      trees.setMatrixAt(tk, M);
+      const g = 0.2 + envHash(i, 15, seed) * 0.18; // varied greens
+      CT.setRGB(g * 0.7, g + 0.06, g * 0.55);
+      trees.setColorAt(tk, CT);
+      tk++;
+    }
+    // real trees standing on the playfield's forest cells
+    for (let cy = 0; cy < field.height && tk < 640; cy++) {
+      for (let cx = 0; cx < field.width && tk < 640; cx++) {
+        if (field.cells[cy * field.width + cx] !== 'forest') continue;
+        const w = cellWorldXZ(cx, cy, field);
+        const yy = terrainHeight(cx, cy, field);
+        for (let n = 0; n < 3 && tk < 640; n++) {
+          const jx = (envHash(cx * 7 + cy, n * 3 + 1, seed) - 0.5) * CELL_SIZE;
+          const jz = (envHash(cx * 7 + cy, n * 3 + 2, seed) - 0.5) * CELL_SIZE;
+          const sc = 0.5 + envHash(cx * 7 + cy, n, seed) * 0.5;
+          P.set(w.x + jx, yy, w.z + jz);
+          S.set(sc, sc, sc);
+          M.compose(P, Q, S);
+          trees.setMatrixAt(tk, M);
+          const g = 0.2 + envHash(cx * 7 + cy, n + 4, seed) * 0.18;
+          CT.setRGB(g * 0.7, g + 0.06, g * 0.55);
+          trees.setColorAt(tk, CT);
+          tk++;
+        }
+      }
+    }
+    trees.count = tk;
+    trees.instanceMatrix.needsUpdate = true;
+    if (trees.instanceColor) trees.instanceColor.needsUpdate = true;
+    trees.castShadow = true;
+    this.scene.add(trees);
+
+    // --- scattered boulders on the near hills ---
+    const rockGeo = new THREE.DodecahedronGeometry(1, 0);
+    const rocks = new THREE.InstancedMesh(rockGeo, new THREE.MeshStandardMaterial({ color: 0x6b665e, roughness: 1, flatShading: true }), 70);
+    let rk = 0;
+    for (let i = 0; i < 600 && rk < 70; i++) {
+      const ang = envHash(i, 14, seed) * Math.PI * 2;
+      const rad = clearing + envHash(i, 16, seed) * 70;
+      const x = Math.cos(ang) * rad;
+      const z = Math.sin(ang) * rad;
+      if (envHash(i, 18, seed) > 0.4) continue;
+      const y = surroundHeight(x, z, clearing, seed);
+      const sc = 0.5 + envHash(i, 20, seed) * 1.4;
+      Q.setFromAxisAngle(UP, envHash(i, 22, seed) * Math.PI);
+      P.set(x, y + sc * 0.3, z);
+      S.set(sc, sc * 0.75, sc);
+      M.compose(P, Q, S);
+      Q.identity();
+      rocks.setMatrixAt(rk++, M);
+    }
+    rocks.count = rk;
+    rocks.instanceMatrix.needsUpdate = true;
+    this.scene.add(rocks);
   }
 
   syncUnits(session: BattleSession): void {
@@ -360,7 +502,7 @@ export class BattleScene {
     (this.skyMat.uniforms.top!.value as THREE.Color).setHex(env.skyTop);
     (this.skyMat.uniforms.horizon!.value as THREE.Color).setHex(env.skyHz);
     (this.scene.background as THREE.Color).setHex(env.skyTop);
-    (this.scene.fog as THREE.Fog).color.setHex(env.fog);
+    (this.scene.fog as THREE.FogExp2).color.setHex(env.fog);
     this.sun.color.setHex(env.sun);
     this.sun.intensity = env.sunI;
     this.hemi.color.setHex(env.hemiSky);
@@ -830,6 +972,77 @@ function disposeObject(o: THREE.Object3D): void {
     // geometry.dispose() — free it too (e.g. spawned arrow volleys).
     if ((c as THREE.InstancedMesh).isInstancedMesh) (c as THREE.InstancedMesh).dispose();
   });
+}
+
+// ---- Environment scatter/shape noise (deterministic, seeded) ----
+function envHash(ix: number, iy: number, seed: number): number {
+  let h = (Math.imul(ix, 374761393) + Math.imul(iy, 668265263) + Math.imul(seed, 2246822519)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+function envNoise(x: number, y: number, seed: number): number {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const xf = x - xi;
+  const yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf);
+  const v = yf * yf * (3 - 2 * yf);
+  const a = envHash(xi, yi, seed);
+  const b = envHash(xi + 1, yi, seed);
+  const c = envHash(xi, yi + 1, seed);
+  const d = envHash(xi + 1, yi + 1, seed);
+  return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+}
+function envFbm(x: number, y: number, seed: number): number {
+  let s = 0;
+  let amp = 1;
+  let f = 1;
+  let tot = 0;
+  for (let i = 0; i < 4; i++) {
+    s += envNoise(x * f, y * f, seed) * amp;
+    tot += amp;
+    amp *= 0.5;
+    f *= 2;
+  }
+  return s / tot;
+}
+function sstep(a: number, b: number, x: number): number {
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+// Rolling hills the battlefield sits in: near-flat over the clearing, swelling
+// into hills then mountains toward the horizon.
+function surroundHeight(x: number, z: number, clearing: number, seed: number): number {
+  const r = Math.hypot(x, z);
+  const rise = sstep(clearing, clearing + 130, r);
+  const hills = (envFbm(x * 0.013, z * 0.013, seed) - 0.5) * 20 * rise;
+  const swell = rise * rise * 26;
+  return -0.4 + swell + hills;
+}
+// Height -> natural ground color for the surrounding terrain (dry grass -> green
+// -> rock -> pale peak).
+function groundRamp(h: number): [number, number, number] {
+  const stops: Array<[number, [number, number, number]]> = [
+    [-1, [0.44, 0.44, 0.3]],
+    [3, [0.34, 0.42, 0.26]],
+    [12, [0.32, 0.36, 0.24]],
+    [26, [0.4, 0.38, 0.34]],
+    [48, [0.5, 0.5, 0.52]],
+  ];
+  if (h <= stops[0]![0]) return stops[0]![1];
+  for (let i = 1; i < stops.length; i++) {
+    if (h <= stops[i]![0]) {
+      const a = stops[i - 1]!;
+      const b = stops[i]!;
+      const t = (h - a[0]) / (b[0] - a[0]);
+      return [
+        a[1][0] + (b[1][0] - a[1][0]) * t,
+        a[1][1] + (b[1][1] - a[1][1]) * t,
+        a[1][2] + (b[1][2] - a[1][2]) * t,
+      ];
+    }
+  }
+  return stops[stops.length - 1]![1];
 }
 
 // Local deterministic RNG for FX spread only (visual variety; not sim state).
