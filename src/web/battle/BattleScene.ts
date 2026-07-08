@@ -384,6 +384,10 @@ export class BattleScene {
         case 'fire':
           this.spawnFire(e.at);
           break;
+        case 'flood':
+          this.spawnFlood(e.from, e.cells);
+          this.pullbackUntil = nowMs() + 3500; // pull the shot back to take in the whole flood
+          break;
         case 'volley': {
           const a = this.units.get(e.unitId);
           const b = this.units.get(e.targetUnitId);
@@ -608,6 +612,92 @@ export class BattleScene {
       smMat.opacity = 0.62 * (1 - age) * (1 - age * 0.35); // dense mid-rise, thins at the top
 
       (scorch.material as THREE.MeshBasicMaterial).opacity = 0.55 * Math.min(1, age * 6) * (1 - age * 0.4);
+    });
+  }
+
+  // River-breach flood: a sheet of animated water that sweeps outward from the
+  // breach cell across the flooded cells (a foam-crested wave front), holds, then
+  // recedes. Built as one merged quad-per-cell mesh; each vertex carries its
+  // distance from the breach so the shader reveals cells as the front reaches them.
+  private spawnFlood(from: Vec2, cells: Vec2[]): void {
+    if (!this.field || cells.length === 0) return;
+    const field = this.field;
+    const fromW = cellWorldXZ(from.x, from.y, field);
+    // Pool the water clearly above the highest flooded cell. terrainHeight() is the
+    // base cell elevation; the rendered mesh adds up to ~0.3 of fbm micro-relief on
+    // top, so the sheet must clear that or it drowns in the terrain bumps.
+    let maxTerrain = -Infinity;
+    for (const c of cells) maxTerrain = Math.max(maxTerrain, terrainHeight(c.x, c.y, field));
+    const level = maxTerrain + 0.6;
+    const half = CELL_SIZE / 2;
+    const positions: number[] = [];
+    const dists: number[] = [];
+    const indices: number[] = [];
+    let vi = 0;
+    let maxDist = 0.0001;
+    for (const c of cells) {
+      const w = cellWorldXZ(c.x, c.y, field);
+      const corners = [[-half, -half], [half, -half], [half, half], [-half, half]];
+      for (const [ox, oz] of corners) {
+        const x = w.x + ox!;
+        const z = w.z + oz!;
+        positions.push(x, level, z);
+        const d = Math.hypot(x - fromW.x, z - fromW.z);
+        dists.push(d);
+        if (d > maxDist) maxDist = d;
+      }
+      indices.push(vi, vi + 2, vi + 1, vi, vi + 3, vi + 2);
+      vi += 4;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('aDist', new THREE.Float32BufferAttribute(dists, 1));
+    geo.setIndex(indices);
+    const mat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      uniforms: { uT: { value: 0 }, uFront: { value: 0 }, uFade: { value: 1 }, uCol: { value: new THREE.Color(0x2a5568) } },
+      vertexShader:
+        'uniform float uT; attribute float aDist; varying float vD; varying vec3 vW; varying float vR;' +
+        'void main(){ vec3 p = position;' +
+        ' float r = sin(p.x*0.5 + uT*2.2)*0.06 + sin(p.z*0.6 - uT*1.7)*0.05;' +
+        ' p.y += r; vR = r; vD = aDist; vec4 wp = modelMatrix*vec4(p,1.0); vW = wp.xyz;' +
+        ' gl_Position = projectionMatrix * viewMatrix * wp; }',
+      fragmentShader:
+        'uniform float uT; uniform float uFront; uniform float uFade; uniform vec3 uCol;' +
+        'varying float vD; varying vec3 vW; varying float vR;' +
+        'void main(){ float rev = smoothstep(uFront, uFront - 1.5, vD);' + // 1 where the front has passed
+        ' if (rev <= 0.001) discard;' +
+        ' float foam = smoothstep(1.8, 0.0, abs(vD - uFront));' + // bright crest at the advancing edge
+        ' float sh = 0.5 + 0.5*sin(vR*22.0 + uT*3.0);' +
+        ' float spk = smoothstep(0.85, 1.0, sin(vW.x*0.4 + uT*2.0)*sin(vW.z*0.5 - uT*1.7));' +
+        ' vec3 col = uCol + vec3(0.08,0.14,0.18)*sh + vec3(0.4)*spk + vec3(0.5)*foam;' +
+        ' gl_FragColor = vec4(col, (0.82*rev + 0.55*foam) * uFade); }',
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    const reach = maxDist + 2;
+    this.spawnEffect(mesh, 5200, (age, _dt, t) => {
+      mat.uniforms.uT!.value = t / 1000;
+      mat.uniforms.uFront!.value = Math.min(1, age / 0.3) * reach; // sweep out over the first ~30%
+      mat.uniforms.uFade!.value = age > 0.75 ? Math.max(0, 1 - (age - 0.75) / 0.25) : 1; // recede at the end
+    });
+
+    // A splash of spray leaping up at the breach as the bank gives way.
+    const N = 46;
+    const sp = makeParticles(N, 0xcfe6ef, 0.22, true);
+    for (let i = 0; i < N; i++) {
+      sp.pos[i * 3] = fromW.x + (fxRand() - 0.5) * 1.2;
+      sp.pos[i * 3 + 1] = level + fxRand() * 0.4;
+      sp.pos[i * 3 + 2] = fromW.z + (fxRand() - 0.5) * 1.2;
+      const ang = fxRand() * Math.PI * 2;
+      const spd = 1.5 + fxRand() * 3.5;
+      sp.vel[i * 3] = Math.cos(ang) * spd;
+      sp.vel[i * 3 + 1] = 2.5 + fxRand() * 3;
+      sp.vel[i * 3 + 2] = Math.sin(ang) * spd;
+    }
+    this.spawnEffect(sp.points, 1100, (age, dt) => {
+      advanceParticles(sp, dt / 1000, 9);
+      (sp.points.material as THREE.PointsMaterial).opacity = 1 - age;
     });
   }
 
