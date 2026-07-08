@@ -20,7 +20,6 @@ import {
   terrainHeight,
   unitWorldPosition,
 } from './geometry.js';
-import { framing } from './camera.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const MAX_SOLDIERS = 48;
@@ -62,7 +61,13 @@ export class BattleScene {
   private field: BattleField | null = null;
   private raf = 0;
   private disposed = false;
-  private cameraSeated = false;
+  // Cinematic camera director state.
+  private readonly focusC = new THREE.Vector3(0, 1.5, 0);
+  private focusSpan = 40;
+  private introT = 0;
+  private pullbackUntil = 0;
+  private autoPausedUntil = 0; // while > now, the user is orbiting; auto yields
+  private lastT = 0;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -86,6 +91,10 @@ export class BattleScene {
     this.controls.maxPolarAngle = Math.PI * 0.49;
     this.controls.minDistance = 8;
     this.controls.maxDistance = 120;
+    // When the user grabs the camera, pause the cinematic director; resume a
+    // few seconds after they let go.
+    this.controls.addEventListener('start', () => { this.autoPausedUntil = Number.POSITIVE_INFINITY; });
+    this.controls.addEventListener('end', () => { this.autoPausedUntil = nowMs() + 6000; });
 
     // Dusk lighting: warm low sun casting long shadows + soft sky fill.
     this.scene.add(new THREE.HemisphereLight(0xaec4e8, 0x4a3d28, 0.55));
@@ -256,21 +265,40 @@ export class BattleScene {
     return pole;
   }
 
+  // Track the battle's focus (centroid + span); the director in the loop eases
+  // the camera toward it, so the shot follows the armies as they advance.
   frameBattle(session: BattleSession): void {
     const c = battleCentroidXZ(session.battle.units, session.battle.field);
-    const f = framing(c, fieldWorldSize(session.battle.field));
-    if (!this.cameraSeated) {
-      this.camera.position.set(f.position[0], f.position[1], f.position[2]);
-      this.cameraSeated = true;
-    }
-    this.controls.target.set(f.target[0], f.target[1], f.target[2]);
-    this.controls.update();
+    const size = fieldWorldSize(session.battle.field);
+    this.focusC.set(c.x, 1.5, c.z);
+    this.focusSpan = Math.max(size.w, size.h);
   }
 
   playEvents(events: BattleEvent[]): void {
     for (const e of events) {
       if (e.kind === 'fire') this.spawnFire(e.at);
+      if (e.kind === 'rout' || e.kind === 'moraleBreak') this.pullbackUntil = nowMs() + 3500;
     }
+  }
+
+  // Cinematic director: an opening sweep that eases into a low framed shot,
+  // gentle idle drift, and a pull-back on routs. Skipped while the user orbits.
+  private updateCamera(t: number, dt: number): void {
+    this.introT = Math.min(1, this.introT + dt / 3500);
+    const e = easeInOut(this.introT);
+    const rout = t < this.pullbackUntil;
+    const az = lerp(-1.15, 0.16 * Math.sin(t * 0.00008), e);
+    const radius = lerp(this.focusSpan * 1.95, this.focusSpan * (rout ? 1.75 : 1.18), e);
+    const elev = lerp(0.26, rout ? 0.72 : 0.5, e);
+    const ce = Math.cos(elev);
+    TMP.set(
+      this.focusC.x + radius * ce * Math.sin(az),
+      this.focusC.y + radius * Math.sin(elev),
+      this.focusC.z + radius * ce * Math.cos(az),
+    );
+    this.camera.position.lerp(TMP, rout ? 0.035 : 0.05);
+    this.controls.target.lerp(this.focusC, 0.06);
+    this.camera.lookAt(this.controls.target);
   }
 
   private spawnFire(at: Vec2): void {
@@ -293,6 +321,8 @@ export class BattleScene {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
     const t = nowMs();
+    const dt = this.lastT ? Math.min(60, t - this.lastT) : 16;
+    this.lastT = t;
     for (const v of this.units.values()) {
       const target = v.group.userData.target as THREE.Vector3 | undefined;
       if (target) v.group.position.lerp(target, 0.12);
@@ -313,7 +343,11 @@ export class BattleScene {
         fire.light.intensity = 6 * (1 - age) * flick;
       }
     }
-    this.controls.update();
+    if (t < this.autoPausedUntil) {
+      this.controls.update(); // user is orbiting
+    } else {
+      this.updateCamera(t, dt); // cinematic director
+    }
     this.renderer.render(this.scene, this.camera);
   };
 
@@ -342,6 +376,13 @@ function buildTerrainBufferGeometry(field: BattleField): THREE.BufferGeometry {
   return bg;
 }
 
+const TMP = new THREE.Vector3();
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+function easeInOut(t: number): number {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
 function nowMs(): number {
   return typeof performance !== 'undefined' ? performance.now() : 0;
 }
