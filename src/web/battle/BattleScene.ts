@@ -529,43 +529,85 @@ export class BattleScene {
     const y = terrainHeight(at.x, at.y, this.field);
     const group = new THREE.Group();
     group.position.set(x, y, z);
+
+    // Dark scorch decal on the ground that fades in fast and lingers under the smoke.
+    const scorch = new THREE.Mesh(
+      new THREE.CircleGeometry(1.6, 20),
+      new THREE.MeshBasicMaterial({ color: 0x140f0a, transparent: true, opacity: 0, depthWrite: false }),
+    );
+    scorch.rotation.x = -Math.PI / 2;
+    scorch.position.y = 0.03;
+    group.add(scorch);
+
+    // Two-layer flame: a broad orange body wrapping a small white-hot inner core,
+    // so the fire reads with a temperature gradient rather than one flat blob.
     const core = new THREE.Mesh(
       new THREE.SphereGeometry(0.8, 10, 8),
       new THREE.MeshBasicMaterial({ color: 0xff7a1c, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
     );
     core.position.y = 0.7;
     group.add(core);
-    const E = 40;
+    const inner = new THREE.Mesh(
+      new THREE.SphereGeometry(0.42, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xffe8a6, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }),
+    );
+    inner.position.y = 0.6;
+    group.add(inner);
+
+    const E = 48;
     const em = makeParticles(E, 0xffb050, 0.3, true);
     for (let i = 0; i < E; i++) {
       em.pos[i * 3] = (fxRand() - 0.5); em.pos[i * 3 + 1] = fxRand() * 0.6; em.pos[i * 3 + 2] = (fxRand() - 0.5);
-      em.vel[i * 3] = (fxRand() - 0.5) * 0.8; em.vel[i * 3 + 1] = 1.6 + fxRand() * 2.2; em.vel[i * 3 + 2] = (fxRand() - 0.5) * 0.8;
+      em.vel[i * 3] = (fxRand() - 0.5) * 0.9; em.vel[i * 3 + 1] = 1.8 + fxRand() * 2.6; em.vel[i * 3 + 2] = (fxRand() - 0.5) * 0.9;
     }
     group.add(em.points);
-    const S = 28;
-    const sm = makeParticles(S, 0x565058, 0.5, false);
+
+    const S = 52;
+    // Warm medium-grey so the plume reads against both a dark sky and pale ground.
+    const sm = makeParticles(S, 0x847f78, 0.5, false);
     for (let i = 0; i < S; i++) {
       sm.pos[i * 3] = (fxRand() - 0.5) * 0.8; sm.pos[i * 3 + 1] = 0.8 + fxRand(); sm.pos[i * 3 + 2] = (fxRand() - 0.5) * 0.8;
-      sm.vel[i * 3] = (fxRand() - 0.5) * 0.5; sm.vel[i * 3 + 1] = 0.8 + fxRand() * 0.8; sm.vel[i * 3 + 2] = (fxRand() - 0.5) * 0.5;
+      sm.vel[i * 3] = (fxRand() - 0.5) * 0.5; sm.vel[i * 3 + 1] = 0.9 + fxRand(); sm.vel[i * 3 + 2] = (fxRand() - 0.5) * 0.5;
     }
     group.add(sm.points);
+
     const light = this.fireLights.find((l) => l.intensity < 0.1);
     if (light) {
       light.position.set(group.position.x, group.position.y + 1, group.position.z);
       light.intensity = 7; // claim it now so a second fire this frame grabs another
     }
-    this.spawnEffect(group, 2400, (age, dt, t) => {
-      const flick = 0.7 + 0.3 * Math.sin(t / 40);
+
+    // Prevailing wind the rising smoke leans into (world units/s of sideways accel).
+    const WIND_X = 0.9;
+    const WIND_Z = 0.35;
+    // The whole effect outlives the flames: the plume keeps rising, spreading and
+    // thinning for the full 4.2s while the flame body burns out over the first ~55%.
+    this.spawnEffect(group, 4200, (age, dt, t) => {
       const de = dt / 1000;
-      (core.material as THREE.MeshBasicMaterial).opacity = 0.9 * (1 - age) * flick;
-      core.scale.setScalar((1 + age) * flick);
-      if (light) light.intensity = 7 * (1 - age) * flick; // fades to 0 → auto-freed
-      advanceParticles(em, de, 0);
-      (em.points.material as THREE.PointsMaterial).opacity = 1 - age;
+      const flame = Math.min(1, age / 0.55); // flame body + pooled light live in the first 55%
+      const flick = 0.7 + 0.3 * Math.sin(t / 40);
+      const flick2 = 0.62 + 0.38 * Math.sin(t / 27 + 1.3);
+      (core.material as THREE.MeshBasicMaterial).opacity = 0.85 * (1 - flame) * flick;
+      core.scale.setScalar((1 + flame) * flick);
+      (inner.material as THREE.MeshBasicMaterial).opacity = 0.95 * (1 - flame) * flick2;
+      inner.scale.setScalar((0.9 + flame * 0.6) * flick2);
+      if (light) light.intensity = 7 * (1 - flame) * flick; // hits 0 at 55% → auto-freed
+
+      advanceParticles(em, de, 0.5); // gentle gravity so embers rise then arc back
+      const emMat = em.points.material as THREE.PointsMaterial;
+      emMat.opacity = 1 - flame;
+      emMat.size = 0.3 * (1 - flame * 0.5);
+
       advanceParticles(sm, de, 0);
+      for (let i = 0; i < sm.vel.length; i += 3) {
+        sm.vel[i] = sm.vel[i]! + WIND_X * de; // lean the plume downwind as it rises
+        sm.vel[i + 2] = sm.vel[i + 2]! + WIND_Z * de;
+      }
       const smMat = sm.points.material as THREE.PointsMaterial;
-      smMat.size = 0.5 + age * 1.4;
-      smMat.opacity = 0.5 * (1 - age);
+      smMat.size = 0.55 + age * 2.2; // billow outward as it climbs
+      smMat.opacity = 0.62 * (1 - age) * (1 - age * 0.35); // dense mid-rise, thins at the top
+
+      (scorch.material as THREE.MeshBasicMaterial).opacity = 0.55 * Math.min(1, age * 6) * (1 - age * 0.4);
     });
   }
 
