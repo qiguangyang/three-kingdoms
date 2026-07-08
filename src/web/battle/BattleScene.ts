@@ -7,7 +7,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { BattleSession } from '../../state/battleSession.js';
 import type { BattleEvent, BattleField, GeneralId, Vec2 } from '../../engine/battle/types.js';
-import type { BattleUnit } from '../../engine/types.js';
+import type { BattleUnit, TroopType } from '../../engine/types.js';
 import { factionColor } from '../theme.js';
 import {
   CELL_SIZE,
@@ -34,17 +34,62 @@ const ENV_PRESETS = {
   overcast: { skyTop: 0x6a7280, skyHz: 0x9aa2ac, fog: 0x9aa2ac, sun: 0xdadfe4, sunI: 1.25, hemiSky: 0xb2bac4, hemiI: 0.9, amb: 0.6 },
 } as const;
 
-let SOLDIER_GEO: THREE.BufferGeometry | null = null;
-function soldierGeometry(): THREE.BufferGeometry {
-  if (SOLDIER_GEO) return SOLDIER_GEO;
+// Distinct low-poly silhouettes per troop type (infantry=spear, archer=bow,
+// cavalry=mounted, navy=boat), each built once from primitives and shared
+// across all armies of that type.
+const SOLDIER_GEOS = new Map<string, THREE.BufferGeometry>();
+function soldierKind(type: TroopType): string {
+  if (type === 'heavyCav') return 'cavalry';
+  if (type === 'xuan') return 'infantry';
+  return type;
+}
+function soldierGeometryFor(type: TroopType): THREE.BufferGeometry {
+  const key = soldierKind(type);
+  const cached = SOLDIER_GEOS.get(key);
+  if (cached) return cached;
+  const g = buildSoldier(key);
+  SOLDIER_GEOS.set(key, g);
+  return g;
+}
+function isSharedSoldierGeo(g: THREE.BufferGeometry): boolean {
+  for (const v of SOLDIER_GEOS.values()) if (v === g) return true;
+  return false;
+}
+function buildSoldier(kind: string): THREE.BufferGeometry {
   const body = new THREE.CylinderGeometry(0.05, 0.1, 0.34, 6);
   body.translate(0, 0.17, 0);
   const head = new THREE.SphereGeometry(0.075, 8, 6);
   head.translate(0, 0.42, 0);
+  if (kind === 'archer') {
+    const bow = new THREE.TorusGeometry(0.12, 0.014, 5, 10, Math.PI * 1.25);
+    bow.rotateY(Math.PI / 2);
+    bow.translate(0.12, 0.34, 0);
+    return mergeGeometries([body, head, bow], false);
+  }
+  if (kind === 'cavalry') {
+    const horse = new THREE.BoxGeometry(0.5, 0.2, 0.16);
+    horse.translate(0, 0.3, 0);
+    const neck = new THREE.BoxGeometry(0.12, 0.24, 0.12);
+    neck.translate(0.25, 0.46, 0);
+    const rider = new THREE.CylinderGeometry(0.05, 0.08, 0.26, 6);
+    rider.translate(-0.05, 0.56, 0);
+    const rhead = new THREE.SphereGeometry(0.07, 8, 6);
+    rhead.translate(-0.05, 0.76, 0);
+    return mergeGeometries([horse, neck, rider, rhead], false);
+  }
+  if (kind === 'navy') {
+    const hull = new THREE.BoxGeometry(0.52, 0.1, 0.2);
+    hull.translate(0, 0.08, 0);
+    const prow = new THREE.BoxGeometry(0.14, 0.16, 0.14);
+    prow.translate(0.29, 0.14, 0);
+    const mast = new THREE.CylinderGeometry(0.012, 0.012, 0.52, 4);
+    mast.translate(0, 0.34, 0);
+    return mergeGeometries([hull, prow, mast], false);
+  }
+  // infantry (default): spearman
   const spear = new THREE.CylinderGeometry(0.012, 0.012, 0.6, 4);
   spear.translate(0.1, 0.34, 0);
-  SOLDIER_GEO = mergeGeometries([body, head, spear], false);
-  return SOLDIER_GEO;
+  return mergeGeometries([body, head, spear], false);
 }
 
 interface UnitVisual {
@@ -260,7 +305,7 @@ export class BattleScene {
   private buildUnit(u: BattleUnit): UnitVisual {
     const group = new THREE.Group();
     const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(factionColor(u.factionId)), roughness: 0.65 });
-    const soldiers = new THREE.InstancedMesh(soldierGeometry(), material, MAX_SOLDIERS);
+    const soldiers = new THREE.InstancedMesh(soldierGeometryFor(u.troopType), material, MAX_SOLDIERS);
     soldiers.castShadow = true;
     const offs = formationOffsets(MAX_SOLDIERS);
     const m = new THREE.Matrix4();
@@ -587,7 +632,7 @@ export class BattleScene {
     this.controls.dispose();
     this.scene.traverse((o) => {
       const mesh = o as THREE.Mesh;
-      if (mesh.geometry && mesh.geometry !== SOLDIER_GEO) mesh.geometry.dispose();
+      if (mesh.geometry && !isSharedSoldierGeo(mesh.geometry)) mesh.geometry.dispose();
       const mat = mesh.material;
       if (Array.isArray(mat)) mat.forEach((mm) => mm.dispose());
       else if (mat) (mat as THREE.Material).dispose();
@@ -645,7 +690,7 @@ function arcPoint(a: THREE.Vector3, b: THREE.Vector3, t: number, out: THREE.Vect
 function disposeObject(o: THREE.Object3D): void {
   o.traverse((c) => {
     const mesh = c as THREE.Mesh;
-    if (mesh.geometry && mesh.geometry !== SOLDIER_GEO) mesh.geometry.dispose();
+    if (mesh.geometry && !isSharedSoldierGeo(mesh.geometry)) mesh.geometry.dispose();
     const mat = mesh.material;
     if (Array.isArray(mat)) mat.forEach((mm) => mm.dispose());
     else if (mat) (mat as THREE.Material).dispose();
