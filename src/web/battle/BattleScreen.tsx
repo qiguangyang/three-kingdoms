@@ -14,6 +14,22 @@ import { BattleView } from './BattleView.js';
 import type { BattleSession } from '../../state/battleSession.js';
 import type { MessageKey } from '../../i18n/types.js';
 
+// Cinematic HUD palette — a dark, broadcast-style overlay on the 3D battle,
+// deliberately distinct from the app's paper theme (this is an immersive mode).
+const GOLD = '#c9a35c';
+const PAPER = '#e8dcc3';
+const PAPER_DIM = '#b8ad97';
+const LINE = 'rgba(201,163,92,.26)';
+const PANEL: React.CSSProperties = {
+  background: 'rgba(10,13,18,.82)',
+  border: `1px solid ${LINE}`,
+  borderRadius: 8,
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
+  color: PAPER,
+  boxShadow: '0 8px 30px rgba(0,0,0,.45)',
+};
+
 function troopTotal(session: BattleSession, factionId: string): number {
   return session.battle.units
     .filter((u) => u.factionId === factionId && u.troops > 0)
@@ -53,95 +69,168 @@ export const BattleScreen: React.FC = () => {
   const { battle } = session;
   const atk = battle.attackerFactionId;
   const def = battle.defenderFactionId;
+  const atkT = troopTotal(session, atk);
+  const defT = troopTotal(session, def);
+  const maxT = Math.max(atkT, defT, 1);
   const playerUnits = battle.units.filter((u) => u.factionId === session.playerFactionId && u.state === 'fielded');
   const reserves = battle.units.filter((u) => u.factionId === session.playerFactionId && u.state === 'reserve');
   const resolved = session.phase === 'resolved';
+  const won = session.attackerWon === session.playerIsAttacker;
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-2 px-4 py-3">
-      <header className="flex items-baseline justify-between">
-        <h2 className="font-display text-2xl tracking-widest text-ink-800">{t('battle.heading')}</h2>
-        <span className="font-mono text-sm text-ink-500">{t('battle.dayOf', { day: battle.daysElapsed, total: 30 })}</span>
-      </header>
-
-      {/* Troop bars */}
-      <div className="flex gap-4 text-xs">
-        <Bar label={t('battle.attackers')} color={factionColor(atk)} value={troopTotal(session, atk)} />
-        <Bar label={t('battle.defenders')} color={factionColor(def)} value={troopTotal(session, def)} />
-      </div>
-
-      {/* Field */}
-      <div className="relative flex-1 overflow-hidden rounded border border-ink-300/40 bg-parchment-100">
+    <div
+      className="relative h-full w-full overflow-hidden"
+      style={{ background: '#0a0d12', fontFamily: "'Noto Sans TC', system-ui, sans-serif" }}
+    >
+      {/* Full-bleed 3D battlefield */}
+      <div className="absolute inset-0">
         <BattleView session={session} />
       </div>
 
-      {/* Controls */}
-      {!resolved && (
-        <div className="flex flex-wrap items-center gap-2">
-          <button className="btn btn-primary" onClick={() => resolveBattleDay()}>{t('battle.advanceDay')}</button>
-          <button className="btn" onClick={() => setPlaying((p) => !p)}>{playing ? t('battle.pause') : t('battle.play')}</button>
-          {[1, 2, 4].map((sp) => (
-            <button key={sp} className={`btn btn-ghost ${session.speed === sp ? 'font-bold text-seal-700' : ''}`} onClick={() => setBattleSpeed(sp as 1 | 2 | 4)}>
-              {t('battle.speed')} ×{sp}
-            </button>
-          ))}
-          {reserves.length > 0 && (
-            <button className="btn" onClick={() => submitBattleOrders([{ kind: 'commitReserves', factionId: session.playerFactionId }])}>
-              {t('battle.commitReserves')}
-            </button>
-          )}
-          <button className="btn btn-ghost" onClick={() => quickResolveBattle()}>{t('battle.quickResolve')}</button>
-        </div>
-      )}
+      {/* Cinematic letterbox + vignette */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-16" style={{ background: 'linear-gradient(#000c, transparent)' }} />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40" style={{ background: 'linear-gradient(transparent, #000d)' }} />
+      <div className="pointer-events-none absolute inset-0" style={{ boxShadow: 'inset 0 0 220px rgba(0,0,0,.6)' }} />
 
-      {/* Gambits */}
-      {!resolved && session.gambits.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded border border-seal-500/40 bg-seal-500/5 px-2 py-1">
-          <span className="font-display text-xs tracking-widest text-seal-700">{t('battle.gambits')}</span>
-          {session.gambits.map((g) => (
-            <button key={g.id} className="btn btn-primary" onClick={() => { chooseBattleGambit(g.id); resolveBattleDay(); }}>
-              {t(g.labelKey as MessageKey)}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Per-unit orders */}
-      {!resolved && (
-        <div className="max-h-28 overflow-y-auto rounded border border-ink-300/40 px-2 py-1">
-          <div className="text-[11px] uppercase tracking-widest text-ink-500">{t('battle.yourOrders')}</div>
-          <ul className="flex flex-wrap gap-2">
-            {playerUnits.map((u) => (
-              <li key={u.id} className="flex items-center gap-1 rounded bg-parchment-50 px-1.5 py-0.5 text-xs">
-                <span className="font-mono">{u.troops.toLocaleString()}</span>
-                <button className="btn-ghost text-[11px]" onClick={() => submitBattleOrders([{ kind: 'hold', unitId: u.id }])}>{t('battle.hold')}</button>
-                <button className="btn-ghost text-[11px]" onClick={() => {
-                  const foe = battle.units.find((e) => e.factionId !== u.factionId && e.state === 'fielded');
-                  if (foe) submitBattleOrders([{ kind: 'charge', unitId: u.id, targetUnitId: foe.id }]);
-                }}>{t('battle.charge')}</button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* After-action */}
-      {resolved && (
-        <div className="rounded border border-ink-300/50 bg-parchment-50 px-4 py-3">
-          <div className={`font-display text-lg tracking-widest ${session.attackerWon === session.playerIsAttacker ? 'text-emerald-700' : 'text-seal-700'}`}>
-            {session.attackerWon === session.playerIsAttacker ? t('battle.victoryTitle') : t('battle.defeatTitle')}
+      {/* Intel panel — brand, day, faction strengths */}
+      <div className="absolute left-5 top-5 w-72 px-4 py-3" style={PANEL}>
+        <div className="flex items-center gap-3">
+          <span
+            className="grid h-9 w-9 place-items-center rounded"
+            style={{ background: '#b3382c', color: '#f3e4cf', fontFamily: "'Noto Serif TC', serif", fontWeight: 900, fontSize: 18 }}
+            aria-hidden
+          >
+            战
+          </span>
+          <div>
+            <div className="font-display text-lg leading-tight" style={{ letterSpacing: '0.3em', color: PAPER }}>
+              {t('battle.heading')}
+            </div>
+            <div className="mt-0.5 text-[10px]" style={{ letterSpacing: '0.22em', color: GOLD }}>
+              {t('battle.dayOf', { day: battle.daysElapsed, total: 30 })}
+            </div>
           </div>
-          <button className="btn btn-primary mt-2" autoFocus onClick={() => finishBattle()}>{t('battle.finish')}</button>
+        </div>
+        <div className="mt-3 flex flex-col gap-2.5 pt-3" style={{ borderTop: `1px dashed ${LINE}` }}>
+          <FactionRow label={t('battle.attackers')} color={factionColor(atk)} troops={atkT} max={maxT} />
+          <FactionRow label={t('battle.defenders')} color={factionColor(def)} troops={defT} max={maxT} />
+        </div>
+      </div>
+
+      {/* Bottom command cluster */}
+      {!resolved && (
+        <div className="absolute inset-x-0 bottom-5 flex flex-col items-center gap-2 px-4">
+          {/* Gambit opportunities — highlighted above the controls */}
+          {session.gambits.length > 0 && (
+            <div className="flex flex-wrap items-center justify-center gap-2 px-3 py-2" style={{ ...PANEL, borderColor: 'rgba(201,163,92,.5)' }}>
+              <span className="font-display text-xs" style={{ letterSpacing: '0.28em', color: GOLD }}>{t('battle.gambits')}</span>
+              {session.gambits.map((g) => (
+                <CinBtn key={g.id} variant="gold" onClick={() => { chooseBattleGambit(g.id); resolveBattleDay(); }}>
+                  {t(g.labelKey as MessageKey)}
+                </CinBtn>
+              ))}
+            </div>
+          )}
+
+          {/* Primary controls */}
+          <div className="flex flex-wrap items-center justify-center gap-2 px-3 py-2" style={PANEL}>
+            <CinBtn variant="gold" onClick={() => resolveBattleDay()}>{t('battle.advanceDay')}</CinBtn>
+            <CinBtn onClick={() => setPlaying((p) => !p)}>{playing ? t('battle.pause') : t('battle.play')}</CinBtn>
+            <span className="mx-1 h-5 w-px" style={{ background: LINE }} />
+            {[1, 2, 4].map((sp) => (
+              <CinBtn key={sp} active={session.speed === sp} onClick={() => setBattleSpeed(sp as 1 | 2 | 4)}>
+                {t('battle.speed')} ×{sp}
+              </CinBtn>
+            ))}
+            {reserves.length > 0 && (
+              <>
+                <span className="mx-1 h-5 w-px" style={{ background: LINE }} />
+                <CinBtn onClick={() => submitBattleOrders([{ kind: 'commitReserves', factionId: session.playerFactionId }])}>
+                  {t('battle.commitReserves')}
+                </CinBtn>
+              </>
+            )}
+            <span className="mx-1 h-5 w-px" style={{ background: LINE }} />
+            <CinBtn onClick={() => quickResolveBattle()}>{t('battle.quickResolve')}</CinBtn>
+          </div>
+
+          {/* Per-unit orders */}
+          {playerUnits.length > 0 && (
+            <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 px-3 py-1.5" style={PANEL}>
+              <span className="text-[10px] uppercase" style={{ letterSpacing: '0.2em', color: PAPER_DIM }}>{t('battle.yourOrders')}</span>
+              {playerUnits.map((u) => (
+                <span key={u.id} className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs" style={{ background: 'rgba(255,255,255,.05)' }}>
+                  <span className="font-mono tabular-nums" style={{ color: PAPER_DIM }}>{u.troops.toLocaleString()}</span>
+                  <button className="text-[11px]" style={{ color: GOLD }} onClick={() => submitBattleOrders([{ kind: 'hold', unitId: u.id }])}>{t('battle.hold')}</button>
+                  <button className="text-[11px]" style={{ color: GOLD }} onClick={() => {
+                    const foe = battle.units.find((e) => e.factionId !== u.factionId && e.state === 'fielded');
+                    if (foe) submitBattleOrders([{ kind: 'charge', unitId: u.id, targetUnitId: foe.id }]);
+                  }}>{t('battle.charge')}</button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* After-action overlay */}
+      {resolved && (
+        <div className="absolute inset-0 grid place-items-center" style={{ background: 'rgba(5,7,10,.62)' }}>
+          <div className="px-10 py-8 text-center" style={PANEL}>
+            <div className="text-[11px]" style={{ letterSpacing: '0.4em', color: GOLD }}>{t('battle.heading')}</div>
+            <div
+              className="mt-3 font-display text-4xl"
+              style={{ letterSpacing: '0.18em', color: won ? '#7ac89a' : '#e07a6a' }}
+            >
+              {won ? t('battle.victoryTitle') : t('battle.defeatTitle')}
+            </div>
+            <div className="mt-6">
+              <CinBtn variant="gold" onClick={() => finishBattle()}>{t('battle.finish')}</CinBtn>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 };
 
-const Bar: React.FC<{ label: string; color: string; value: number }> = ({ label, color, value }) => (
-  <div className="flex items-center gap-2">
-    <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: color }} aria-hidden />
-    <span className="text-ink-600">{label}</span>
-    <span className="font-mono tabular-nums text-ink-800">{value.toLocaleString()}</span>
+// A single faction's strength: colour swatch, name, troop count, and a bar
+// filling relative to the stronger side — the campaign-map "power" read.
+const FactionRow: React.FC<{ label: string; color: string; troops: number; max: number }> = ({ label, color, troops, max }) => (
+  <div>
+    <div className="flex items-center justify-between">
+      <span className="flex items-center gap-2">
+        <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} aria-hidden />
+        <span className="text-xs" style={{ color: PAPER }}>{label}</span>
+      </span>
+      <span className="font-mono text-[11px] tabular-nums" style={{ color: PAPER_DIM }}>{troops.toLocaleString()}</span>
+    </div>
+    <div className="mt-1 h-[5px] overflow-hidden rounded" style={{ background: 'rgba(255,255,255,.08)' }}>
+      <span
+        className="block h-full rounded transition-[width] duration-1000 ease-out"
+        style={{ width: `${(troops / max) * 100}%`, background: `linear-gradient(90deg, ${color}55, ${color})` }}
+      />
+    </div>
   </div>
 );
+
+// Dark-glass HUD button; `gold` is the primary/emphasis variant, `active`
+// marks a selected toggle (e.g. current speed).
+const CinBtn: React.FC<{ onClick: () => void; children: React.ReactNode; variant?: 'gold' | 'plain'; active?: boolean }> = ({ onClick, children, variant = 'plain', active = false }) => {
+  const gold = variant === 'gold';
+  return (
+    <button
+      onClick={onClick}
+      className="rounded px-3 py-1.5 text-xs transition-colors"
+      style={{
+        background: gold ? 'linear-gradient(180deg, rgba(201,163,92,.28), rgba(201,163,92,.14))' : active ? 'rgba(201,163,92,.16)' : 'rgba(255,255,255,.05)',
+        border: `1px solid ${gold || active ? 'rgba(201,163,92,.55)' : LINE}`,
+        color: gold ? '#f4e6cb' : active ? GOLD : PAPER,
+        letterSpacing: '0.08em',
+        fontWeight: gold ? 600 : 400,
+      }}
+    >
+      {children}
+    </button>
+  );
+};
