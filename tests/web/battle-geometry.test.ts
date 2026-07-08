@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   HEIGHT_SCALE, cellColor, cellWorldXZ, terrainHeight, unitWorldPosition,
   blockScale, buildTerrainGeometry, battleCentroidXZ, fieldWorldSize,
+  soldierCount, formationOffsets,
 } from '../../src/web/battle/geometry.js';
 import type { BattleField } from '../../src/engine/battle/types.js';
 import type { BattleUnit } from '../../src/engine/types.js';
@@ -72,6 +73,22 @@ describe('battle geometry', () => {
       expect(c).toBeGreaterThanOrEqual(0);
       expect(c).toBeLessThanOrEqual(1);
     }
+  });
+
+  it('soldierCount is monotonic and clamped to 4..48', () => {
+    expect(soldierCount(0)).toBe(4);
+    expect(soldierCount(500)).toBeLessThan(soldierCount(20000));
+    expect(soldierCount(1e9)).toBe(48);
+  });
+
+  it('formationOffsets returns count offsets in a centered grid', () => {
+    expect(formationOffsets(1)).toHaveLength(1);
+    const nine = formationOffsets(9, 1);
+    expect(nine).toHaveLength(9);
+    // centered: mean offset ~ 0
+    const mean = nine.reduce((a, o) => ({ x: a.x + o.x, z: a.z + o.z }), { x: 0, z: 0 });
+    expect(mean.x / 9).toBeCloseTo(0);
+    expect(mean.z / 9).toBeCloseTo(0);
   });
 
   it('centroid stays within field world bounds', () => {

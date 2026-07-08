@@ -80,6 +80,27 @@ export function buildTerrainGeometry(
   return { positions, colors, indices };
 }
 
+// Number of soldier figures to draw for a unit block — scaled to troop count,
+// clamped so a small rout still reads and a huge stack stays performant.
+export function soldierCount(troops: number): number {
+  return Math.max(4, Math.min(48, Math.round(Math.sqrt(Math.max(0, troops)) / 3)));
+}
+
+// Local XZ offsets arranging `count` soldiers in a roughly-square grid centered
+// on the origin (ranks along Z, files along X). Deterministic.
+export function formationOffsets(count: number, spacing = 0.34): { x: number; z: number }[] {
+  const n = Math.max(1, Math.floor(count));
+  const cols = Math.ceil(Math.sqrt(n));
+  const rows = Math.ceil(n / cols);
+  const out: { x: number; z: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const r = Math.floor(i / cols);
+    const c = i % cols;
+    out.push({ x: (c - (cols - 1) / 2) * spacing, z: (r - (rows - 1) / 2) * spacing });
+  }
+  return out;
+}
+
 // Average world XZ of the still-active units, for camera framing.
 export function battleCentroidXZ(units: BattleUnit[], field: BattleField): { x: number; z: number } {
   const active = units.filter((u) => u.state === 'fielded' || u.state === 'routing');

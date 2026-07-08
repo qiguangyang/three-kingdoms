@@ -7,6 +7,9 @@ import {
 } from '../../state/store.js';
 import { t } from '../../i18n/locale.js';
 import { factionColor } from '../theme.js';
+import {
+  playCharge, playClash, playDuel, playFire, playGong, playRetreat, playRout, playVolley,
+} from '../audio/battle.js';
 import { BattleView } from './BattleView.js';
 import type { BattleSession } from '../../state/battleSession.js';
 import type { MessageKey } from '../../i18n/types.js';
@@ -30,6 +33,21 @@ export const BattleScreen: React.FC = () => {
     const id = setTimeout(() => resolveBattleDay(), 900 / session.speed);
     return () => clearTimeout(id);
   }, [session, playing]);
+
+  // Play at most one cue per event kind for the day just resolved (works for
+  // both the 3D and SVG views; silent no-op when muted or WebAudio is absent).
+  useEffect(() => {
+    if (!session || session.lastEvents.length === 0) return;
+    const kinds = new Set(session.lastEvents.map((e) => e.kind));
+    if (kinds.has('duel')) playDuel();
+    if (kinds.has('fire')) playFire();
+    if (kinds.has('volley')) playVolley();
+    if (kinds.has('charge') || kinds.has('reserveCommitted')) playCharge();
+    if (kinds.has('clash')) playClash();
+    if (kinds.has('moraleBreak') || kinds.has('rout')) playRout();
+    const end = session.lastEvents.find((e) => e.kind === 'end');
+    if (end && end.kind === 'end') (end.attackerWon === session.playerIsAttacker ? playGong : playRetreat)();
+  }, [session]);
 
   if (!session) return null;
   const { battle } = session;

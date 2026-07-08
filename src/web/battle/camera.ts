@@ -7,8 +7,9 @@ export function framing(
 ): { position: [number, number, number]; target: [number, number, number] } {
   const span = Math.max(size.w, size.h);
   const dist = span * 0.85;
+  // Low, pulled-back angle for an epic, more horizontal view of the ranks.
   return {
-    position: [centroid.x, dist * 0.9, centroid.z + dist * 0.9],
-    target: [centroid.x, 0, centroid.z],
+    position: [centroid.x, dist * 0.55, centroid.z + dist * 1.05],
+    target: [centroid.x, 1.5, centroid.z],
   };
 }
