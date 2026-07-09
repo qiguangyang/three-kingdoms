@@ -15,6 +15,9 @@ const KEYS = [
   'battle.act.deploy', 'battle.act.engage', 'battle.act.decide',
   'battle.narr.deploy', 'battle.narr.volley', 'battle.narr.clash', 'battle.narr.charge',
   'battle.narr.fire', 'battle.narr.flood', 'battle.narr.duel', 'battle.narr.rout',
+  'battle.reveal.tag', 'battle.reveal.cavalryCharge', 'battle.reveal.fireAttack',
+  'battle.reveal.floodAttack', 'battle.reveal.duelChallenge', 'battle.reveal.fordCrossing',
+  'battle.reveal.ambush', 'battle.mute', 'battle.unmute',
 ] as const;
 
 describe('battle screen i18n keys', () => {

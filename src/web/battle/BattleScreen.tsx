@@ -12,6 +12,7 @@ import { CITIES } from '../../data/cities.js';
 import { GENERALS } from '../../data/generals/index.js';
 import {
   playCharge, playClash, playDuel, playFire, playGong, playRetreat, playRout, playVolley,
+  startBattleMusic, stopBattleMusic, setBattleIntensity, isMuted, toggleMuted,
 } from '../audio/battle.js';
 import { BattleView } from './BattleView.js';
 import type { BattleSession } from '../../state/battleSession.js';
@@ -59,9 +60,17 @@ export const BattleScreen: React.FC = () => {
   const [narr, setNarr] = React.useState<{ key: MessageKey; n: number } | null>(null);
   const narrN = React.useRef(0);
   const combatStarted = React.useRef(false);
+  // Full-screen stratagem reveal card (when the player unleashes a gambit).
+  const [reveal, setReveal] = React.useState<{ nameKey: MessageKey; descKey: MessageKey; n: number } | null>(null);
+  const revealN = React.useRef(0);
+  const [muted, setMuted] = React.useState(isMuted());
   // Reset the per-battle presentation state when a new battle (city) opens.
   const cityId = session?.battle.cityId;
-  useEffect(() => { setIntroOpen(true); combatStarted.current = false; setNarr(null); }, [cityId]);
+  useEffect(() => { setIntroOpen(true); combatStarted.current = false; setNarr(null); setReveal(null); }, [cityId]);
+  // Music bed: stop on unmount, and stop once the battle is decided.
+  useEffect(() => () => stopBattleMusic(), []);
+  const phase = session?.phase;
+  useEffect(() => { if (phase === 'resolved') stopBattleMusic(); }, [phase]);
 
   // Auto-play: while playing and awaiting orders, resolve a day on an interval
   // scaled by speed. A gambit window only slows the cadence (giving you a moment
@@ -135,7 +144,10 @@ export const BattleScreen: React.FC = () => {
       ['reserveCommitted', 'battle.narr.charge'],
       ['volley', 'battle.narr.volley'],
     ];
-    if (['fire', 'flood', 'duel', 'clash', 'volley', 'charge'].some((k) => kinds.has(k))) combatStarted.current = true;
+    const fighting = ['fire', 'flood', 'duel', 'clash', 'volley', 'charge', 'rout', 'moraleBreak'].some((k) => kinds.has(k));
+    if (fighting) combatStarted.current = true;
+    // Swell the music when blood is spilled; ease it back on quiet days.
+    setBattleIntensity(fighting ? 0.9 : combatStarted.current ? 0.5 : 0.2);
     const nh = NARR.find(([k]) => kinds.has(k));
     narrN.current += 1;
     setNarr({ key: nh ? nh[1] : 'battle.narr.deploy', n: narrN.current });
@@ -235,7 +247,12 @@ export const BattleScreen: React.FC = () => {
             <div className="flex flex-wrap items-center justify-center gap-2 px-3 py-2" style={{ ...PANEL, borderColor: 'rgba(201,163,92,.5)' }}>
               <span className="font-display text-xs" style={{ letterSpacing: '0.28em', color: GOLD }}>{t('battle.gambits')}</span>
               {session.gambits.map((g) => (
-                <CinBtn key={g.id} variant="gold" onClick={() => { chooseBattleGambit(g.id); resolveBattleDay(); }}>
+                <CinBtn key={g.id} variant="gold" onClick={() => {
+                  revealN.current += 1;
+                  setReveal({ nameKey: g.labelKey as MessageKey, descKey: `battle.reveal.${g.id}` as MessageKey, n: revealN.current });
+                  chooseBattleGambit(g.id);
+                  resolveBattleDay();
+                }}>
                   {t(g.labelKey as MessageKey)}
                 </CinBtn>
               ))}
@@ -262,6 +279,12 @@ export const BattleScreen: React.FC = () => {
             )}
             <span className="mx-1 h-5 w-px" style={{ background: LINE }} />
             <CinBtn onClick={() => quickResolveBattle()}>{t('battle.quickResolve')}</CinBtn>
+            <CinBtn onClick={() => {
+              const m = toggleMuted();
+              setMuted(m);
+              if (m) stopBattleMusic();
+              else startBattleMusic();
+            }}>{muted ? `🔇 ${t('battle.unmute')}` : `🔊 ${t('battle.mute')}`}</CinBtn>
           </div>
 
           {/* Per-unit orders */}
@@ -280,6 +303,20 @@ export const BattleScreen: React.FC = () => {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Stratagem reveal card */}
+      {reveal && !resolved && (
+        <div key={reveal.n} className="battle-reveal pointer-events-none absolute inset-0 z-30 grid place-items-center"
+          style={{ background: 'radial-gradient(circle at 50% 46%, rgba(70,24,14,.42), rgba(6,7,10,.74) 68%)' }}>
+          <div className="text-center">
+            <div style={{ letterSpacing: '0.55em', color: GOLD, fontSize: 13, fontWeight: 600 }}>{t('battle.reveal.tag')}</div>
+            <div className="font-display" style={{ fontSize: 'clamp(58px, 10vw, 132px)', fontWeight: 900, letterSpacing: '0.16em', color: '#f5e7c6', textShadow: '0 4px 30px #000, 0 0 54px rgba(201,163,92,.5)', margin: '0.08em 0 0.12em' }}>
+              {t(reveal.nameKey)}
+            </div>
+            <div className="font-display" style={{ letterSpacing: '0.18em', color: PAPER_DIM, fontSize: 'clamp(15px, 1.9vw, 22px)' }}>{t(reveal.descKey)}</div>
+          </div>
         </div>
       )}
 
@@ -303,7 +340,7 @@ export const BattleScreen: React.FC = () => {
 
       {/* Pre-battle cinematic title card */}
       {introOpen && !resolved && (
-        <BattleIntro session={session} game={game} onBegin={() => { setIntroOpen(false); setPlaying(true); }} />
+        <BattleIntro session={session} game={game} onBegin={() => { setIntroOpen(false); setPlaying(true); if (!muted) startBattleMusic(); }} />
       )}
     </div>
   );
