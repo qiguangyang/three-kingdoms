@@ -18,7 +18,7 @@ import { pickName } from '../../i18n/locale.js';
 import { useSession } from '../hooks/useSession.js';
 import { selectLocale } from '../../state/selectors.js';
 
-interface MapViewProps {
+export interface MapViewProps {
   game: GameState;
   selectedCityId: string | null;
   onSelectCity: (cityId: string | null) => void;
@@ -233,6 +233,7 @@ export const MapView: React.FC<MapViewProps> = ({
     <div ref={containerRef} className="relative h-full w-full overflow-hidden">
       <svg
         className="map-svg"
+        data-testid="svg-map"
         viewBox={`${safeViewbox.x} ${safeViewbox.y} ${safeViewbox.w} ${safeViewbox.h}`}
         width="100%"
         height="100%"

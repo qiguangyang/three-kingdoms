@@ -12,7 +12,7 @@ import {
   setSelectedCity,
   toggleLocale,
 } from '../../state/store.js';
-import { MapView } from '../components/MapView.js';
+import { WorldMapView } from '../map/WorldMapView.js';
 import { StatusBar } from '../components/StatusBar.js';
 import { Sidebar } from '../components/Sidebar.js';
 import { WorldNewsFeed } from '../components/WorldNewsFeed.js';
@@ -288,7 +288,7 @@ export const MainScreen: React.FC = () => {
       <div className="relative flex flex-1 overflow-hidden">
         <div className="flex flex-1 flex-col">
           <div className="relative flex-1 overflow-hidden">
-            <MapView
+            <WorldMapView
               game={game}
               selectedCityId={selectedCityId}
               onSelectCity={setSelectedCity}
