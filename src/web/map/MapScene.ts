@@ -346,6 +346,12 @@ export class MapScene {
       if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose();
     });
     this.renderer.dispose();
+    // EffectComposer.dispose() only frees its own ping-pong targets + copyPass;
+    // dispose each pass so UnrealBloomPass's render targets and the pass shader
+    // materials (OutputPass, grade ShaderPass) are released too.
+    for (const pass of this.composer.passes) {
+      (pass as { dispose?: () => void }).dispose?.();
+    }
     this.composer.dispose();
     this.labelRenderer.domElement.remove();
   }
