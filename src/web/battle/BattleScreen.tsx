@@ -217,7 +217,7 @@ export const BattleScreen: React.FC = () => {
 
       {/* Cinematic event caption */}
       {caption && !resolved && (
-        <div key={caption.n} className="battle-caption pointer-events-none absolute inset-x-0 top-[15%] flex justify-center">
+        <div key={`cap-${caption.n}`} className="battle-caption pointer-events-none absolute inset-x-0 top-[15%] flex justify-center">
           <span
             className="font-display"
             style={{ fontSize: 'clamp(28px, 4.4vw, 52px)', fontWeight: 900, letterSpacing: '0.2em', color: '#f3e5c6', textShadow: '0 2px 18px #000, 0 0 34px rgba(201,163,92,.45)' }}
@@ -229,7 +229,7 @@ export const BattleScreen: React.FC = () => {
 
       {/* Documentary narration subtitle */}
       {!introOpen && !resolved && narr && (
-        <div key={narr.n} className="battle-narr pointer-events-none absolute inset-x-0 bottom-[20%] flex justify-center px-6">
+        <div key={`narr-${narr.n}`} className="battle-narr pointer-events-none absolute inset-x-0 bottom-[20%] flex justify-center px-6">
           <span
             className="font-display text-center"
             style={{ fontSize: 'clamp(15px, 2vw, 22px)', letterSpacing: '0.14em', color: PAPER, fontWeight: 300, textShadow: '0 2px 14px #000, 0 0 4px #000' }}
@@ -246,7 +246,10 @@ export const BattleScreen: React.FC = () => {
           {session.gambits.length > 0 && (
             <div className="flex flex-wrap items-center justify-center gap-2 px-3 py-2" style={{ ...PANEL, borderColor: 'rgba(201,163,92,.5)' }}>
               <span className="font-display text-xs" style={{ letterSpacing: '0.28em', color: GOLD }}>{t('battle.gambits')}</span>
-              {session.gambits.map((g) => (
+              {/* One button per distinct stratagem: chooseGambit resolves by id
+                  (first match), so duplicate-id gambits from different units are
+                  the same option — showing them twice misleads and collides keys. */}
+              {session.gambits.filter((g, i, a) => a.findIndex((x) => x.id === g.id) === i).map((g) => (
                 <CinBtn key={g.id} variant="gold" onClick={() => {
                   revealN.current += 1;
                   setReveal({ nameKey: g.labelKey as MessageKey, descKey: `battle.reveal.${g.id}` as MessageKey, n: revealN.current });
@@ -308,7 +311,7 @@ export const BattleScreen: React.FC = () => {
 
       {/* Stratagem reveal card */}
       {reveal && !resolved && (
-        <div key={reveal.n} className="battle-reveal pointer-events-none absolute inset-0 z-30 grid place-items-center"
+        <div key={`reveal-${reveal.n}`} className="battle-reveal pointer-events-none absolute inset-0 z-30 grid place-items-center"
           style={{ background: 'radial-gradient(circle at 50% 46%, rgba(70,24,14,.42), rgba(6,7,10,.74) 68%)' }}>
           <div className="text-center">
             <div style={{ letterSpacing: '0.55em', color: GOLD, fontSize: 13, fontWeight: 600 }}>{t('battle.reveal.tag')}</div>
