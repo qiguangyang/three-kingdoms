@@ -9,6 +9,7 @@
 // point used by completion handlers, replay tests, and AI internals
 // that need synchronous state transitions.
 
+import { createBattle } from './battle/index.js';
 import { resolveQuickBattle } from './combat.js';
 import { runScenarioEvents } from './events.js';
 import {
@@ -202,10 +203,12 @@ export function tickDays(
   state: GameState,
   daysToAdvance: number,
   agents: Record<string, FactionAgent>,
+  options?: { deferPlayerBattles?: boolean },
 ): GameState {
   let next = state;
   for (let i = 0; i < daysToAdvance; i++) {
-    next = tickOneDay(next, agents);
+    if (next.pendingBattle) break; // a player battle is owed; stop advancing
+    next = tickOneDay(next, agents, options);
   }
   return next;
 }
@@ -213,8 +216,44 @@ export function tickDays(
 function tickOneDay(
   state: GameState,
   agents: Record<string, FactionAgent>,
+  options?: { deferPlayerBattles?: boolean },
 ): GameState {
   let next = state;
+
+  // Step 0: atomic player-siege deferral. Before touching ANY op this tick,
+  // peek the queue for the first siege that (a) completes this tick — i.e.
+  // its daysRemaining would hit 0, which is daysRemaining <= 1 before the
+  // decrement — and (b) involves the player as attacker or defender. If one
+  // exists, pause the entire day: nothing is decremented, the calendar day
+  // is frozen, and the battle is handed to the tactical BattleScreen. The
+  // siege op is dropped from the queue so it can't re-fire when the
+  // strategic loop resumes (the BattleScreen owes the resolution). Keeping
+  // this peek before Step 1 makes the calendar day and every op timer stay
+  // in lockstep across the pause — no drift on resume.
+  if (options?.deferPlayerBattles) {
+    const dueSiege = next.pendingOps.find(
+      (op): op is Extract<PendingOp, { kind: 'siege' }> =>
+        op.kind === 'siege' &&
+        op.daysRemaining <= 1 &&
+        (op.factionId === next.playerFactionId ||
+          (next.cities[op.targetCityId]?.factionId ?? '__neutral__') === next.playerFactionId),
+    );
+    if (dueSiege) {
+      const defenderFactionId = next.cities[dueSiege.targetCityId]?.factionId ?? '__neutral__';
+      const battle = createBattle(next, {
+        cityId: dueSiege.targetCityId,
+        attackerFactionId: dueSiege.factionId,
+        defenderFactionId,
+        attackingGeneralIds: dueSiege.generalIds,
+        attackingTroops: dueSiege.troops,
+      });
+      return {
+        ...next,
+        pendingBattle: battle,
+        pendingOps: next.pendingOps.filter((op) => op !== dueSiege),
+      };
+    }
+  }
 
   // Step 1: decrement ops and apply completions. Completion handlers
   // may spawn follow-up ops (e.g., march → siege) via scheduleOp, which

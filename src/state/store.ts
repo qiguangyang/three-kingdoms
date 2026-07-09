@@ -1,7 +1,10 @@
 import { createStore } from 'zustand/vanilla';
 import type { StoreApi } from 'zustand/vanilla';
 import { makeDefaultAgent } from '../engine/ai/index.js';
-import type { FactionAgent, GameState, LogEntry, Scenario, StrategicCommand } from '../engine/types.js';
+import type { FactionAgent, GameState, LogEntry, Personality, Scenario, StrategicCommand, TacticalCommand } from '../engine/types.js';
+// GambitId lives in the battle-local types module, not the engine barrel
+// (../engine/types.js imports it internally but does not re-export it).
+import type { GambitId } from '../engine/battle/types.js';
 import { buildInitialState } from '../engine/scenario.js';
 import { advanceMonth, applyCommand, checkOutcome } from '../engine/turn.js';
 import { schedulePlayerCommand, tickDays } from '../engine/pendingOp.js';
@@ -9,6 +12,10 @@ import { CONTINUOUS_SLOT, loadFromSlot, saveToSlot } from './persistence.js';
 import { REF_DATA } from '../data/index.js';
 import type { Locale } from '../i18n/types.js';
 import { setLocale } from '../i18n/locale.js';
+import {
+  autoResolveSession, chooseGambit, queuePlayerCommand, resolveDay, sessionResult, setSpeed, startSession,
+} from './battleSession.js';
+import type { BattleSession } from './battleSession.js';
 
 // ----- UI state slice -----
 //
@@ -45,6 +52,7 @@ export interface SessionState {
   game: GameState | null;
   ui: UIState;
   agents: Record<string, FactionAgent>;
+  battle: BattleSession | null;
 }
 
 const initialUI: UIState = {
@@ -61,6 +69,7 @@ export const gameStore: StoreApi<SessionState> = createStore<SessionState>(() =>
   game: null,
   ui: initialUI,
   agents: {},
+  battle: null,
 }));
 
 // ----- Helpers used by the UI to drive the engine -----
@@ -109,7 +118,10 @@ export function endTurn(): void {
 }
 
 // Advance the calendar by `days` in-game days, ticking every pending
-// op and rolling over months / years on boundaries.
+// op and rolling over months / years on boundaries. Player-involved
+// sieges are deferred: if one comes due mid-advance, the calendar
+// pauses and control hands off to the battle screen instead of
+// auto-resolving.
 export function advanceDays(days: number): void {
   const { game, agents } = gameStore.getState();
   if (!game) return;
@@ -117,8 +129,19 @@ export function advanceDays(days: number): void {
   // Use the new tickDays which knows how to apply pending ops; AI
   // strategic decisions fire at the top of each month from inside
   // tickDays. Note: advanceMonth is no longer the canonical path.
-  const next = tickDays(game, days, agents);
+  const next = tickDays(game, days, agents, { deferPlayerBattles: true });
   void advanceMonth; // keep import alive for tests that use it directly
+  if (next.pendingBattle) {
+    const personalities: Record<string, Personality> = {};
+    for (const f of Object.values(next.factions)) personalities[f.id] = f.personality;
+    gameStore.setState((s) => ({
+      ...s,
+      game: next,
+      battle: startSession(next.pendingBattle!, next.playerFactionId, personalities),
+      ui: { ...s.ui, screen: { kind: 'battle' } },
+    }));
+    return;
+  }
   const digest = extractDigest(logLenBefore, next.log);
   const outcome = checkOutcome(next);
   gameStore.setState((s) => ({
@@ -196,6 +219,70 @@ export function setScreen(screen: Screen): void {
   gameStore.setState((s) => ({ ...s, ui: { ...s.ui, screen } }));
 }
 
+// ----- Battle screen mutators -----
+//
+// A BattleSession wraps the pure battle sim (see battleSession.ts) with
+// player-facing state: queued orders, offered gambits, playback speed.
+// These mutators route UI intents into that session and never touch the
+// engine's Battle directly.
+
+function sessionFromGame(game: GameState): BattleSession {
+  const personalities: Record<string, Personality> = {};
+  for (const f of Object.values(game.factions)) personalities[f.id] = f.personality;
+  return startSession(game.pendingBattle!, game.playerFactionId, personalities);
+}
+
+// Route to the battle screen for the game's current pendingBattle (used on
+// load/restore and by advanceDays when a siege defers).
+export function enterPendingBattle(): void {
+  gameStore.setState((s) => {
+    if (!s.game?.pendingBattle) return s;
+    return { ...s, battle: sessionFromGame(s.game), ui: { ...s.ui, screen: { kind: 'battle' } } };
+  });
+}
+
+export function submitBattleOrders(cmds: TacticalCommand[]): void {
+  gameStore.setState((s) => {
+    if (!s.battle) return s;
+    let sess = s.battle;
+    for (const c of cmds) sess = queuePlayerCommand(sess, c);
+    return { ...s, battle: sess };
+  });
+}
+
+export function chooseBattleGambit(gambitId: GambitId): void {
+  gameStore.setState((s) => (s.battle ? { ...s, battle: chooseGambit(s.battle, gambitId) } : s));
+}
+
+export function resolveBattleDay(): void {
+  gameStore.setState((s) => (s.battle ? { ...s, battle: resolveDay(s.battle) } : s));
+}
+
+export function setBattleSpeed(speed: 1 | 2 | 4): void {
+  gameStore.setState((s) => (s.battle ? { ...s, battle: setSpeed(s.battle, speed) } : s));
+}
+
+export function quickResolveBattle(): void {
+  gameStore.setState((s) => (s.battle ? { ...s, battle: autoResolveSession(s.battle) } : s));
+}
+
+// Fold the resolved battle's outcome back into GameState (casualties,
+// city capture, general fates), clear the pendingBattle + battle slice,
+// and route to game-over or back to the main screen.
+export function finishBattle(): void {
+  const { game, battle } = gameStore.getState();
+  if (!game || !battle) return;
+  const result = sessionResult(game, battle);
+  const cleared: GameState = { ...result.state, pendingBattle: undefined };
+  const outcome = checkOutcome(cleared);
+  gameStore.setState((s) => ({
+    ...s,
+    game: cleared,
+    battle: null,
+    ui: outcome ? { ...s.ui, screen: { kind: 'gameOver', outcome } } : { ...s.ui, screen: { kind: 'main' } },
+  }));
+}
+
 export function setMessage(message: string | null): void {
   gameStore.setState((s) => ({ ...s, ui: { ...s.ui, message } }));
 }
@@ -245,6 +332,8 @@ export function loadGame(snapshot: { game: GameState; locale?: Locale }): void {
       locale: snapshot.locale ?? s.ui.locale,
     },
   }));
+  // If the restored game was mid-battle, resume the battle screen.
+  if (gameStore.getState().game?.pendingBattle) enterPendingBattle();
 }
 
 // ----- Continuous autosave -----

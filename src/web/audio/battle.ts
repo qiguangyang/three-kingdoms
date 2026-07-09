@@ -179,3 +179,127 @@ export function playRetreat(): void {
     glideTo: 80,
   });
 }
+
+// Rising rush for a cavalry charge.
+export function playCharge(): void {
+  if (isMuted()) return;
+  playTone({ freq: 160, type: 'sawtooth', durationMs: 260, peakGain: 0.14, attackMs: 8, releaseMs: 120, glideTo: 320 });
+}
+
+// Short hiss cluster for an arrow volley.
+export function playVolley(): void {
+  if (isMuted()) return;
+  for (const offsetMs of [0, 40, 80]) {
+    setTimeout(() => playTone({ freq: 1400, type: 'triangle', durationMs: 90, peakGain: 0.05, attackMs: 2, releaseMs: 70, glideTo: 700 }), offsetMs);
+  }
+}
+
+// Low roar for a fire attack.
+export function playFire(): void {
+  if (isMuted()) return;
+  playTone({ freq: 90, type: 'sawtooth', durationMs: 420, peakGain: 0.16, attackMs: 20, releaseMs: 260, glideTo: 60 });
+  playTone({ freq: 300, type: 'square', durationMs: 300, peakGain: 0.05, attackMs: 10, releaseMs: 200, glideTo: 140 });
+}
+
+// Two-note clash for a general's duel.
+export function playDuel(): void {
+  if (isMuted()) return;
+  playTone({ freq: 990, type: 'square', durationMs: 120, peakGain: 0.1, attackMs: 2, releaseMs: 90, glideTo: 660 });
+  setTimeout(() => playTone({ freq: 1240, type: 'square', durationMs: 140, peakGain: 0.1, attackMs: 2, releaseMs: 110, glideTo: 520 }), 130);
+}
+
+// Falling tone for a rout.
+export function playRout(): void {
+  if (isMuted()) return;
+  playTone({ freq: 420, type: 'sine', durationMs: 380, peakGain: 0.12, attackMs: 6, releaseMs: 260, glideTo: 90 });
+}
+
+// ── Procedural battle music bed ─────────────────────────────────────────────
+// A low drone (root/fifth/octave through a slowly-sweeping lowpass) under a war
+// drum whose tempo and weight rise with the fighting. Synthesized — no assets —
+// and it sits quietly under the event SFX. start on Begin, stop on finish/leave.
+interface Music {
+  master: GainNode;
+  filter: BiquadFilterNode;
+  drone: OscillatorNode[];
+  lfo: OscillatorNode;
+  drumTimer: ReturnType<typeof setTimeout> | null;
+  intensity: number;
+}
+let music: Music | null = null;
+
+function drumHit(c: AudioContext, dest: AudioNode, intensity: number): void {
+  const now = c.currentTime;
+  const o = c.createOscillator();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(94, now);
+  o.frequency.exponentialRampToValueAtTime(42, now + 0.16);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(0.28 + intensity * 0.34, now + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0008, now + 0.34);
+  o.connect(g).connect(dest);
+  o.start(now);
+  o.stop(now + 0.4);
+}
+
+export function startBattleMusic(): void {
+  const c = ensureCtx();
+  if (!c || music) return;
+  const master = c.createGain();
+  master.gain.setValueAtTime(0, c.currentTime);
+  master.gain.linearRampToValueAtTime(0.2, c.currentTime + 2.5); // gentle fade-in
+  const filter = c.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 460;
+  filter.Q.value = 0.9;
+  filter.connect(master).connect(c.destination);
+  const drone = [55, 82.5, 110].map((f, i) => {
+    const o = c.createOscillator();
+    o.type = i === 0 ? 'sawtooth' : 'triangle';
+    o.frequency.value = f;
+    o.detune.value = (i - 1) * 5;
+    const g = c.createGain();
+    g.gain.value = i === 0 ? 0.42 : 0.22;
+    o.connect(g).connect(filter);
+    o.start();
+    return o;
+  });
+  const lfo = c.createOscillator();
+  lfo.frequency.value = 0.05;
+  const lfoGain = c.createGain();
+  lfoGain.gain.value = 200;
+  lfo.connect(lfoGain).connect(filter.frequency);
+  lfo.start();
+  music = { master, filter, drone, lfo, drumTimer: null, intensity: 0.2 };
+  const beat = (): void => {
+    if (!music) return;
+    drumHit(c, master, music.intensity);
+    music.drumTimer = setTimeout(beat, 1500 - music.intensity * 650); // faster when intense
+  };
+  beat();
+}
+
+// 0 = calm deployment, 1 = full melee — drives drum tempo + weight.
+export function setBattleIntensity(x: number): void {
+  if (music) music.intensity = Math.max(0, Math.min(1, x));
+}
+
+export function stopBattleMusic(): void {
+  if (!music || !ctx) return;
+  const c = ctx;
+  const m = music;
+  music = null;
+  if (m.drumTimer) clearTimeout(m.drumTimer);
+  const now = c.currentTime;
+  m.master.gain.cancelScheduledValues(now);
+  m.master.gain.setValueAtTime(m.master.gain.value, now);
+  m.master.gain.linearRampToValueAtTime(0, now + 1.2);
+  const stopAt = now + 1.3;
+  for (const o of m.drone) { try { o.stop(stopAt); } catch { /* already stopped */ } }
+  try { m.lfo.stop(stopAt); } catch { /* ignore */ }
+}
+
+export function musicPlaying(): boolean {
+  return music !== null;
+}

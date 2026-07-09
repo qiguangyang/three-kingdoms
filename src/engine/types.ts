@@ -4,6 +4,14 @@
 // (cities, generals, factions) carry both zh and en via LocalizedString so
 // the engine is locale-independent and the UI picks the active locale.
 
+import type {
+  BattleCell,
+  BattleField,
+  BattleUnitState,
+  FormationRole,
+  GambitId,
+} from './battle/types.js';
+
 export type LocalizedString = { zh: string; en: string };
 
 export type FactionId = string;
@@ -150,6 +158,13 @@ export interface BattleUnit {
   pos: { x: number; y: number }; // battlefield-local grid (smaller than world)
   morale: number; // 0-100
   hasActed: boolean;
+  state: BattleUnitState; // fielded | reserve | routing | gone
+  formationRole: FormationRole; // van | center | rear | flank
+  // Leadership snapshot copied from the commanding general at createBattle
+  // time, so stepBattle stays pure (no GameState lookup). Absent for garrison
+  // blocks / unled mobs.
+  wu?: number; // martial (wu)
+  command?: number; // command (tong)
 }
 
 export interface Battle {
@@ -157,8 +172,12 @@ export interface Battle {
   attackerFactionId: FactionId;
   defenderFactionId: FactionId;
   daysElapsed: number; // 30-day timeout triggers attacker auto-retreat
-  units: BattleUnit[];
-  field: { width: number; height: number };
+  units: BattleUnit[]; // includes reserves (state:'reserve') and gone units
+  field: BattleField; // generated terrain; single source for sim + renderer
+  seed: number; // battle terrain/rng seed (derived from GameState.rngState)
+  rngCursor: number; // advances as the sim rolls; written back on resolve
+  wind?: { dir: { x: number; y: number }; strength: number }; // for fire gambit
+  startTroops?: { attacker: number; defender: number }; // committed totals at battle start, for casualty accounting
   log: LogEntry[];
 }
 
@@ -193,7 +212,11 @@ export type TacticalCommand =
   | { kind: 'march'; unitId: string; target: { x: number; y: number } }
   | { kind: 'meleeAttack'; unitId: string; targetUnitId: string }
   | { kind: 'rangedAttack'; unitId: string; targetUnitId: string }
+  | { kind: 'charge'; unitId: string; targetUnitId: string }
   | { kind: 'stratagem'; unitId: string; targetUnitId: string }
+  | { kind: 'challengeDuel'; unitId: string; targetUnitId: string }
+  | { kind: 'commitReserves'; factionId: FactionId }
+  | { kind: 'gambit'; gambitId: GambitId; unitIds: string[] }
   | { kind: 'hold'; unitId: string }
   | { kind: 'retreat'; unitId: string };
 
