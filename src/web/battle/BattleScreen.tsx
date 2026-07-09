@@ -46,8 +46,6 @@ export const BattleScreen: React.FC = () => {
   const [playing, setPlaying] = React.useState(false);
   // Pre-battle cinematic title card, shown once per battle (reset on a new city).
   const [introOpen, setIntroOpen] = React.useState(true);
-  const cityId = session?.battle.cityId;
-  useEffect(() => { setIntroOpen(true); }, [cityId]);
   // A brief cinematic caption for the most dramatic event of the day just resolved.
   const [caption, setCaption] = React.useState<{ key: MessageKey; n: number } | null>(null);
   const capN = React.useRef(0);
@@ -56,6 +54,14 @@ export const BattleScreen: React.FC = () => {
   // captioned key (so a highlight doesn't re-flash / strobe at high speed).
   const lastEventsRef = React.useRef<unknown>(null);
   const lastCapKey = React.useRef<MessageKey | null>(null);
+  // Documentary narration: a persistent subtitle describing the current day, plus
+  // an act label that advances deploy -> engage -> decide as the battle unfolds.
+  const [narr, setNarr] = React.useState<{ key: MessageKey; n: number } | null>(null);
+  const narrN = React.useRef(0);
+  const combatStarted = React.useRef(false);
+  // Reset the per-battle presentation state when a new battle (city) opens.
+  const cityId = session?.battle.cityId;
+  useEffect(() => { setIntroOpen(true); combatStarted.current = false; setNarr(null); }, [cityId]);
 
   // Auto-play: while playing and awaiting orders with no gambit to weigh,
   // resolve a day on an interval scaled by speed. Pause at gambit windows.
@@ -104,6 +110,23 @@ export const BattleScreen: React.FC = () => {
       capN.current += 1;
       setCaption({ key: hit[1], n: capN.current });
     }
+
+    // Narrate every day (a full descriptive line, not just the punchy caption).
+    const NARR: Array<[string, MessageKey]> = [
+      ['fire', 'battle.narr.fire'],
+      ['flood', 'battle.narr.flood'],
+      ['duel', 'battle.narr.duel'],
+      ['moraleBreak', 'battle.narr.rout'],
+      ['rout', 'battle.narr.rout'],
+      ['clash', 'battle.narr.clash'],
+      ['charge', 'battle.narr.charge'],
+      ['reserveCommitted', 'battle.narr.charge'],
+      ['volley', 'battle.narr.volley'],
+    ];
+    if (['fire', 'flood', 'duel', 'clash', 'volley', 'charge'].some((k) => kinds.has(k))) combatStarted.current = true;
+    const nh = NARR.find(([k]) => kinds.has(k));
+    narrN.current += 1;
+    setNarr({ key: nh ? nh[1] : 'battle.narr.deploy', n: narrN.current });
   }, [session]);
 
   if (!session) return null;
@@ -117,6 +140,7 @@ export const BattleScreen: React.FC = () => {
   const reserves = battle.units.filter((u) => u.factionId === session.playerFactionId && u.state === 'reserve');
   const resolved = session.phase === 'resolved';
   const won = session.attackerWon === session.playerIsAttacker;
+  const act: MessageKey = resolved ? 'battle.act.decide' : combatStarted.current ? 'battle.act.engage' : 'battle.act.deploy';
 
   return (
     <div
@@ -158,6 +182,15 @@ export const BattleScreen: React.FC = () => {
         </div>
       </div>
 
+      {/* Act label (documentary chapter) */}
+      {!introOpen && narr && (
+        <div className="pointer-events-none absolute inset-x-0 top-6 flex justify-center">
+          <span className="font-display" style={{ letterSpacing: '0.4em', color: GOLD, fontSize: 15, textShadow: '0 2px 12px #000' }}>
+            {t(act)}
+          </span>
+        </div>
+      )}
+
       {/* Cinematic event caption */}
       {caption && !resolved && (
         <div key={caption.n} className="battle-caption pointer-events-none absolute inset-x-0 top-[15%] flex justify-center">
@@ -166,6 +199,18 @@ export const BattleScreen: React.FC = () => {
             style={{ fontSize: 'clamp(28px, 4.4vw, 52px)', fontWeight: 900, letterSpacing: '0.2em', color: '#f3e5c6', textShadow: '0 2px 18px #000, 0 0 34px rgba(201,163,92,.45)' }}
           >
             {t(caption.key)}
+          </span>
+        </div>
+      )}
+
+      {/* Documentary narration subtitle */}
+      {!introOpen && !resolved && narr && (
+        <div key={narr.n} className="battle-narr pointer-events-none absolute inset-x-0 bottom-[20%] flex justify-center px-6">
+          <span
+            className="font-display text-center"
+            style={{ fontSize: 'clamp(15px, 2vw, 22px)', letterSpacing: '0.14em', color: PAPER, fontWeight: 300, textShadow: '0 2px 14px #000, 0 0 4px #000' }}
+          >
+            {t(narr.key)}
           </span>
         </div>
       )}
