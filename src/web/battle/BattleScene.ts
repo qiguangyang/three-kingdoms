@@ -1339,10 +1339,13 @@ export class BattleScene {
       v.heading += Math.atan2(Math.sin(aim - v.heading), Math.cos(aim - v.heading)) * 0.08;
       v.group.rotation.y = v.heading;
       animateSoldiers(v, t, t < v.engagedUntil);
+      // Jostle only the soldier block in melee — offset the InstancedMesh, not the
+      // whole group, so the banner and labels stay planted while the ranks reel.
       if (t < v.shakeUntil) {
         const k = (v.shakeUntil - t) / 260;
-        v.group.position.x += Math.sin(t * 0.09) * 0.32 * k;
-        v.group.position.z += Math.cos(t * 0.11) * 0.2 * k;
+        v.soldiers.position.set(Math.sin(t * 0.09) * 0.32 * k, 0, Math.cos(t * 0.11) * 0.2 * k);
+      } else if (v.soldiers.position.x !== 0 || v.soldiers.position.z !== 0) {
+        v.soldiers.position.set(0, 0, 0);
       }
       if (v.flag && v.flagBase) wave(v.flag, v.flagBase, t, v.basePos.x);
     }
