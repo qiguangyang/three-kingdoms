@@ -63,12 +63,24 @@ export const BattleScreen: React.FC = () => {
   const cityId = session?.battle.cityId;
   useEffect(() => { setIntroOpen(true); combatStarted.current = false; setNarr(null); }, [cityId]);
 
-  // Auto-play: while playing and awaiting orders with no gambit to weigh,
-  // resolve a day on an interval scaled by speed. Pause at gambit windows.
+  // Auto-play: while playing and awaiting orders, resolve a day on an interval
+  // scaled by speed. A gambit window only slows the cadence (giving you a moment
+  // to seize it) rather than stalling the battle — so it keeps flowing into the
+  // fight instead of freezing on the first opportunity.
   useEffect(() => {
-    if (!session || !playing) return;
-    if (session.phase !== 'awaitingOrders' || session.gambits.length > 0) return;
-    const id = setTimeout(() => resolveBattleDay(), 900 / session.speed);
+    if (!session || !playing || session.phase !== 'awaitingOrders') return;
+    const delay = session.gambits.length > 0 ? 2600 : 900 / session.speed;
+    const id = setTimeout(() => {
+      // Press the assault: order the player's blocks to charge the nearest foe so
+      // the battle closes and actually fights, instead of the passive default
+      // "dripping advance" that stalls in front of a walled garrison.
+      const mine = session.battle.units.filter((u) => u.factionId === session.playerFactionId && u.state === 'fielded');
+      const foe = session.battle.units.find((e) => e.factionId !== session.playerFactionId && (e.state === 'fielded' || e.state === 'reserve'));
+      if (foe && mine.length > 0) {
+        submitBattleOrders(mine.map((u) => ({ kind: 'charge', unitId: u.id, targetUnitId: foe.id })));
+      }
+      resolveBattleDay();
+    }, delay);
     return () => clearTimeout(id);
   }, [session, playing]);
 
@@ -291,7 +303,7 @@ export const BattleScreen: React.FC = () => {
 
       {/* Pre-battle cinematic title card */}
       {introOpen && !resolved && (
-        <BattleIntro session={session} game={game} onBegin={() => setIntroOpen(false)} />
+        <BattleIntro session={session} game={game} onBegin={() => { setIntroOpen(false); setPlaying(true); }} />
       )}
     </div>
   );

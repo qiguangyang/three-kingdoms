@@ -31,6 +31,8 @@ const UP = new THREE.Vector3(0, 1, 0);
 const MAX_SOLDIERS = 48;
 const WATER_Y = 0.2;
 const FLAG_W = 0.5;
+// World distance under which two opposing blocks count as locked in melee.
+const MELEE_DIST = 3.8;
 // Azimuths the shot director rotates through on each cut, so consecutive shots
 // look at the action from visibly different angles.
 const CUT_AZIMUTHS = [-1.15, 0.4, -0.55, 1.2, -2.05, 0.9];
@@ -138,6 +140,7 @@ interface UnitVisual {
   target: THREE.Vector3;
   placed: boolean;
   shakeUntil: number;
+  engagedUntil: number; // while > now, the block is in melee (drives combat animation)
 }
 
 // Text the renderer floats over the battle (resolved in React, where the name
@@ -187,6 +190,7 @@ export class BattleScene {
   private cutUntil = 0; // don't cut again before this (avoid strobing cuts)
   private shotSeq = 0; // rotates the angle each cut for variety
   private shakeAmp = 0;
+  private meleeSparkT = 0;
   private autoPausedUntil = 0;
   private lastT = 0;
 
@@ -674,7 +678,7 @@ export class BattleScene {
     return {
       group, soldiers, material, banner, flag, flagBase, generalId: u.generalId,
       factionId: u.factionId, offsets: offs, heading: 0, moving: 0,
-      basePos: new THREE.Vector3(), target: new THREE.Vector3(), placed: false, shakeUntil: 0,
+      basePos: new THREE.Vector3(), target: new THREE.Vector3(), placed: false, shakeUntil: 0, engagedUntil: 0,
     };
   }
 
@@ -1133,6 +1137,35 @@ export class BattleScene {
     this.shakeAmp = Math.max(this.shakeAmp, a);
   }
 
+  // Continuous melee: any two opposing blocks that have closed to melee range are
+  // marked engaged (drives the soldiers' combat lunge + a jostle) and throw off a
+  // steady stream of sparks at their contact line — so a battle in contact looks
+  // like ongoing fighting between the discrete day-steps, not two static clusters.
+  private updateMelee(t: number): void {
+    const arr = [...this.units.values()];
+    const spark = t > this.meleeSparkT;
+    let bursts = 0;
+    for (let i = 0; i < arr.length; i++) {
+      const a = arr[i]!;
+      for (let j = i + 1; j < arr.length; j++) {
+        const b = arr[j]!;
+        if (a.factionId === b.factionId) continue;
+        if (a.basePos.distanceTo(b.basePos) > MELEE_DIST) continue;
+        a.engagedUntil = t + 250;
+        b.engagedUntil = t + 250;
+        a.shakeUntil = Math.max(a.shakeUntil, t + 200);
+        b.shakeUntil = Math.max(b.shakeUntil, t + 200);
+        if (spark && bursts < 3) {
+          const mid = a.basePos.clone().lerp(b.basePos, 0.5);
+          mid.y += 0.7;
+          this.spawnSparks(mid, 0xffd070, 6);
+          bursts++;
+        }
+      }
+    }
+    if (spark) this.meleeSparkT = t + 150;
+  }
+
   private loop = (): void => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
@@ -1162,7 +1195,7 @@ export class BattleScene {
       }
       v.heading += Math.atan2(Math.sin(aim - v.heading), Math.cos(aim - v.heading)) * 0.08;
       v.group.rotation.y = v.heading;
-      animateSoldiers(v, t);
+      animateSoldiers(v, t, t < v.engagedUntil);
       if (t < v.shakeUntil) {
         const k = (v.shakeUntil - t) / 260;
         v.group.position.x += Math.sin(t * 0.09) * 0.32 * k;
@@ -1170,6 +1203,7 @@ export class BattleScene {
       }
       if (v.flag && v.flagBase) wave(v.flag, v.flagBase, t, v.basePos.x);
     }
+    this.updateMelee(t);
 
     for (let i = this.effects.length - 1; i >= 0; i--) {
       const fx = this.effects[i]!;
@@ -1305,7 +1339,7 @@ const _sm = new THREE.Matrix4();
 const _sq = new THREE.Quaternion();
 const _sp = new THREE.Vector3();
 const _ss = new THREE.Vector3();
-function animateSoldiers(v: UnitVisual, t: number): void {
+function animateSoldiers(v: UnitVisual, t: number, engaged: boolean): void {
   const n = v.soldiers.count;
   const off = v.offsets;
   const march = v.moving;
@@ -1314,7 +1348,16 @@ function animateSoldiers(v: UnitVisual, t: number): void {
     const phase = i * 1.7;
     const bob = Math.abs(Math.sin(t * 0.006 + phase)) * (0.03 + march * 0.11);
     const sway = Math.sin(t * 0.004 + phase * 1.3) * 0.02;
-    _sp.set(o.x + sway * 0.4, bob, o.z);
+    // When locked in melee, each figure lunges fast along the block's forward
+    // axis (toward the enemy) — reads as men hacking at each other, not standing.
+    let lungeZ = 0;
+    let lungeY = 0;
+    if (engaged) {
+      const lunge = Math.sin(t * 0.019 + phase * 2.3);
+      lungeZ = lunge * 0.14;
+      lungeY = Math.abs(lunge) * 0.06;
+    }
+    _sp.set(o.x + sway * 0.4, bob + lungeY, o.z + lungeZ);
     // Mostly face the block's front (the group is turned toward the enemy) with a
     // little per-figure jitter — reads as disciplined ranks, not a milling crowd.
     _sq.setFromAxisAngle(UP, Math.sin(i * 12.9898) * 0.32 + sway);
