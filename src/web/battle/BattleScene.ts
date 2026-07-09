@@ -853,7 +853,10 @@ export class BattleScene {
       geo,
       new THREE.MeshStandardMaterial({ map: flagTexture(factionColor(factionId), FACTION_GLYPH[factionId] ?? '·'), side: THREE.DoubleSide, roughness: 0.82 }),
     );
-    flag.position.set(0.01, poleH / 2 - FLAG_H / 2 - 0.06, 0); // pole-local, hanging from near the top
+    // Pole-local. Fly the flag at 60% of the pole height so it sits clear of the
+    // unit's floating name label (which hovers near the pole top) instead of
+    // overlapping it, while still riding above the soldiers' heads.
+    flag.position.set(0.01, poleH * 0.6 - poleH / 2, 0);
     flag.castShadow = true;
     pole.add(flag);
     return { pole, flag, base: (geo.attributes.position!.array as Float32Array).slice() };
