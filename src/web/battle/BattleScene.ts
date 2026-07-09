@@ -30,7 +30,7 @@ import {
 const UP = new THREE.Vector3(0, 1, 0);
 const MAX_SOLDIERS = 48;
 const WATER_Y = 0.2;
-const FLAG_W = 0.5;
+const FLAG_W = 0.64;
 // World distance under which two opposing blocks count as locked in melee.
 const MELEE_DIST = 3.8;
 // Azimuths the shot director rotates through on each cut, so consecutive shots
@@ -831,19 +831,27 @@ export class BattleScene {
   // with the faction colour + surname glyph (曹/劉/孫…), anchored at the pole and
   // waved per-frame in the loop. Returns the base vertex positions for the wave.
   private buildBanner(factionId: string): { pole: THREE.Mesh; flag: THREE.Mesh; base: Float32Array } {
+    // A tall tapered staff standing from the ground, crowned by a gilt spearhead,
+    // flying the faction banner near its top.
     const pole = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.025, 0.025, 1.4, 5),
-      new THREE.MeshStandardMaterial({ color: 0x3a2c1c, roughness: 0.9 }),
+      new THREE.CylinderGeometry(0.028, 0.05, 2.2, 6),
+      new THREE.MeshStandardMaterial({ color: 0x2b2016, roughness: 0.85 }),
     );
-    pole.position.set(0, 0.7, -0.6);
+    pole.position.set(0, 1.1, -0.55);
     pole.castShadow = true;
-    const geo = new THREE.PlaneGeometry(FLAG_W, 0.34, 12, 3);
+    const finial = new THREE.Mesh(
+      new THREE.ConeGeometry(0.055, 0.2, 6),
+      new THREE.MeshStandardMaterial({ color: 0xcaa64f, roughness: 0.35, metalness: 0.4 }),
+    );
+    finial.position.set(0, 1.2, 0); // pole-local, just above the top
+    pole.add(finial);
+    const geo = new THREE.PlaneGeometry(FLAG_W, 0.46, 16, 8);
     geo.translate(FLAG_W / 2, 0, 0); // anchor the pole edge at local x = 0
     const flag = new THREE.Mesh(
       geo,
-      new THREE.MeshStandardMaterial({ map: flagTexture(factionColor(factionId), FACTION_GLYPH[factionId] ?? '·'), side: THREE.DoubleSide, roughness: 0.75 }),
+      new THREE.MeshStandardMaterial({ map: flagTexture(factionColor(factionId), FACTION_GLYPH[factionId] ?? '·'), side: THREE.DoubleSide, roughness: 0.82 }),
     );
-    flag.position.set(0.02, 1.12, -0.6);
+    flag.position.set(0.01, 0.82, 0); // pole-local, hanging from near the top
     flag.castShadow = true;
     pole.add(flag);
     return { pole, flag, base: (geo.attributes.position!.array as Float32Array).slice() };
@@ -1444,24 +1452,68 @@ function disposeMaterial(m: THREE.Material): void {
 
 // ---- Faction cloth flags ----
 // Draw the faction colour + surname glyph onto a canvas for the flag texture.
+// A war banner drawn on a canvas: a diagonal faction gradient (bright -> dark),
+// a cream-and-black double border, a corner boss at each corner, and the lord's
+// surname glyph in a heavy serif with a drop shadow — then redrawn once the serif
+// font has loaded so the character is crisp, not a fallback. (Technique from the
+// MIT battlefield-editor; original implementation.)
 function flagTexture(color: string, glyph: string): THREE.CanvasTexture {
+  const W = 256;
+  const H = 168;
   const cv = document.createElement('canvas');
-  cv.width = 128;
-  cv.height = 88;
+  cv.width = W;
+  cv.height = H;
   const ctx = cv.getContext('2d')!;
-  ctx.fillStyle = color;
-  ctx.fillRect(0, 0, 128, 88);
-  ctx.strokeStyle = 'rgba(0,0,0,.32)';
-  ctx.lineWidth = 7;
-  ctx.strokeRect(4, 4, 120, 80);
-  ctx.fillStyle = 'rgba(247,239,222,.94)';
-  ctx.font = '900 58px "Noto Serif TC", "Noto Serif SC", serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(glyph, 64, 48);
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
+  const dark = new THREE.Color(color).multiplyScalar(0.42).getStyle();
+  const light = new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.18).getStyle();
+  const draw = (): void => {
+    const grad = ctx.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, light);
+    grad.addColorStop(0.5, color);
+    grad.addColorStop(1, dark);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    // faint cloth sheen
+    const sheen = ctx.createLinearGradient(0, 0, W, 0);
+    sheen.addColorStop(0, 'rgba(255,255,255,0)');
+    sheen.addColorStop(0.5, 'rgba(255,255,255,.10)');
+    sheen.addColorStop(1, 'rgba(0,0,0,.10)');
+    ctx.fillStyle = sheen;
+    ctx.fillRect(0, 0, W, H);
+    // cream + black double border
+    ctx.strokeStyle = 'rgba(233,220,193,.92)';
+    ctx.lineWidth = 11;
+    ctx.strokeRect(9, 9, W - 18, H - 18);
+    ctx.strokeStyle = 'rgba(0,0,0,.28)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(19, 19, W - 38, H - 38);
+    // gilt corner bosses
+    ctx.fillStyle = 'rgba(201,163,92,.9)';
+    for (const [bx, by] of [[16, 16], [W - 16, 16], [16, H - 16], [W - 16, H - 16]] as const) {
+      ctx.beginPath();
+      ctx.arc(bx, by, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // surname glyph with a soft drop shadow
+    ctx.font = `900 ${Math.round(H * 0.62)}px "Noto Serif TC", "Noto Serif SC", serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,.55)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 5;
+    ctx.fillStyle = '#f4ecd6';
+    ctx.fillText(glyph, W / 2, H * 0.55);
+    ctx.shadowColor = 'transparent';
+    tex.needsUpdate = true;
+  };
+  draw();
+  // redraw once the serif font loads so the glyph isn't a system fallback
+  if (typeof document !== 'undefined' && document.fonts?.ready) {
+    document.fonts.ready.then(draw).catch(() => {});
+  }
   return tex;
 }
 // Per-figure life: rewrite the soldier instance matrices each frame with a gentle
