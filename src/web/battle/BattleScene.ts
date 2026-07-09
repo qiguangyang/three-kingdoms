@@ -6,6 +6,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import type { BattleSession } from '../../state/battleSession.js';
 import type { BattleEvent, BattleField, GeneralId, Vec2 } from '../../engine/battle/types.js';
 import type { BattleUnit, TroopType } from '../../engine/types.js';
@@ -130,6 +134,7 @@ export class BattleScene {
   // light count never changes (adding/removing lights recompiles materials).
   private readonly fireLights: THREE.PointLight[] = [];
   private readonly labelRenderer: CSS2DRenderer;
+  private readonly composer: EffectComposer;
   private landmarkLabel: CSS2DObject | null = null;
   private skyMat!: THREE.ShaderMaterial;
   private sun!: THREE.DirectionalLight;
@@ -207,6 +212,15 @@ export class BattleScene {
       this.fireLights.push(l);
     }
 
+    // Post-processing: a gentle bloom so fire, water sparkle, and the bright sky
+    // glow filmically. RenderPass renders linear HDR; OutputPass applies the
+    // renderer's ACES tone mapping + sRGB once, at the end (no double-grade).
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.55, 0.7, 0.82);
+    this.composer.addPass(bloom);
+    this.composer.addPass(new OutputPass());
+
     this.resize();
     this.loop();
   }
@@ -241,6 +255,7 @@ export class BattleScene {
     const h = this.canvas.clientHeight || 500;
     this.renderer.setSize(w, h, false);
     this.labelRenderer.setSize(w, h);
+    this.composer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -951,7 +966,7 @@ export class BattleScene {
     } else {
       this.updateCamera(t, dt);
     }
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render();
     this.labelRenderer.render(this.scene, this.camera);
   };
 
@@ -968,6 +983,7 @@ export class BattleScene {
       if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose();
     });
     this.renderer.dispose();
+    this.composer.dispose();
     this.labelRenderer.domElement.remove();
   }
 }
