@@ -12,7 +12,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import type { BattleSession } from '../../state/battleSession.js';
-import type { BattleEvent, BattleField, GeneralId, Vec2 } from '../../engine/battle/types.js';
+import type { BattleCell, BattleEvent, BattleField, GeneralId, Vec2 } from '../../engine/battle/types.js';
 import type { BattleUnit, TroopType } from '../../engine/types.js';
 import { FACTION_GLYPH, factionColor } from '../theme.js';
 import {
@@ -86,41 +86,53 @@ function isSharedSoldierGeo(g: THREE.BufferGeometry): boolean {
   for (const v of SOLDIER_GEOS.values()) if (v === g) return true;
   return false;
 }
+// A low-poly foot soldier: two legs, a shouldered torso, head + helmet, and two
+// arms — reads as a man rather than a pill. Weapons are added per troop type.
+function humanoid(): THREE.BufferGeometry[] {
+  const legL = new THREE.BoxGeometry(0.06, 0.24, 0.07); legL.translate(-0.05, 0.12, 0);
+  const legR = new THREE.BoxGeometry(0.06, 0.24, 0.07); legR.translate(0.05, 0.12, 0);
+  const torso = new THREE.CylinderGeometry(0.11, 0.075, 0.24, 6); torso.translate(0, 0.36, 0);
+  const head = new THREE.SphereGeometry(0.075, 8, 6); head.translate(0, 0.53, 0);
+  const helmet = new THREE.ConeGeometry(0.085, 0.11, 6); helmet.translate(0, 0.58, 0);
+  const armL = new THREE.BoxGeometry(0.04, 0.2, 0.04); armL.translate(-0.13, 0.35, 0.01);
+  const armR = new THREE.BoxGeometry(0.04, 0.2, 0.04); armR.translate(0.13, 0.35, 0.01);
+  return [legL, legR, torso, head, helmet, armL, armR];
+}
 function buildSoldier(kind: string): THREE.BufferGeometry {
-  const body = new THREE.CylinderGeometry(0.05, 0.1, 0.34, 6);
-  body.translate(0, 0.17, 0);
-  const head = new THREE.SphereGeometry(0.075, 8, 6);
-  head.translate(0, 0.42, 0);
-  if (kind === 'archer') {
-    const bow = new THREE.TorusGeometry(0.12, 0.014, 5, 10, Math.PI * 1.25);
-    bow.rotateY(Math.PI / 2);
-    bow.translate(0.12, 0.34, 0);
-    return mergeGeometries([body, head, bow], false);
-  }
   if (kind === 'cavalry') {
-    const horse = new THREE.BoxGeometry(0.5, 0.2, 0.16);
-    horse.translate(0, 0.3, 0);
-    const neck = new THREE.BoxGeometry(0.12, 0.24, 0.12);
-    neck.translate(0.25, 0.46, 0);
-    const rider = new THREE.CylinderGeometry(0.05, 0.08, 0.26, 6);
-    rider.translate(-0.05, 0.56, 0);
-    const rhead = new THREE.SphereGeometry(0.07, 8, 6);
-    rhead.translate(-0.05, 0.76, 0);
-    return mergeGeometries([horse, neck, rider, rhead], false);
+    const parts: THREE.BufferGeometry[] = [];
+    const body = new THREE.BoxGeometry(0.44, 0.17, 0.17); body.translate(0, 0.36, 0);
+    parts.push(body);
+    for (const [lx, lz] of [[-0.17, -0.06], [0.17, -0.06], [-0.17, 0.06], [0.17, 0.06]] as const) {
+      const leg = new THREE.BoxGeometry(0.05, 0.28, 0.05); leg.translate(lx, 0.14, lz); parts.push(leg);
+    }
+    const neck = new THREE.BoxGeometry(0.1, 0.22, 0.1); neck.translate(0.24, 0.52, 0); neck.rotateZ(-0.35); parts.push(neck);
+    const hhead = new THREE.BoxGeometry(0.17, 0.1, 0.1); hhead.translate(0.33, 0.6, 0); parts.push(hhead);
+    // seated rider (torso + head + helmet), raised onto the horse's back
+    const rtorso = new THREE.CylinderGeometry(0.09, 0.07, 0.2, 6); rtorso.translate(-0.06, 0.56, 0); parts.push(rtorso);
+    const rhead = new THREE.SphereGeometry(0.07, 8, 6); rhead.translate(-0.06, 0.71, 0); parts.push(rhead);
+    const rhelm = new THREE.ConeGeometry(0.08, 0.1, 6); rhelm.translate(-0.06, 0.76, 0); parts.push(rhelm);
+    return mergeGeometries(parts, false);
   }
   if (kind === 'navy') {
-    const hull = new THREE.BoxGeometry(0.52, 0.1, 0.2);
-    hull.translate(0, 0.08, 0);
-    const prow = new THREE.BoxGeometry(0.14, 0.16, 0.14);
-    prow.translate(0.29, 0.14, 0);
-    const mast = new THREE.CylinderGeometry(0.012, 0.012, 0.52, 4);
-    mast.translate(0, 0.34, 0);
-    return mergeGeometries([hull, prow, mast], false);
+    const hull = new THREE.BoxGeometry(0.52, 0.1, 0.2); hull.translate(0, 0.08, 0);
+    const prow = new THREE.BoxGeometry(0.14, 0.16, 0.14); prow.translate(0.29, 0.14, 0);
+    const mast = new THREE.CylinderGeometry(0.012, 0.012, 0.52, 4); mast.translate(0, 0.34, 0);
+    const sail = new THREE.BoxGeometry(0.02, 0.28, 0.24); sail.translate(0, 0.4, 0);
+    return mergeGeometries([hull, prow, mast, sail], false);
   }
-  // infantry (default): spearman
-  const spear = new THREE.CylinderGeometry(0.012, 0.012, 0.6, 4);
-  spear.translate(0.1, 0.34, 0);
-  return mergeGeometries([body, head, spear], false);
+  const parts = humanoid();
+  if (kind === 'archer') {
+    const bow = new THREE.TorusGeometry(0.14, 0.014, 5, 10, Math.PI * 1.3); bow.rotateY(Math.PI / 2); bow.translate(0.16, 0.42, 0);
+    parts.push(bow);
+    return mergeGeometries(parts, false);
+  }
+  // infantry (default): spear + shield
+  const spear = new THREE.CylinderGeometry(0.012, 0.012, 0.64, 4); spear.translate(0.16, 0.46, 0);
+  const tip = new THREE.ConeGeometry(0.028, 0.09, 4); tip.translate(0.16, 0.82, 0);
+  const shield = new THREE.BoxGeometry(0.03, 0.17, 0.15); shield.translate(-0.16, 0.36, 0.02);
+  parts.push(spear, tip, shield);
+  return mergeGeometries(parts, false);
 }
 
 interface UnitVisual {
@@ -317,6 +329,7 @@ export class BattleScene {
     );
     ground.receiveShadow = true;
     this.scene.add(ground);
+    this.addGroundDetail(field);
 
     if (field.river) {
       const size = fieldWorldSize(field);
@@ -345,6 +358,80 @@ export class BattleScene {
 
     if (field.wall) this.addFortification(field, field.wall);
     this.addCamps(field);
+    this.addGroundDetail(field);
+  }
+
+  // Scatter grass tufts and pebbles across the playfield so the battleground reads
+  // as living ground (grassland churned by an army) instead of a bare tinted mesh.
+  private addGroundDetail(field: BattleField): void {
+    const seed = Math.abs(field.seed) | 0;
+    const fw = fieldWorldSize(field);
+    const cellOf = (cx: number, cy: number): BattleCell =>
+      field.cells[Math.max(0, Math.min(field.height - 1, cy)) * field.width + Math.max(0, Math.min(field.width - 1, cx))] ?? 'plain';
+
+    // --- grass tufts (a few splayed blades, instanced) ---
+    const blades: THREE.BufferGeometry[] = [];
+    for (let i = 0; i < 4; i++) {
+      const bl = new THREE.ConeGeometry(0.03, 0.26, 3);
+      const a = (i / 4) * Math.PI * 2;
+      bl.rotateZ((i - 1.5) * 0.16);
+      bl.translate(Math.cos(a) * 0.045, 0.13, Math.sin(a) * 0.045);
+      blades.push(bl);
+    }
+    const tuft = mergeGeometries(blades, false);
+    const grass = new THREE.InstancedMesh(tuft, new THREE.MeshStandardMaterial({ roughness: 1 }), 900);
+    const M = new THREE.Matrix4();
+    const P = new THREE.Vector3();
+    const Q = new THREE.Quaternion();
+    const S = new THREE.Vector3();
+    const CT = new THREE.Color();
+    let g = 0;
+    for (let i = 0; i < 2200 && g < 900; i++) {
+      const x = (envHash(i, 3, seed) - 0.5) * fw.w * 0.98;
+      const z = (envHash(i, 7, seed) - 0.5) * fw.h * 0.98;
+      const cx = Math.round(x / CELL_SIZE + (field.width - 1) / 2);
+      const cy = Math.round(z / CELL_SIZE + (field.height - 1) / 2);
+      const cell = cellOf(cx, cy);
+      if (cell === 'river' || cell === 'ford' || cell === 'wall' || cell === 'gate') continue;
+      if (envHash(i, 9, seed) > 0.7) continue; // patchy, not a lawn
+      const sc = 0.6 + envHash(i, 12, seed) * 0.9;
+      P.set(x, terrainHeight(cx, cy, field), z);
+      Q.setFromAxisAngle(UP, envHash(i, 15, seed) * Math.PI);
+      S.set(sc, sc * (0.8 + envHash(i, 17, seed) * 0.6), sc);
+      M.compose(P, Q, S);
+      grass.setMatrixAt(g, M);
+      const v = 0.28 + envHash(i, 19, seed) * 0.22;
+      CT.setRGB(v * 0.72, v, v * 0.42); // varied grass greens
+      grass.setColorAt(g, CT);
+      g++;
+    }
+    grass.count = g;
+    grass.instanceMatrix.needsUpdate = true;
+    if (grass.instanceColor) grass.instanceColor.needsUpdate = true;
+    this.scene.add(grass);
+
+    // --- pebbles (small instanced rocks) ---
+    const rockGeo = new THREE.DodecahedronGeometry(0.12, 0);
+    const rocks = new THREE.InstancedMesh(rockGeo, new THREE.MeshStandardMaterial({ color: 0x6b655c, roughness: 1, flatShading: true }), 60);
+    let r = 0;
+    for (let i = 0; i < 400 && r < 60; i++) {
+      const x = (envHash(i, 21, seed) - 0.5) * fw.w * 0.95;
+      const z = (envHash(i, 23, seed) - 0.5) * fw.h * 0.95;
+      const cx = Math.round(x / CELL_SIZE + (field.width - 1) / 2);
+      const cy = Math.round(z / CELL_SIZE + (field.height - 1) / 2);
+      const cell = cellOf(cx, cy);
+      if (cell === 'river' || cell === 'wall' || cell === 'gate') continue;
+      if (envHash(i, 25, seed) > 0.35) continue;
+      const sc = 0.6 + envHash(i, 27, seed) * 1.2;
+      P.set(x, terrainHeight(cx, cy, field) + 0.03, z);
+      Q.setFromAxisAngle(UP, envHash(i, 29, seed) * Math.PI);
+      S.set(sc, sc * 0.7, sc);
+      M.compose(P, Q, S);
+      rocks.setMatrixAt(r++, M);
+    }
+    rocks.count = r;
+    rocks.instanceMatrix.needsUpdate = true;
+    this.scene.add(rocks);
   }
 
   // A besieged city's fortifications along the defender edge: a crenellated
