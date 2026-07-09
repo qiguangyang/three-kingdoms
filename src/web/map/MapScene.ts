@@ -10,7 +10,7 @@
 // WorldMapView routes to the SVG MapView fallback when WebGL is unavailable.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
+import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -18,8 +18,9 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { MAP_HEIGHT, MAP_WIDTH } from '../../engine/constants.js';
 import { COASTLINE_PATH } from '../../data/map/geography.js';
-import type { GameState } from '../../engine/types.js';
-import { gridToWorld } from './mapGeometry.js';
+import type { City, GameState } from '../../engine/types.js';
+import { FACTION_GLYPH, factionColor } from '../theme.js';
+import { gridToWorld, markerScale } from './mapGeometry.js';
 
 // ---- render-layer tuning (world units; the map spans MAP_WIDTH x MAP_HEIGHT,
 // i.e. 500 x 200 world units, centered on the origin via gridToWorld) ----
@@ -39,6 +40,19 @@ const SKY_TOP = 0x2a3b60;
 const SKY_HORIZON = 0x93a0b4;
 const FOG_COLOR = 0x93a0b4;
 const FOG_DENSITY = 0.0012; // low: the far landmass stays visible, edges haze out
+
+// ---- city-marker tuning (world units) ----
+// markerScale() returns ~1..2.2 (economic importance); multiply into world units
+// so a walled town reads at the map's scale (500x200) from the orbit distances.
+const MARKER_UNIT = 3.0; // world units per markerScale point
+const CAPITAL_MARKER_MULT = 1.35; // a faction capital's town is a bit larger
+const STONE_COLOR = 0x8a7d68; // town wall stone, then tinted toward the faction
+const STONE_TINT = 0.32; // how far the stone leans to the faction colour (0..1)
+const ROOF_COLOR = 0x3a2c26; // dark tiled keep roof
+const MARKER_GOLD = 0xffcf7a; // selection ring + hover emphasis (matches the coast)
+const LABEL_GAP = 2.2; // world units the CSS2D label floats above the marker top
+const HOVER_THROTTLE_MS = 30; // min gap between hover raycasts on pointer move
+const CLICK_DRAG_PX = 5; // pointer travel under which a press counts as a click, not an orbit-drag
 
 // Final film-grade pass (runs after tone mapping, on display-space colour).
 // Copied from BattleScene.ts — same painterly S-curve + split-tone + vignette so
@@ -73,6 +87,22 @@ export interface MapLabelData {
   factionId: string | null;
 }
 
+// A live city marker in the scene: the walled-town group, the material whose
+// emissive we brighten on hover/select, the (hidden) gold selection ring, and
+// the floating CSS2D label. `sig` captures the faction + capital state the
+// group was built for, so syncCities can detect when a marker must be rebuilt.
+interface CityVisual {
+  group: THREE.Group;
+  keepMat: THREE.MeshStandardMaterial; // central keep — brightened on hover/select
+  ring: THREE.Mesh; // gold selection ring, hidden until selected
+  label: CSS2DObject | null;
+  labelY: number; // local height the label floats at, above the marker
+  factionId: string | null;
+  sig: string; // `${factionId}|${isCapital}` — rebuild trigger
+  selected: boolean;
+  hovered: boolean;
+}
+
 // Placeholder shapes for later tasks (Phase 3). The authoritative definitions
 // land in mapGeometry.ts / the store; kept minimal here so the Task 1.2 stubs
 // typecheck and Task 3.x can refine them.
@@ -100,10 +130,22 @@ export class MapScene {
   private hemi!: THREE.HemisphereLight;
   private ambient!: THREE.AmbientLight;
   private waterMat: THREE.ShaderMaterial | null = null;
-  // Picking callback registered by the React layer; wired up in Task 1.3.
+  // Picking callback registered by the React layer.
   private pickCb: ((cityId: string | null) => void) | null = null;
   private raf = 0;
   private disposed = false;
+
+  // ---- city layer (Task 1.3) ----
+  private readonly cities = new Map<string, CityVisual>();
+  private land: THREE.Mesh | null = null; // terrain mesh, raycast to seat markers on the surface
+  private readonly terrainRay = new THREE.Raycaster(); // samples land height under a city
+  private readonly pickRay = new THREE.Raycaster(); // resolves the marker under the cursor
+  private readonly pointerNdc = new THREE.Vector2();
+  private selectedId: string | null = null;
+  private hoveredId: string | null = null;
+  private lastHoverAt = 0; // throttles hover raycasts on pointermove
+  private downX = 0; // pointer-down position, to tell a click from an orbit-drag
+  private downY = 0;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -183,6 +225,13 @@ export class MapScene {
 
     this.resize();
     this.loop();
+
+    // Pointer picking: hover-highlight and click-to-select over the city markers.
+    // OrbitControls listens on the same canvas; we distinguish a click from an
+    // orbit-drag by the pointer travel between down and up (CLICK_DRAG_PX).
+    this.canvas.addEventListener('pointermove', this.onPointerMove);
+    this.canvas.addEventListener('pointerdown', this.onPointerDown);
+    this.canvas.addEventListener('pointerup', this.onPointerUp);
   }
 
   // High-segment dome + fragment dithering for the dusk sky. Copied from
@@ -269,6 +318,7 @@ export class MapScene {
     land.receiveShadow = true;
     land.castShadow = true;
     this.scene.add(land);
+    this.land = land; // kept so syncCities can raycast city markers onto the surface
 
     // Glowing gold coastline where land meets sea, floated just above the water
     // so it reads as a shoreline; kept bright so the bloom pass makes it glow.
@@ -334,6 +384,20 @@ export class MapScene {
   dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
+    this.canvas.removeEventListener('pointermove', this.onPointerMove);
+    this.canvas.removeEventListener('pointerdown', this.onPointerDown);
+    this.canvas.removeEventListener('pointerup', this.onPointerUp);
+    // Remove every city marker's CSS2D label element. Their GPU geometry /
+    // material / texture are freed by the scene.traverse() sweep below (each
+    // marker mesh is a scene descendant), but the label DOM nodes are not — and
+    // the whole label overlay is torn down at the end regardless.
+    for (const v of this.cities.values()) {
+      if (v.label) {
+        v.label.removeFromParent();
+        v.label.element.remove();
+      }
+    }
+    this.cities.clear();
     this.controls.dispose();
     // Free every geometry / material / texture in the scene, matching the
     // battle scene's disposal rigor to avoid GPU leaks between mounts.
@@ -356,16 +420,267 @@ export class MapScene {
     this.labelRenderer.domElement.remove();
   }
 
-  // ---- stubs filled in by later tasks (signatures fixed by the plan) ----
+  // ---- city layer (Task 1.3) ----
 
-  // Place / update / remove 3D city markers + labels. Implemented in Task 1.3.
-  syncCities(_game: GameState, _labels: MapLabelData[]): void {
-    // implemented in Task 1.3
+  // Diff the city markers against the previous sync (add / update / remove keyed
+  // by city id, mirroring BattleScene.syncUnits). A marker whose faction or
+  // capital status changed is rebuilt; every marker's floating label is refreshed
+  // from the matching MapLabelData.
+  syncCities(game: GameState, labels: MapLabelData[]): void {
+    const labelById = new Map(labels.map((l) => [l.cityId, l]));
+    const capitals = capitalCityIds(game);
+    const alive = new Set<string>();
+
+    for (const city of Object.values(game.cities)) {
+      alive.add(city.id);
+      const isCapital = capitals.has(city.id);
+      const sig = `${city.factionId ?? '_'}|${isCapital ? 'C' : '_'}`;
+      let v = this.cities.get(city.id);
+      // Faction handover / capital move: rebuild so colours + banner are correct.
+      if (v && v.sig !== sig) {
+        this.disposeMarker(v);
+        this.cities.delete(city.id);
+        v = undefined;
+      }
+      if (!v) {
+        v = this.buildMarker(city, isCapital, sig);
+        this.scene.add(v.group);
+        this.cities.set(city.id, v);
+        if (city.id === this.selectedId) this.applySelected(v, true);
+      }
+      const ld = labelById.get(city.id);
+      if (ld) this.updateLabel(v, ld);
+    }
+
+    for (const [id, v] of this.cities) {
+      if (alive.has(id)) continue;
+      this.disposeMarker(v);
+      this.cities.delete(id);
+    }
   }
 
-  // Highlight the selected city marker. Implemented in Task 1.3.
-  setSelected(_cityId: string | null): void {
-    // implemented in Task 1.3
+  // Highlight the selected city marker (gold ring + brighter emissive + a small
+  // scale-up), clearing the previous selection.
+  setSelected(cityId: string | null): void {
+    if (this.selectedId === cityId) return;
+    const prev = this.selectedId ? this.cities.get(this.selectedId) : undefined;
+    if (prev) this.applySelected(prev, false);
+    this.selectedId = cityId;
+    const next = cityId ? this.cities.get(cityId) : undefined;
+    if (next) this.applySelected(next, true);
+  }
+
+  // Register the pointer-pick callback fired on click (city id, or null on a
+  // click that hits no marker).
+  onPickCity(cb: (cityId: string | null) => void): void {
+    this.pickCb = cb;
+  }
+
+  // Build one walled-town marker: a low stone wall (tinted toward the faction),
+  // four corner towers, a faction-coloured central keep with a dark roof, a
+  // hidden gold selection ring, and — for a capital — a faction banner. The whole
+  // group is seated on the terrain surface via a downward raycast.
+  private buildMarker(city: City, isCapital: boolean, sig: string): CityVisual {
+    const w = gridToWorld(city.pos);
+    const baseY = this.terrainHeightAt(w.x, w.z);
+    const s = markerScale(city) * MARKER_UNIT * (isCapital ? CAPITAL_MARKER_MULT : 1);
+
+    const group = new THREE.Group();
+    group.position.set(w.x, baseY, w.z);
+    group.userData.cityId = city.id; // walked up from a raycast hit to resolve the city
+
+    const factionCol = new THREE.Color(factionColor(city.factionId));
+    const stoneCol = new THREE.Color(STONE_COLOR).lerp(factionCol, STONE_TINT);
+
+    const wallH = s * 0.5;
+    const keepH = s * 1.1;
+    const towerH = s * 0.8;
+    const roofH = s * 0.6;
+    const half = s * 0.72; // corner-tower offset from centre
+
+    const add = (mesh: THREE.Mesh): THREE.Mesh => {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+      return mesh;
+    };
+
+    // Low square curtain wall.
+    add(new THREE.Mesh(
+      new THREE.BoxGeometry(s * 1.7, wallH, s * 1.7),
+      new THREE.MeshStandardMaterial({ color: stoneCol, roughness: 0.92 }),
+    )).position.y = wallH / 2;
+
+    // Four corner towers.
+    for (const [dx, dz] of [[-half, -half], [half, -half], [-half, half], [half, half]] as const) {
+      const t = add(new THREE.Mesh(
+        new THREE.BoxGeometry(s * 0.34, towerH, s * 0.34),
+        new THREE.MeshStandardMaterial({ color: stoneCol, roughness: 0.92 }),
+      ));
+      t.position.set(dx, towerH / 2, dz);
+    }
+
+    // Faction-coloured central keep — the piece that carries hover/select emissive.
+    const keepMat = new THREE.MeshStandardMaterial({
+      color: factionCol,
+      roughness: 0.7,
+      emissive: new THREE.Color(MARKER_GOLD),
+      emissiveIntensity: 0,
+    });
+    const keep = add(new THREE.Mesh(new THREE.BoxGeometry(s * 0.75, keepH, s * 0.75), keepMat));
+    keep.position.y = wallH + keepH / 2;
+
+    // Dark pyramidal roof crowning the keep.
+    const roof = add(new THREE.Mesh(
+      new THREE.ConeGeometry(s * 0.62, roofH, 4),
+      new THREE.MeshStandardMaterial({ color: ROOF_COLOR, roughness: 0.85 }),
+    ));
+    roof.position.y = wallH + keepH + roofH / 2;
+    roof.rotation.y = Math.PI / 4;
+
+    // Gold selection ring, laid flat around the base — unlit so the bloom pass
+    // makes it glow; hidden until the city is selected.
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(s * 1.35, s * 0.11, 8, 24),
+      new THREE.MeshBasicMaterial({ color: MARKER_GOLD }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.15;
+    ring.visible = false;
+    group.add(ring);
+
+    // Capital banner: a modest faction flag on a pole at one corner.
+    if (isCapital) this.addCapitalBanner(group, city.factionId, s, half);
+
+    const labelY = wallH + keepH + roofH + LABEL_GAP;
+    return {
+      group, keepMat, ring, label: null, labelY,
+      factionId: city.factionId, sig, selected: false, hovered: false,
+    };
+  }
+
+  // A pole flying a small faction flag beside the keep, marking a capital.
+  private addCapitalBanner(group: THREE.Group, factionId: string | null, s: number, half: number): void {
+    const poleH = s * 2.6;
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(s * 0.05, s * 0.07, poleH, 6),
+      new THREE.MeshStandardMaterial({ color: 0x2b2016, roughness: 0.85 }),
+    );
+    pole.position.set(half, poleH / 2, -half);
+    pole.castShadow = true;
+    const finial = new THREE.Mesh(
+      new THREE.ConeGeometry(s * 0.1, s * 0.28, 6),
+      new THREE.MeshStandardMaterial({ color: 0xcaa64f, roughness: 0.35, metalness: 0.4 }),
+    );
+    finial.position.y = poleH / 2 + s * 0.14; // pole-local, crowning the top
+    pole.add(finial);
+    const flagW = s * 1.1;
+    const flagH = s * 0.7;
+    const flagGeo = new THREE.PlaneGeometry(flagW, flagH);
+    flagGeo.translate(flagW / 2, 0, 0); // anchor the pole edge at local x = 0
+    const flag = new THREE.Mesh(
+      flagGeo,
+      new THREE.MeshStandardMaterial({
+        map: capitalFlagTexture(factionColor(factionId), FACTION_GLYPH[factionId ?? '__neutral__'] ?? '·'),
+        side: THREE.DoubleSide,
+        roughness: 0.82,
+      }),
+    );
+    flag.position.set(0.01, poleH * 0.62 - poleH / 2, 0);
+    flag.castShadow = true;
+    pole.add(flag);
+    group.add(pole);
+  }
+
+  // Create (once) and refresh a marker's floating CSS2D label from label data.
+  private updateLabel(v: CityVisual, ld: MapLabelData): void {
+    if (!v.label) {
+      v.label = new CSS2DObject(makeMapLabelEl());
+      v.label.position.set(0, v.labelY, 0);
+      v.group.add(v.label);
+    }
+    v.label.element.innerHTML = cityLabelHtml(ld.name, ld.sub, factionColor(ld.factionId));
+  }
+
+  // Sample the terrain surface height under a world XZ by raycasting straight
+  // down onto the land mesh (the exact rendered relief), so a marker sits on the
+  // ground rather than at y=0. Clamped to sea level so a marker never sinks.
+  private terrainHeightAt(wx: number, wz: number): number {
+    if (!this.land) return LOWLAND_H;
+    this.terrainRay.set(new THREE.Vector3(wx, 240, wz), DOWN);
+    const hits = this.terrainRay.intersectObject(this.land, false);
+    const y = hits.length > 0 ? hits[0]!.point.y : LOWLAND_H;
+    return Math.max(y, WATER_Y);
+  }
+
+  // Apply / clear the selected look on a marker.
+  private applySelected(v: CityVisual, on: boolean): void {
+    v.selected = on;
+    v.ring.visible = on;
+    v.keepMat.emissiveIntensity = on ? 0.6 : v.hovered ? 0.35 : 0;
+    v.group.scale.setScalar(on ? 1.14 : 1);
+  }
+
+  // Apply / clear the subtle hover look (a faint emissive lift) on a marker,
+  // leaving a selected marker's stronger highlight untouched.
+  private setHovered(cityId: string | null): void {
+    if (this.hoveredId === cityId) return;
+    const prev = this.hoveredId ? this.cities.get(this.hoveredId) : undefined;
+    if (prev) {
+      prev.hovered = false;
+      if (!prev.selected) prev.keepMat.emissiveIntensity = 0;
+    }
+    this.hoveredId = cityId;
+    const next = cityId ? this.cities.get(cityId) : undefined;
+    if (next) {
+      next.hovered = true;
+      if (!next.selected) next.keepMat.emissiveIntensity = 0.35;
+    }
+    this.canvas.style.cursor = cityId ? 'pointer' : '';
+  }
+
+  // Resolve the city id of the marker under the current pointer NDC, or null.
+  private pickCityAt(clientX: number, clientY: number): string | null {
+    if (this.cities.size === 0) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+    this.pointerNdc.set(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this.pickRay.setFromCamera(this.pointerNdc, this.camera);
+    const roots: THREE.Object3D[] = [];
+    for (const v of this.cities.values()) roots.push(v.group);
+    const hit = this.pickRay.intersectObjects(roots, true)[0];
+    return hit ? cityIdFromObject(hit.object) : null;
+  }
+
+  private readonly onPointerMove = (e: PointerEvent): void => {
+    const t = nowMs();
+    if (t - this.lastHoverAt < HOVER_THROTTLE_MS) return; // throttle the hover raycast
+    this.lastHoverAt = t;
+    this.setHovered(this.pickCityAt(e.clientX, e.clientY));
+  };
+
+  private readonly onPointerDown = (e: PointerEvent): void => {
+    this.downX = e.clientX;
+    this.downY = e.clientY;
+  };
+
+  private readonly onPointerUp = (e: PointerEvent): void => {
+    // Only treat a near-stationary press as a click; a drag is an orbit gesture.
+    if (Math.hypot(e.clientX - this.downX, e.clientY - this.downY) > CLICK_DRAG_PX) return;
+    this.pickCb?.(this.pickCityAt(e.clientX, e.clientY));
+  };
+
+  // Remove a marker from the scene and free its per-marker GPU resources + label.
+  private disposeMarker(v: CityVisual): void {
+    this.scene.remove(v.group);
+    disposeObject3D(v.group);
+    if (v.label) {
+      v.label.removeFromParent();
+      v.label.element.remove();
+    }
   }
 
   // Build the translucent faction-territory overlay. Implemented in Task 3.2.
@@ -377,11 +692,119 @@ export class MapScene {
   setMarches(_ops: InFlightMarch[]): void {
     // implemented in Task 3.3
   }
+}
 
-  // Register the pointer-pick callback. Wired to a Raycaster in Task 1.3.
-  onPickCity(cb: (cityId: string | null) => void): void {
-    this.pickCb = cb;
+// ---------------------------------------------------------------- city-marker
+// helpers (pure; scene state stays on the class)
+
+// Straight-down ray direction shared by every terrain-height sample.
+const DOWN = new THREE.Vector3(0, -1, 0);
+
+// The set of capital city ids: each alive faction's lord (faction.lordId) resides
+// in exactly one city (General.locationCityId), which the scenario seeds as the
+// faction's first city — its capital. That marker gets the larger town + banner.
+function capitalCityIds(game: GameState): Set<string> {
+  const set = new Set<string>();
+  for (const f of Object.values(game.factions)) {
+    if (!f.alive) continue;
+    const lord = game.generals[f.lordId];
+    if (lord?.locationCityId) set.add(lord.locationCityId);
   }
+  return set;
+}
+
+// Walk up from a raycast hit to the marker group that carries the city id.
+function cityIdFromObject(o: THREE.Object3D | null): string | null {
+  let cur: THREE.Object3D | null = o;
+  while (cur) {
+    const id = cur.userData?.cityId as string | undefined;
+    if (id) return id;
+    cur = cur.parent;
+  }
+  return null;
+}
+
+// Free every geometry / material / texture under an object subtree exactly once
+// (deduped so shared resources are not disposed twice), plus any InstancedMesh
+// GPU buffer. Used when a marker is removed in a diff. Mirrors the battle scene's
+// disposeObject discipline.
+function disposeObject3D(root: THREE.Object3D): void {
+  const geos = new Set<THREE.BufferGeometry>();
+  const mats = new Set<THREE.Material>();
+  root.traverse((c) => {
+    const mesh = c as THREE.Mesh;
+    if (mesh.geometry) geos.add(mesh.geometry);
+    const mat = mesh.material;
+    if (Array.isArray(mat)) mat.forEach((m) => mats.add(m));
+    else if (mat) mats.add(mat as THREE.Material);
+    if ((c as THREE.InstancedMesh).isInstancedMesh) (c as THREE.InstancedMesh).dispose();
+  });
+  for (const g of geos) g.dispose();
+  for (const m of mats) disposeMaterial(m);
+}
+
+// The floating city label element: the battle scene's "unit" label style, so the
+// two scenes' CSS2D labels read as one system. pointer-events:none keeps it clear
+// of the canvas picking.
+function makeMapLabelEl(): HTMLDivElement {
+  const el = document.createElement('div');
+  el.style.cssText =
+    'padding:2px 7px;border-radius:5px;white-space:nowrap;pointer-events:none;' +
+    "font:600 11px/1.25 'Noto Sans TC',system-ui,sans-serif;color:#e8dcc3;" +
+    'background:rgba(10,13,18,.66);border:1px solid rgba(201,163,92,.28);text-shadow:0 1px 3px #000';
+  return el;
+}
+
+// name (bold) + sub (dimmed), prefixed by a faction-colour dot.
+function cityLabelHtml(name: string, sub: string, color: string): string {
+  const dot = `<span style="color:${color}">●</span>`;
+  const nm = name ? `<b>${escapeText(name)}</b>` : '';
+  const s = sub ? ` <span style="opacity:.68;font-weight:400">${escapeText(sub)}</span>` : '';
+  return `${dot} ${nm}${s}`;
+}
+
+function escapeText(s: string): string {
+  return s.replace(/[&<>]/g, (c) => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;'));
+}
+
+// A compact faction banner drawn on a canvas: a faction-colour gradient, a cream
+// border, and the lord's surname glyph — redrawn once the serif font loads so the
+// character is crisp. A lightweight take on the battle scene's flagTexture.
+function capitalFlagTexture(color: string, glyph: string): THREE.CanvasTexture {
+  const W = 128;
+  const H = 88;
+  const cv = document.createElement('canvas');
+  cv.width = W;
+  cv.height = H;
+  const ctx = cv.getContext('2d')!;
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  const dark = new THREE.Color(color).multiplyScalar(0.5).getStyle();
+  const draw = (): void => {
+    const grad = ctx.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, dark);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = 'rgba(233,220,193,.85)';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(5, 5, W - 10, H - 10);
+    ctx.font = `900 ${Math.round(H * 0.6)}px "Noto Serif TC", "Noto Serif SC", serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,.5)';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = '#f4ecd6';
+    ctx.fillText(glyph, W / 2, H * 0.54);
+    ctx.shadowColor = 'transparent';
+    tex.needsUpdate = true;
+  };
+  draw();
+  if (typeof document !== 'undefined' && document.fonts?.ready) {
+    document.fonts.ready.then(draw).catch(() => {});
+  }
+  return tex;
 }
 
 // ---------------------------------------------------------------- geometry
