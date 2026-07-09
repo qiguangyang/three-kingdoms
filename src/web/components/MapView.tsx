@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MAP_HEIGHT, MAP_WIDTH } from '../../engine/constants.js';
+import { GRID_SCALE, MAP_HEIGHT, MAP_WIDTH } from '../../engine/constants.js';
 import type { City, GameState } from '../../engine/types.js';
 import {
   COASTLINE_PATH,
@@ -66,9 +66,18 @@ const INTERNAL_OP_COLOR: Record<string, string> = {
   recruit: '#8a5a2a',  // 征兵铜
 };
 
-// One logical map cell renders to this many SVG units. Bigger value yields
-// a denser-looking map but doesn't change the underlying coordinate system.
-const CELL = 32;
+// Pixels per SCALED grid unit. Coordinates (city.pos + all geography) are now
+// multiplied by GRID_SCALE, so we divide the old 32 px/cell by GRID_SCALE to
+// keep the map at the same on-screen extent (MAP_PX_W stays 3200).
+const CELL = 32 / GRID_SCALE;
+// Pixels per AUTHORED base cell (= 32). Feature sizes (marker radius, fonts,
+// stroke widths, half-cell offsets) were tuned against the base grid; scaling
+// a base-unit quantity by GRID_SCALE lifts it into scaled-unit space, and
+// UNIT is that quantity already resolved to pixels (CELL * GRID_SCALE).
+const UNIT = CELL * GRID_SCALE;
+// Half a base cell expressed in scaled units — the center offset that puts a
+// city glyph in the middle of its cell rather than on the grid line.
+const HALF_CELL = 0.5 * GRID_SCALE;
 const MAP_PX_W = MAP_WIDTH * CELL;
 const MAP_PX_H = MAP_HEIGHT * CELL;
 
@@ -110,11 +119,12 @@ export const MapView: React.FC<MapViewProps> = ({
     return () => ro.disconnect();
   }, []);
 
-  // Center the view on the central plains (Luoyang) by default. The viewbox
-  // is in SVG units (logical_units * CELL).
+  // Center the view on the central plains (Luoyang, base cell 30,17) by
+  // default. The viewbox is in SVG pixels; Luoyang now lives at the scaled
+  // coord 30*GRID_SCALE, so its pixel center is 30*GRID_SCALE*CELL.
   const [viewbox, setViewbox] = useState<Viewbox>(() => ({
-    x: 30 * CELL - 500,
-    y: 17 * CELL - 280,
+    x: 30 * GRID_SCALE * CELL - 500,
+    y: 17 * GRID_SCALE * CELL - 280,
     w: 1000,
     h: 560,
   }));
@@ -234,11 +244,11 @@ export const MapView: React.FC<MapViewProps> = ({
         onWheel={onWheel}
       >
         <defs>
-          <pattern id="paper" patternUnits="userSpaceOnUse" width={CELL * 6} height={CELL * 6}>
-            <rect width={CELL * 6} height={CELL * 6} fill="#f1e3bf" />
+          <pattern id="paper" patternUnits="userSpaceOnUse" width={UNIT * 6} height={UNIT * 6}>
+            <rect width={UNIT * 6} height={UNIT * 6} fill="#f1e3bf" />
             <rect
-              width={CELL * 6}
-              height={CELL * 6}
+              width={UNIT * 6}
+              height={UNIT * 6}
               fill="url(#paperNoise)"
               opacity="0.45"
             />
@@ -247,27 +257,27 @@ export const MapView: React.FC<MapViewProps> = ({
             <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="3" />
             <feColorMatrix values="0 0 0 0 0.50  0 0 0 0 0.40  0 0 0 0 0.22  0 0 0 0.30 0" />
           </filter>
-          <pattern id="seaPattern" patternUnits="userSpaceOnUse" width={CELL * 4} height={CELL * 4}>
-            <rect width={CELL * 4} height={CELL * 4} fill="#c7dde7" />
+          <pattern id="seaPattern" patternUnits="userSpaceOnUse" width={UNIT * 4} height={UNIT * 4}>
+            <rect width={UNIT * 4} height={UNIT * 4} fill="#c7dde7" />
             <path
-              d={`M 0 ${CELL * 2} Q ${CELL} ${CELL * 1.6} ${CELL * 2} ${CELL * 2} T ${CELL * 4} ${CELL * 2}`}
+              d={`M 0 ${UNIT * 2} Q ${UNIT} ${UNIT * 1.6} ${UNIT * 2} ${UNIT * 2} T ${UNIT * 4} ${UNIT * 2}`}
               fill="none"
               stroke="#94b8c8"
               strokeWidth="1.2"
               opacity="0.6"
             />
             <path
-              d={`M 0 ${CELL * 3.4} Q ${CELL} ${CELL * 3.0} ${CELL * 2} ${CELL * 3.4} T ${CELL * 4} ${CELL * 3.4}`}
+              d={`M 0 ${UNIT * 3.4} Q ${UNIT} ${UNIT * 3.0} ${UNIT * 2} ${UNIT * 3.4} T ${UNIT * 4} ${UNIT * 3.4}`}
               fill="none"
               stroke="#94b8c8"
               strokeWidth="1.2"
               opacity="0.45"
             />
           </pattern>
-          <pattern id="lakePattern" patternUnits="userSpaceOnUse" width={CELL * 2} height={CELL * 2}>
-            <rect width={CELL * 2} height={CELL * 2} fill="#a9c8d6" />
+          <pattern id="lakePattern" patternUnits="userSpaceOnUse" width={UNIT * 2} height={UNIT * 2}>
+            <rect width={UNIT * 2} height={UNIT * 2} fill="#a9c8d6" />
             <path
-              d={`M 0 ${CELL} Q ${CELL / 2} ${CELL * 0.8} ${CELL} ${CELL} T ${CELL * 2} ${CELL}`}
+              d={`M 0 ${UNIT} Q ${UNIT / 2} ${UNIT * 0.8} ${UNIT} ${UNIT} T ${UNIT * 2} ${UNIT}`}
               fill="none"
               stroke="#7ea4b6"
               strokeWidth="1"
@@ -298,7 +308,7 @@ export const MapView: React.FC<MapViewProps> = ({
             d={COASTLINE_PATH}
             fill="none"
             stroke="#7d5a3a"
-            strokeWidth={0.06}
+            strokeWidth={0.06 * GRID_SCALE}
             strokeLinecap="round"
             strokeLinejoin="round"
           />
@@ -314,9 +324,9 @@ export const MapView: React.FC<MapViewProps> = ({
               textAnchor="middle"
               dominantBaseline="middle"
               fontFamily="'Noto Serif SC', serif"
-              fontSize={(p.size ?? 1) * 1.4}
+              fontSize={(p.size ?? 1) * 1.4 * GRID_SCALE}
               fontWeight={700}
-              letterSpacing={(p.size ?? 1) * 0.3}
+              letterSpacing={(p.size ?? 1) * 0.3 * GRID_SCALE}
               fill="#8a7437"
               opacity={0.16}
             >
@@ -328,7 +338,13 @@ export const MapView: React.FC<MapViewProps> = ({
         {/* ============ Layer 3: mountain ridges (back row, lighter) ============ */}
         <g transform={`scale(${CELL})`}>
           {MOUNTAINS.map((m) => (
-            <MountainPath key={`${m.id}-shadow`} m={m} offsetY={0.6} fill="#a99476" opacity={0.45} />
+            <MountainPath
+              key={`${m.id}-shadow`}
+              m={m}
+              offsetY={0.6 * GRID_SCALE}
+              fill="#a99476"
+              opacity={0.45}
+            />
           ))}
           {MOUNTAINS.map((m) => (
             <MountainPath key={m.id} m={m} fill="#7a6648" opacity={0.85} />
@@ -337,10 +353,10 @@ export const MapView: React.FC<MapViewProps> = ({
             <MountainPath
               key={`${m.id}-highlight`}
               m={m}
-              offsetY={-0.2}
+              offsetY={-0.2 * GRID_SCALE}
               fill="none"
               stroke="#3d3324"
-              strokeWidth={0.04}
+              strokeWidth={0.04 * GRID_SCALE}
               opacity={0.45}
             />
           ))}
@@ -354,7 +370,7 @@ export const MapView: React.FC<MapViewProps> = ({
                 points={lake.polygon.map(([x, y]) => `${x},${y}`).join(' ')}
                 fill="url(#lakePattern)"
                 stroke="#5a85a0"
-                strokeWidth={0.045}
+                strokeWidth={0.045 * GRID_SCALE}
                 strokeOpacity={0.6}
               />
               <text
@@ -363,7 +379,7 @@ export const MapView: React.FC<MapViewProps> = ({
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fontFamily="'Noto Serif SC', serif"
-                fontSize={0.6}
+                fontSize={0.6 * GRID_SCALE}
                 fontStyle="italic"
                 fill="#2a4a5a"
                 pointerEvents="none"
@@ -382,7 +398,7 @@ export const MapView: React.FC<MapViewProps> = ({
               key={`${r.id}-shadow`}
               d={r.path}
               stroke="#3a5567"
-              strokeWidth={r.id === 'huanghe' || r.id === 'changjiang' ? 0.42 : 0.3}
+              strokeWidth={(r.id === 'huanghe' || r.id === 'changjiang' ? 0.42 : 0.3) * GRID_SCALE}
               opacity={0.55}
             />
           ))}
@@ -392,7 +408,7 @@ export const MapView: React.FC<MapViewProps> = ({
               key={r.id}
               d={r.path}
               stroke={r.id === 'huanghe' ? '#a47a3c' : '#5083a6'}
-              strokeWidth={r.id === 'huanghe' || r.id === 'changjiang' ? 0.32 : 0.22}
+              strokeWidth={(r.id === 'huanghe' || r.id === 'changjiang' ? 0.32 : 0.22) * GRID_SCALE}
               opacity={0.9}
             />
           ))}
@@ -404,11 +420,11 @@ export const MapView: React.FC<MapViewProps> = ({
               <text
                 key={`${r.id}-label`}
                 x={mid.x}
-                y={mid.y - 0.5}
+                y={mid.y - 0.5 * GRID_SCALE}
                 textAnchor="middle"
                 fontFamily="'Noto Serif SC', serif"
                 fontStyle="italic"
-                fontSize={0.55}
+                fontSize={0.55 * GRID_SCALE}
                 fill="#2a3f4f"
                 opacity={0.8}
                 pointerEvents="none"
@@ -425,7 +441,7 @@ export const MapView: React.FC<MapViewProps> = ({
             <use
               key={i}
               href="#tree"
-              transform={`translate(${d.x} ${d.y}) scale(${d.s * 0.04})`}
+              transform={`translate(${d.x} ${d.y}) scale(${d.s * 0.04 * GRID_SCALE})`}
             />
           ))}
         </g>
@@ -435,31 +451,33 @@ export const MapView: React.FC<MapViewProps> = ({
           <path
             d={GREAT_WALL_PATH}
             stroke="#6a3a1a"
-            strokeWidth={0.12}
-            strokeDasharray="0.6 0.25"
+            strokeWidth={0.12 * GRID_SCALE}
+            strokeDasharray={`${0.6 * GRID_SCALE} ${0.25 * GRID_SCALE}`}
             strokeLinecap="round"
             opacity={0.85}
           />
-          {/* Wall battlement ticks: a few short perpendiculars hinting at towers */}
+          {/* Wall battlement ticks: a few short perpendiculars hinting at
+              towers. The x anchors are base-cell coordinates, lifted into
+              scaled space to stay on the (scaled) wall path. */}
           {[12, 24, 36, 48, 60, 72].map((x) => (
             <line
               key={x}
-              x1={x}
-              y1={3.4}
-              x2={x}
-              y2={5.4}
+              x1={x * GRID_SCALE}
+              y1={3.4 * GRID_SCALE}
+              x2={x * GRID_SCALE}
+              y2={5.4 * GRID_SCALE}
               stroke="#6a3a1a"
-              strokeWidth={0.08}
+              strokeWidth={0.08 * GRID_SCALE}
               opacity={0.7}
             />
           ))}
           <text
-            x={40}
-            y={2.6}
+            x={40 * GRID_SCALE}
+            y={2.6 * GRID_SCALE}
             textAnchor="middle"
             fontFamily="'Noto Serif SC', serif"
             fontStyle="italic"
-            fontSize={0.7}
+            fontSize={0.7 * GRID_SCALE}
             fill="#6a3a1a"
             opacity={0.85}
           >
@@ -477,9 +495,9 @@ export const MapView: React.FC<MapViewProps> = ({
               textAnchor="middle"
               dominantBaseline="middle"
               fontFamily="'Noto Serif SC', serif"
-              fontSize={(p.size ?? 1) * 0.9}
+              fontSize={(p.size ?? 1) * 0.9 * GRID_SCALE}
               fontWeight={500}
-              letterSpacing={(p.size ?? 1) * 0.18}
+              letterSpacing={(p.size ?? 1) * 0.18 * GRID_SCALE}
               fill="#3f6a82"
               opacity={0.6}
             >
@@ -493,9 +511,9 @@ export const MapView: React.FC<MapViewProps> = ({
           {Object.values(game.cities).map((city) => (
             <circle
               key={`tint-${city.id}`}
-              cx={city.pos.x + 0.5}
-              cy={city.pos.y + 0.5}
-              r={2}
+              cx={city.pos.x + HALF_CELL}
+              cy={city.pos.y + HALF_CELL}
+              r={2 * GRID_SCALE}
               fill={factionColor(city.factionId)}
               opacity={city.factionId ? 0.14 : 0.04}
             />
@@ -577,8 +595,8 @@ export const MapView: React.FC<MapViewProps> = ({
           aria-label="Reset"
           onClick={() =>
             setViewbox({
-              x: 30 * CELL - size.w / 2,
-              y: 17 * CELL - size.h / 2,
+              x: 30 * GRID_SCALE * CELL - size.w / 2,
+              y: 17 * GRID_SCALE * CELL - size.h / 2,
               w: size.w,
               h: size.h,
             })
@@ -646,11 +664,11 @@ const CityMarker: React.FC<CityMarkerProps> = ({
   internalOp,
   onClick,
 }) => {
-  const cx = (city.pos.x + 0.5) * CELL;
-  const cy = (city.pos.y + 0.5) * CELL;
+  const cx = (city.pos.x + HALF_CELL) * CELL;
+  const cy = (city.pos.y + HALF_CELL) * CELL;
   const glyph = city.factionId ? FACTION_GLYPH[city.factionId] ?? '·' : '·';
   const color = factionColor(city.factionId);
-  const r = CELL * 0.42;
+  const r = UNIT * 0.42;
   // Outer <g> owns the translate (positioning the marker on the map).
   // Inner <g> owns the className and receives the CSS hover transform
   // (scale). Splitting these prevents the SVG transform attribute from
@@ -787,10 +805,10 @@ const MarchLine: React.FC<MarchLineProps> = ({
   const from = game.cities[fromCityId];
   const to = game.cities[toCityId];
   if (!from || !to) return null;
-  const x1 = (from.pos.x + 0.5) * CELL;
-  const y1 = (from.pos.y + 0.5) * CELL;
-  const x2 = (to.pos.x + 0.5) * CELL;
-  const y2 = (to.pos.y + 0.5) * CELL;
+  const x1 = (from.pos.x + HALF_CELL) * CELL;
+  const y1 = (from.pos.y + HALF_CELL) * CELL;
+  const x2 = (to.pos.x + HALF_CELL) * CELL;
+  const y2 = (to.pos.y + HALF_CELL) * CELL;
   // Curve a bit so the arrow doesn't slice straight through other cities.
   const mx = (x1 + x2) / 2;
   const my = (y1 + y2) / 2;
@@ -800,7 +818,7 @@ const MarchLine: React.FC<MarchLineProps> = ({
   // Perpendicular offset for the control point of a quadratic curve.
   const nx = -dy / len;
   const ny = dx / len;
-  const sag = Math.min(CELL * 1.4, len * 0.2);
+  const sag = Math.min(UNIT * 1.4, len * 0.2);
   const cx = mx + nx * sag;
   const cy = my + ny * sag;
   const path = `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
@@ -820,7 +838,7 @@ const MarchLine: React.FC<MarchLineProps> = ({
   const tx = 2 * (1 - headT) * (cx - x1) + 2 * headT * (x2 - cx);
   const ty = 2 * (1 - headT) * (cy - y1) + 2 * headT * (y2 - cy);
   const angle = (Math.atan2(ty, tx) * 180) / Math.PI;
-  const arrowSize = CELL * 0.36;
+  const arrowSize = UNIT * 0.36;
 
   // Color the shaft + head based on the march intent. Attacks stay
   // sienna red (the previous look). Reinforcements get a muted teal so
@@ -886,10 +904,13 @@ function buildForestDots(): ForestDot[] {
     const [minX, minY, maxX, maxY] = bounds(patch.polygon);
     const density = patch.density ?? 0.5;
     // Deterministic Halton-ish sequence so dots scatter without RNG drift.
+    // The step and edge insets are base-cell distances lifted into scaled
+    // space (×GRID_SCALE) so the dot count and relative density are unchanged
+    // even though the polygon bounds are now GRID_SCALE times larger.
     let i = 0;
-    const step = 1 / (0.6 + density * 1.4);
-    for (let y = minY + 0.2; y < maxY - 0.2; y += step) {
-      for (let x = minX + 0.2; x < maxX - 0.2; x += step) {
+    const step = GRID_SCALE / (0.6 + density * 1.4);
+    for (let y = minY + 0.2 * GRID_SCALE; y < maxY - 0.2 * GRID_SCALE; y += step) {
+      for (let x = minX + 0.2 * GRID_SCALE; x < maxX - 0.2 * GRID_SCALE; x += step) {
         const jx = (Math.sin(i * 12.9898) * 43758.5453) % 1;
         const jy = (Math.sin(i * 78.233) * 43758.5453) % 1;
         const px = x + (jx - 0.5) * step * 0.6;
