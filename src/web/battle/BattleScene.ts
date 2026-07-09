@@ -30,7 +30,7 @@ import {
 const UP = new THREE.Vector3(0, 1, 0);
 const MAX_SOLDIERS = 48;
 const WATER_Y = 0.2;
-const FLAG_W = 0.64;
+const FLAG_W = 0.95;
 // World distance under which two opposing blocks count as locked in melee.
 const MELEE_DIST = 3.8;
 // Azimuths the shot director rotates through on each cut, so consecutive shots
@@ -833,25 +833,27 @@ export class BattleScene {
   private buildBanner(factionId: string): { pole: THREE.Mesh; flag: THREE.Mesh; base: Float32Array } {
     // A tall tapered staff standing from the ground, crowned by a gilt spearhead,
     // flying the faction banner near its top.
+    const poleH = 3.6;
     const pole = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.028, 0.05, 2.2, 6),
+      new THREE.CylinderGeometry(0.034, 0.06, poleH, 6),
       new THREE.MeshStandardMaterial({ color: 0x2b2016, roughness: 0.85 }),
     );
-    pole.position.set(0, 1.1, -0.55);
+    pole.position.set(0, poleH / 2, -0.55); // base at the ground, standing tall above the ranks
     pole.castShadow = true;
     const finial = new THREE.Mesh(
-      new THREE.ConeGeometry(0.055, 0.2, 6),
+      new THREE.ConeGeometry(0.075, 0.28, 6),
       new THREE.MeshStandardMaterial({ color: 0xcaa64f, roughness: 0.35, metalness: 0.4 }),
     );
-    finial.position.set(0, 1.2, 0); // pole-local, just above the top
+    finial.position.set(0, poleH / 2 + 0.14, 0); // pole-local, crowning the top
     pole.add(finial);
-    const geo = new THREE.PlaneGeometry(FLAG_W, 0.46, 16, 8);
+    const FLAG_H = 0.66;
+    const geo = new THREE.PlaneGeometry(FLAG_W, FLAG_H, 18, 9);
     geo.translate(FLAG_W / 2, 0, 0); // anchor the pole edge at local x = 0
     const flag = new THREE.Mesh(
       geo,
       new THREE.MeshStandardMaterial({ map: flagTexture(factionColor(factionId), FACTION_GLYPH[factionId] ?? '·'), side: THREE.DoubleSide, roughness: 0.82 }),
     );
-    flag.position.set(0.01, 0.82, 0); // pole-local, hanging from near the top
+    flag.position.set(0.01, poleH / 2 - FLAG_H / 2 - 0.06, 0); // pole-local, hanging from near the top
     flag.castShadow = true;
     pole.add(flag);
     return { pole, flag, base: (geo.attributes.position!.array as Float32Array).slice() };
@@ -1561,7 +1563,7 @@ function wave(flag: THREE.Mesh, base: Float32Array, t: number, phase: number): v
   for (let i = 0; i < arr.length; i += 3) {
     const bx = base[i]!;
     const k = bx / FLAG_W; // 0 at pole, 1 at the free edge
-    const w = Math.sin(bx * 16 - t * 0.006 + phase) * 0.06 * k;
+    const w = Math.sin(bx * 11 - t * 0.006 + phase) * 0.1 * k;
     arr[i] = bx;
     arr[i + 1] = base[i + 1]! + w * 0.35;
     arr[i + 2] = base[i + 2]! + w;
