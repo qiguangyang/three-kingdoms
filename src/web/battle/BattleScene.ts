@@ -13,7 +13,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import type { BattleSession } from '../../state/battleSession.js';
 import type { BattleEvent, BattleField, GeneralId, Vec2 } from '../../engine/battle/types.js';
 import type { BattleUnit, TroopType } from '../../engine/types.js';
-import { factionColor } from '../theme.js';
+import { FACTION_GLYPH, factionColor } from '../theme.js';
 import {
   CELL_SIZE,
   battleCentroidXZ,
@@ -29,6 +29,7 @@ import {
 const UP = new THREE.Vector3(0, 1, 0);
 const MAX_SOLDIERS = 48;
 const WATER_Y = 0.2;
+const FLAG_W = 0.5;
 
 // Time-of-day / weather looks, chosen deterministically per battle so different
 // fields feel distinct. Values (sky/fog/sun/ambient) are tuned here, not copied.
@@ -102,6 +103,8 @@ interface UnitVisual {
   soldiers: THREE.InstancedMesh;
   material: THREE.MeshStandardMaterial;
   banner?: THREE.Mesh;
+  flag?: THREE.Mesh;
+  flagBase?: Float32Array;
   label?: CSS2DObject;
   generalId: string;
   basePos: THREE.Vector3;
@@ -536,31 +539,41 @@ export class BattleScene {
     group.scale.setScalar(1.3);
 
     let banner: THREE.Mesh | undefined;
+    let flag: THREE.Mesh | undefined;
+    let flagBase: Float32Array | undefined;
     if (u.generalId) {
-      banner = this.buildBanner(u.factionId);
-      group.add(banner);
+      const b = this.buildBanner(u.factionId);
+      group.add(b.pole);
+      banner = b.pole;
+      flag = b.flag;
+      flagBase = b.base;
     }
     return {
-      group, soldiers, material, banner, generalId: u.generalId,
+      group, soldiers, material, banner, flag, flagBase, generalId: u.generalId,
       basePos: new THREE.Vector3(), target: new THREE.Vector3(), placed: false, shakeUntil: 0,
     };
   }
 
-  private buildBanner(factionId: string): THREE.Mesh {
+  // A pole flying a faction cloth flag: the flag is a subdivided plane textured
+  // with the faction colour + surname glyph (曹/劉/孫…), anchored at the pole and
+  // waved per-frame in the loop. Returns the base vertex positions for the wave.
+  private buildBanner(factionId: string): { pole: THREE.Mesh; flag: THREE.Mesh; base: Float32Array } {
     const pole = new THREE.Mesh(
       new THREE.CylinderGeometry(0.025, 0.025, 1.4, 5),
       new THREE.MeshStandardMaterial({ color: 0x3a2c1c, roughness: 0.9 }),
     );
     pole.position.set(0, 0.7, -0.6);
     pole.castShadow = true;
+    const geo = new THREE.PlaneGeometry(FLAG_W, 0.34, 12, 3);
+    geo.translate(FLAG_W / 2, 0, 0); // anchor the pole edge at local x = 0
     const flag = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.5, 0.34),
-      new THREE.MeshStandardMaterial({ color: new THREE.Color(factionColor(factionId)), side: THREE.DoubleSide, roughness: 0.7 }),
+      geo,
+      new THREE.MeshStandardMaterial({ map: flagTexture(factionColor(factionId), FACTION_GLYPH[factionId] ?? '·'), side: THREE.DoubleSide, roughness: 0.75 }),
     );
-    flag.position.set(0.27, 1.15, -0.6);
+    flag.position.set(0.02, 1.12, -0.6);
     flag.castShadow = true;
     pole.add(flag);
-    return pole;
+    return { pole, flag, base: (geo.attributes.position!.array as Float32Array).slice() };
   }
 
   // Deterministically pick a time-of-day look for this battle and push it into
@@ -946,7 +959,7 @@ export class BattleScene {
         v.group.position.x += Math.sin(t * 0.09) * 0.32 * k;
         v.group.position.z += Math.cos(t * 0.11) * 0.2 * k;
       }
-      if (v.banner) v.banner.rotation.z = Math.sin(t / 600 + v.basePos.x) * 0.08;
+      if (v.flag && v.flagBase) wave(v.flag, v.flagBase, t, v.basePos.x);
     }
 
     for (let i = this.effects.length - 1; i >= 0; i--) {
@@ -978,8 +991,8 @@ export class BattleScene {
       const mesh = o as THREE.Mesh;
       if (mesh.geometry && !isSharedSoldierGeo(mesh.geometry)) mesh.geometry.dispose();
       const mat = mesh.material;
-      if (Array.isArray(mat)) mat.forEach((mm) => mm.dispose());
-      else if (mat) (mat as THREE.Material).dispose();
+      if (Array.isArray(mat)) mat.forEach(disposeMaterial);
+      else if (mat) disposeMaterial(mat as THREE.Material);
       if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose();
     });
     this.renderer.dispose();
@@ -1038,12 +1051,57 @@ function disposeObject(o: THREE.Object3D): void {
     const mesh = c as THREE.Mesh;
     if (mesh.geometry && !isSharedSoldierGeo(mesh.geometry)) mesh.geometry.dispose();
     const mat = mesh.material;
-    if (Array.isArray(mat)) mat.forEach((mm) => mm.dispose());
-    else if (mat) (mat as THREE.Material).dispose();
+    if (Array.isArray(mat)) mat.forEach(disposeMaterial);
+    else if (mat) disposeMaterial(mat as THREE.Material);
     // InstancedMesh holds a separate instanceMatrix GPU buffer not covered by
     // geometry.dispose() — free it too (e.g. spawned arrow volleys).
     if ((c as THREE.InstancedMesh).isInstancedMesh) (c as THREE.InstancedMesh).dispose();
   });
+}
+// Dispose a material and any texture it owns (e.g. a flag's CanvasTexture, which
+// material.dispose() does NOT free on its own).
+function disposeMaterial(m: THREE.Material): void {
+  const map = (m as THREE.MeshStandardMaterial).map;
+  if (map) map.dispose();
+  m.dispose();
+}
+
+// ---- Faction cloth flags ----
+// Draw the faction colour + surname glyph onto a canvas for the flag texture.
+function flagTexture(color: string, glyph: string): THREE.CanvasTexture {
+  const cv = document.createElement('canvas');
+  cv.width = 128;
+  cv.height = 88;
+  const ctx = cv.getContext('2d')!;
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, 128, 88);
+  ctx.strokeStyle = 'rgba(0,0,0,.32)';
+  ctx.lineWidth = 7;
+  ctx.strokeRect(4, 4, 120, 80);
+  ctx.fillStyle = 'rgba(247,239,222,.94)';
+  ctx.font = '900 58px "Noto Serif TC", "Noto Serif SC", serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(glyph, 64, 48);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+// Wave a flag's cloth: displacement grows with distance from the pole (local x),
+// so the flag ripples out from a fixed edge. Reads rest positions from `base`.
+function wave(flag: THREE.Mesh, base: Float32Array, t: number, phase: number): void {
+  const pos = flag.geometry.attributes.position!;
+  const arr = pos.array as Float32Array;
+  for (let i = 0; i < arr.length; i += 3) {
+    const bx = base[i]!;
+    const k = bx / FLAG_W; // 0 at pole, 1 at the free edge
+    const w = Math.sin(bx * 16 - t * 0.006 + phase) * 0.06 * k;
+    arr[i] = bx;
+    arr[i + 1] = base[i + 1]! + w * 0.35;
+    arr[i + 2] = base[i + 2]! + w;
+  }
+  pos.needsUpdate = true;
 }
 
 // ---- Floating CSS2D labels ----
