@@ -40,6 +40,14 @@ export const BattleScreen: React.FC = () => {
   useSession(selectLocale);
   const session = useSession(selectBattle);
   const [playing, setPlaying] = React.useState(false);
+  // A brief cinematic caption for the most dramatic event of the day just resolved.
+  const [caption, setCaption] = React.useState<{ key: MessageKey; n: number } | null>(null);
+  const capN = React.useRef(0);
+  // Identity of the last-processed lastEvents array (so cues/captions fire once
+  // per resolved day, not on every unrelated session mutation) and the last
+  // captioned key (so a highlight doesn't re-flash / strobe at high speed).
+  const lastEventsRef = React.useRef<unknown>(null);
+  const lastCapKey = React.useRef<MessageKey | null>(null);
 
   // Auto-play: while playing and awaiting orders with no gambit to weigh,
   // resolve a day on an interval scaled by speed. Pause at gambit windows.
@@ -54,7 +62,13 @@ export const BattleScreen: React.FC = () => {
   // both the 3D and SVG views; silent no-op when muted or WebAudio is absent).
   useEffect(() => {
     if (!session || session.lastEvents.length === 0) return;
-    const kinds = new Set(session.lastEvents.map((e) => e.kind));
+    // Only react to a genuinely new day's events. Speed changes and order
+    // submissions shallow-copy the session but keep the SAME lastEvents array;
+    // only resolveDay/autoResolve assign a fresh one — so gate on its identity to
+    // avoid replaying cues + re-flashing the caption on unrelated interactions.
+    if (session.lastEvents === lastEventsRef.current) return;
+    lastEventsRef.current = session.lastEvents;
+    const kinds = new Set<string>(session.lastEvents.map((e) => e.kind));
     if (kinds.has('duel')) playDuel();
     if (kinds.has('fire')) playFire();
     if (kinds.has('volley')) playVolley();
@@ -63,6 +77,25 @@ export const BattleScreen: React.FC = () => {
     if (kinds.has('moraleBreak') || kinds.has('rout')) playRout();
     const end = session.lastEvents.find((e) => e.kind === 'end');
     if (end && end.kind === 'end') (end.attackerWon === session.playerIsAttacker ? playGong : playRetreat)();
+
+    // Caption the single most dramatic event of the day. Only rare, decisive beats
+    // are captioned (clash/volley happen almost every engaged day and would strobe
+    // at ×4 autoplay), and a highlight never re-flashes the same word back-to-back.
+    const CAPTIONS: Array<[string, MessageKey]> = [
+      ['fire', 'battle.caption.fire'],
+      ['flood', 'battle.caption.flood'],
+      ['duel', 'battle.caption.duel'],
+      ['moraleBreak', 'battle.caption.rout'],
+      ['rout', 'battle.caption.rout'],
+      ['reserveCommitted', 'battle.caption.charge'],
+      ['charge', 'battle.caption.charge'],
+    ];
+    const hit = CAPTIONS.find(([k]) => kinds.has(k));
+    if (hit && hit[1] !== lastCapKey.current) {
+      lastCapKey.current = hit[1];
+      capN.current += 1;
+      setCaption({ key: hit[1], n: capN.current });
+    }
   }, [session]);
 
   if (!session) return null;
@@ -116,6 +149,18 @@ export const BattleScreen: React.FC = () => {
           <FactionRow label={t('battle.defenders')} color={factionColor(def)} troops={defT} max={maxT} />
         </div>
       </div>
+
+      {/* Cinematic event caption */}
+      {caption && !resolved && (
+        <div key={caption.n} className="battle-caption pointer-events-none absolute inset-x-0 top-[15%] flex justify-center">
+          <span
+            className="font-display"
+            style={{ fontSize: 'clamp(28px, 4.4vw, 52px)', fontWeight: 900, letterSpacing: '0.2em', color: '#f3e5c6', textShadow: '0 2px 18px #000, 0 0 34px rgba(201,163,92,.45)' }}
+          >
+            {t(caption.key)}
+          </span>
+        </div>
+      )}
 
       {/* Bottom command cluster */}
       {!resolved && (

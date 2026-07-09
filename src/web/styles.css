@@ -166,3 +166,14 @@
     theme('colors.parchment.100') 24px
   );
 }
+
+/* Cinematic battle event caption — fade/scale in, hold, fade out */
+@keyframes battleCaption {
+  0% { opacity: 0; transform: translateY(12px) scale(0.94); }
+  16% { opacity: 1; transform: translateY(0) scale(1); }
+  72% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-8px) scale(1.03); }
+}
+.battle-caption {
+  animation: battleCaption 2.5s ease-out forwards;
+}
