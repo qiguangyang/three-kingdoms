@@ -107,6 +107,10 @@ interface UnitVisual {
   flagBase?: Float32Array;
   label?: CSS2DObject;
   generalId: string;
+  factionId: string;
+  offsets: { x: number; z: number }[]; // formation slots, for per-figure animation
+  heading: number; // current facing (world y-rotation), eased toward movement/enemy
+  moving: number; // 0..1 recent movement, drives march-bob intensity
   basePos: THREE.Vector3;
   target: THREE.Vector3;
   placed: boolean;
@@ -475,6 +479,8 @@ export class BattleScene {
       if (!v.placed) {
         v.basePos.copy(v.target);
         v.group.position.copy(v.target);
+        v.heading = Math.atan2(this.focusC.x - v.target.x, this.focusC.z - v.target.z);
+        v.group.rotation.y = v.heading;
         v.placed = true;
       }
       v.soldiers.count = soldierCount(u.troops);
@@ -550,8 +556,21 @@ export class BattleScene {
     }
     return {
       group, soldiers, material, banner, flag, flagBase, generalId: u.generalId,
+      factionId: u.factionId, offsets: offs, heading: 0, moving: 0,
       basePos: new THREE.Vector3(), target: new THREE.Vector3(), placed: false, shakeUntil: 0,
     };
+  }
+
+  // Nearest opposing unit (for a stationary block to square up against).
+  private nearestEnemy(v: UnitVisual): UnitVisual | null {
+    let best: UnitVisual | null = null;
+    let bd = Infinity;
+    for (const o of this.units.values()) {
+      if (o === v || o.factionId === v.factionId) continue;
+      const d = o.basePos.distanceToSquared(v.basePos);
+      if (d < bd) { bd = d; best = o; }
+    }
+    return best;
   }
 
   // A pole flying a faction cloth flag: the flag is a subdivided plane textured
@@ -952,8 +971,27 @@ export class BattleScene {
     if (this.waterMat) this.waterMat.uniforms.uT!.value = t / 1000;
 
     for (const v of this.units.values()) {
+      const px = v.basePos.x;
+      const pz = v.basePos.z;
       v.basePos.lerp(v.target, 0.12);
       v.group.position.copy(v.basePos);
+      const dx = v.basePos.x - px;
+      const dz = v.basePos.z - pz;
+      const step = Math.hypot(dx, dz);
+      // Ease the block to face where it is going; when stationary, face the enemy —
+      // so armies march and square up instead of sliding sideways like furniture.
+      let aim = v.heading;
+      if (step > 0.008) {
+        aim = Math.atan2(dx, dz);
+        v.moving = Math.min(1, v.moving + 0.15);
+      } else {
+        v.moving = Math.max(0, v.moving - 0.05);
+        const foe = this.nearestEnemy(v);
+        if (foe) aim = Math.atan2(foe.basePos.x - v.basePos.x, foe.basePos.z - v.basePos.z);
+      }
+      v.heading += Math.atan2(Math.sin(aim - v.heading), Math.cos(aim - v.heading)) * 0.08;
+      v.group.rotation.y = v.heading;
+      animateSoldiers(v, t);
       if (t < v.shakeUntil) {
         const k = (v.shakeUntil - t) / 260;
         v.group.position.x += Math.sin(t * 0.09) * 0.32 * k;
@@ -1088,6 +1126,34 @@ function flagTexture(color: string, glyph: string): THREE.CanvasTexture {
   tex.anisotropy = 4;
   return tex;
 }
+// Per-figure life: rewrite the soldier instance matrices each frame with a gentle
+// idle sway that grows into a march bounce while the unit is moving — so a block
+// reads as living troops rather than a frozen cluster of statues. Cheap: only the
+// visible `count` instances, reusing shared temps.
+const _sm = new THREE.Matrix4();
+const _sq = new THREE.Quaternion();
+const _sp = new THREE.Vector3();
+const _ss = new THREE.Vector3();
+function animateSoldiers(v: UnitVisual, t: number): void {
+  const n = v.soldiers.count;
+  const off = v.offsets;
+  const march = v.moving;
+  for (let i = 0; i < n; i++) {
+    const o = off[i]!;
+    const phase = i * 1.7;
+    const bob = Math.abs(Math.sin(t * 0.006 + phase)) * (0.03 + march * 0.11);
+    const sway = Math.sin(t * 0.004 + phase * 1.3) * 0.02;
+    _sp.set(o.x + sway * 0.4, bob, o.z);
+    // Mostly face the block's front (the group is turned toward the enemy) with a
+    // little per-figure jitter — reads as disciplined ranks, not a milling crowd.
+    _sq.setFromAxisAngle(UP, Math.sin(i * 12.9898) * 0.32 + sway);
+    _ss.set(1, 0.9 + (0.25 * ((i * 7) % 5)) / 4, 1);
+    _sm.compose(_sp, _sq, _ss);
+    v.soldiers.setMatrixAt(i, _sm);
+  }
+  v.soldiers.instanceMatrix.needsUpdate = true;
+}
+
 // Wave a flag's cloth: displacement grows with distance from the pole (local x),
 // so the flag ripples out from a fixed edge. Reads rest positions from `base`.
 function wave(flag: THREE.Mesh, base: Float32Array, t: number, phase: number): void {
