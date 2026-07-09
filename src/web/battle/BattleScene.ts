@@ -86,59 +86,101 @@ function isSharedSoldierGeo(g: THREE.BufferGeometry): boolean {
   for (const v of SOLDIER_GEOS.values()) if (v === g) return true;
   return false;
 }
-// A low-poly foot soldier: two legs, a shouldered torso, head + helmet, and two
-// arms — reads as a man rather than a pill. Weapons are added per troop type.
-function humanoid(): THREE.BufferGeometry[] {
-  const legL = new THREE.BoxGeometry(0.06, 0.24, 0.07); legL.translate(-0.05, 0.12, 0);
-  const legR = new THREE.BoxGeometry(0.06, 0.24, 0.07); legR.translate(0.05, 0.12, 0);
-  const torso = new THREE.CylinderGeometry(0.11, 0.075, 0.24, 6); torso.translate(0, 0.36, 0);
-  const head = new THREE.SphereGeometry(0.075, 8, 6); head.translate(0, 0.53, 0);
-  const helmet = new THREE.ConeGeometry(0.085, 0.11, 6); helmet.translate(0, 0.58, 0);
-  const armL = new THREE.BoxGeometry(0.04, 0.2, 0.04); armL.translate(-0.13, 0.35, 0.01);
-  const armR = new THREE.BoxGeometry(0.04, 0.2, 0.04); armR.translate(0.13, 0.35, 0.01);
-  return [legL, legR, torso, head, helmet, armL, armR];
+// Realistic soldier palette, baked as vertex colours on the body geometry (the
+// faction tabard is a separate group, tinted per-unit).
+const SKIN = 0xc79a6b;
+const HELM = 0x94815a; // laced cap / tan
+const ARMOR = 0x8c8f95; // steel lamellar
+const SLEEVE = 0x6f6353;
+const BELT = 0x47342a;
+const TROUSER = 0x35312b;
+const BOOT = 0x2a2119;
+const WOOD = 0x6b4f30;
+const STEEL = 0xb8bcc0;
+const SHIELD = 0x5c4835;
+const HORSE = 0x5b4636;
+const HORSE_DK = 0x3e3128;
+
+// Bake a flat vertex colour onto a geometry so several coloured parts can be
+// merged into one instanced geometry (steel armour, tan helmet, skin, dark cloth).
+function paint(geo: THREE.BufferGeometry, hex: number): THREE.BufferGeometry {
+  const c = new THREE.Color(hex);
+  const n = geo.attributes.position!.count;
+  const arr = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(arr, 3));
+  return geo;
 }
+// Merge body parts (group 0, realistic material) + faction accent (group 1) into
+// one grouped geometry the two-material InstancedMesh draws.
+function soldierGeo(body: THREE.BufferGeometry[], accent: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const b = mergeGeometries(body, false);
+  const a = mergeGeometries(accent, false);
+  return mergeGeometries([b, a], true);
+}
+
+// A low-poly Han-era soldier: dark trousers + boots, steel lamellar torso over a
+// belt, sleeved arms, a skin head under a laced helmet, and a tall shouldered
+// spear (archers a bow) — with a faction-coloured tabard over the armour.
 function buildSoldier(kind: string): THREE.BufferGeometry {
   if (kind === 'cavalry') {
-    const parts: THREE.BufferGeometry[] = [];
-    const body = new THREE.BoxGeometry(0.44, 0.17, 0.17); body.translate(0, 0.36, 0);
-    parts.push(body);
-    for (const [lx, lz] of [[-0.17, -0.06], [0.17, -0.06], [-0.17, 0.06], [0.17, 0.06]] as const) {
-      const leg = new THREE.BoxGeometry(0.05, 0.28, 0.05); leg.translate(lx, 0.14, lz); parts.push(leg);
-    }
-    const neck = new THREE.BoxGeometry(0.1, 0.22, 0.1); neck.translate(0.24, 0.52, 0); neck.rotateZ(-0.35); parts.push(neck);
-    const hhead = new THREE.BoxGeometry(0.17, 0.1, 0.1); hhead.translate(0.33, 0.6, 0); parts.push(hhead);
-    // seated rider (torso + head + helmet), raised onto the horse's back
-    const rtorso = new THREE.CylinderGeometry(0.09, 0.07, 0.2, 6); rtorso.translate(-0.06, 0.56, 0); parts.push(rtorso);
-    const rhead = new THREE.SphereGeometry(0.07, 8, 6); rhead.translate(-0.06, 0.71, 0); parts.push(rhead);
-    const rhelm = new THREE.ConeGeometry(0.08, 0.1, 6); rhelm.translate(-0.06, 0.76, 0); parts.push(rhelm);
-    return mergeGeometries(parts, false);
+    const body = [
+      paint(new THREE.BoxGeometry(0.46, 0.18, 0.18).translate(0, 0.37, 0), HORSE),
+      ...([[-0.18, -0.06], [0.18, -0.06], [-0.18, 0.06], [0.18, 0.06]] as const).map(([lx, lz]) =>
+        paint(new THREE.BoxGeometry(0.05, 0.3, 0.05).translate(lx, 0.15, lz), HORSE_DK)),
+      paint(new THREE.BoxGeometry(0.1, 0.22, 0.1).rotateZ(-0.4).translate(0.26, 0.54, 0), HORSE),
+      paint(new THREE.BoxGeometry(0.18, 0.1, 0.1).translate(0.35, 0.62, 0), HORSE),
+      paint(new THREE.CylinderGeometry(0.09, 0.07, 0.2, 7).translate(-0.05, 0.58, 0), ARMOR),
+      paint(new THREE.SphereGeometry(0.06, 8, 6).translate(-0.05, 0.72, 0), SKIN),
+      paint(new THREE.SphereGeometry(0.075, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.55).translate(-0.05, 0.73, 0), HELM),
+      paint(new THREE.CylinderGeometry(0.01, 0.01, 0.6, 4).translate(0.12, 0.72, 0), WOOD),
+      paint(new THREE.ConeGeometry(0.02, 0.08, 4).translate(0.12, 1.04, 0), STEEL),
+    ];
+    const accent = [paint(new THREE.BoxGeometry(0.13, 0.14, 0.02).translate(-0.05, 0.58, 0.085), 0xffffff)];
+    return soldierGeo(body, accent);
   }
   if (kind === 'navy') {
-    const hull = new THREE.BoxGeometry(0.52, 0.1, 0.2); hull.translate(0, 0.08, 0);
-    const prow = new THREE.BoxGeometry(0.14, 0.16, 0.14); prow.translate(0.29, 0.14, 0);
-    const mast = new THREE.CylinderGeometry(0.012, 0.012, 0.52, 4); mast.translate(0, 0.34, 0);
-    const sail = new THREE.BoxGeometry(0.02, 0.28, 0.24); sail.translate(0, 0.4, 0);
-    return mergeGeometries([hull, prow, mast, sail], false);
+    const body = [
+      paint(new THREE.BoxGeometry(0.52, 0.1, 0.2).translate(0, 0.08, 0), WOOD),
+      paint(new THREE.BoxGeometry(0.14, 0.16, 0.14).translate(0.29, 0.14, 0), WOOD),
+      paint(new THREE.CylinderGeometry(0.012, 0.012, 0.52, 4).translate(0, 0.34, 0), WOOD),
+    ];
+    const accent = [paint(new THREE.BoxGeometry(0.02, 0.28, 0.24).translate(0, 0.4, 0), 0xffffff)];
+    return soldierGeo(body, accent);
   }
-  const parts = humanoid();
+  // foot soldier (infantry / archer)
+  const body = [
+    paint(new THREE.BoxGeometry(0.06, 0.2, 0.07).translate(-0.05, 0.16, 0), TROUSER),
+    paint(new THREE.BoxGeometry(0.06, 0.2, 0.07).translate(0.05, 0.16, 0), TROUSER),
+    paint(new THREE.BoxGeometry(0.075, 0.06, 0.11).translate(-0.05, 0.03, 0.015), BOOT),
+    paint(new THREE.BoxGeometry(0.075, 0.06, 0.11).translate(0.05, 0.03, 0.015), BOOT),
+    paint(new THREE.CylinderGeometry(0.12, 0.09, 0.22, 7).translate(0, 0.37, 0), ARMOR),
+    paint(new THREE.CylinderGeometry(0.125, 0.125, 0.03, 10).translate(0, 0.27, 0), BELT),
+    paint(new THREE.BoxGeometry(0.04, 0.19, 0.05).translate(-0.14, 0.36, 0.01), SLEEVE),
+    paint(new THREE.BoxGeometry(0.04, 0.19, 0.05).translate(0.14, 0.36, 0.01), SLEEVE),
+    paint(new THREE.SphereGeometry(0.06, 8, 6).translate(0, 0.53, 0), SKIN),
+    paint(new THREE.SphereGeometry(0.078, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.55).translate(0, 0.53, 0), HELM),
+    paint(new THREE.CylinderGeometry(0.088, 0.088, 0.02, 10).translate(0, 0.505, 0), HELM),
+    paint(new THREE.BoxGeometry(0.14, 0.06, 0.13).translate(0, 0.5, -0.025), HELM),
+  ];
   if (kind === 'archer') {
-    const bow = new THREE.TorusGeometry(0.14, 0.014, 5, 10, Math.PI * 1.3); bow.rotateY(Math.PI / 2); bow.translate(0.16, 0.42, 0);
-    parts.push(bow);
-    return mergeGeometries(parts, false);
+    body.push(paint(new THREE.TorusGeometry(0.14, 0.012, 5, 10, Math.PI * 1.3).rotateY(Math.PI / 2).translate(0.16, 0.42, 0), WOOD));
+  } else {
+    body.push(paint(new THREE.CylinderGeometry(0.01, 0.01, 0.72, 4).translate(0.17, 0.5, 0), WOOD));
+    body.push(paint(new THREE.ConeGeometry(0.02, 0.09, 4).translate(0.17, 0.9, 0), STEEL));
+    body.push(paint(new THREE.BoxGeometry(0.03, 0.18, 0.16).translate(-0.16, 0.36, 0.02), SHIELD));
   }
-  // infantry (default): spear + shield
-  const spear = new THREE.CylinderGeometry(0.012, 0.012, 0.64, 4); spear.translate(0.16, 0.46, 0);
-  const tip = new THREE.ConeGeometry(0.028, 0.09, 4); tip.translate(0.16, 0.82, 0);
-  const shield = new THREE.BoxGeometry(0.03, 0.17, 0.15); shield.translate(-0.16, 0.36, 0.02);
-  parts.push(spear, tip, shield);
-  return mergeGeometries(parts, false);
+  const accent = [
+    paint(new THREE.BoxGeometry(0.16, 0.18, 0.02).translate(0, 0.36, 0.105), 0xffffff),
+    paint(new THREE.BoxGeometry(0.16, 0.18, 0.02).translate(0, 0.36, -0.105), 0xffffff),
+  ];
+  return soldierGeo(body, accent);
 }
 
 interface UnitVisual {
   group: THREE.Group;
   soldiers: THREE.InstancedMesh;
-  material: THREE.MeshStandardMaterial;
+  mats: THREE.MeshStandardMaterial[]; // [realistic body (vertex colours), faction tabard]
   banner?: THREE.Mesh;
   flag?: THREE.Mesh;
   flagBase?: Float32Array;
@@ -693,8 +735,7 @@ export class BattleScene {
       }
       v.soldiers.count = soldierCount(u.troops);
       const routing = u.state === 'routing';
-      v.material.transparent = routing;
-      v.material.opacity = routing ? 0.4 : 1;
+      for (const m of v.mats) { m.transparent = routing; m.opacity = routing ? 0.4 : 1; }
 
       const info = labels?.units[u.id];
       if (info) {
@@ -711,7 +752,7 @@ export class BattleScene {
       if (alive.has(id)) continue;
       this.scene.remove(v.group);
       v.soldiers.dispose();
-      v.material.dispose();
+      for (const m of v.mats) m.dispose();
       if (v.banner) disposeObject(v.banner);
       if (v.label) { v.label.removeFromParent(); v.label.element.remove(); }
       this.units.delete(id);
@@ -732,8 +773,13 @@ export class BattleScene {
 
   private buildUnit(u: BattleUnit): UnitVisual {
     const group = new THREE.Group();
-    const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(factionColor(u.factionId)), roughness: 0.65 });
-    const soldiers = new THREE.InstancedMesh(soldierGeometryFor(u.troopType), material, MAX_SOLDIERS);
+    // Two materials: the realistic body (vertex-coloured — steel/tan/skin/dark) and
+    // the faction-coloured tabard that tells the armies apart. The soldier geometry
+    // is grouped so material 0 paints the body and material 1 the tabard.
+    const bodyMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72 });
+    const factionMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(factionColor(u.factionId)), roughness: 0.6 });
+    const mats = [bodyMat, factionMat];
+    const soldiers = new THREE.InstancedMesh(soldierGeometryFor(u.troopType), mats, MAX_SOLDIERS);
     soldiers.castShadow = true;
     const offs = formationOffsets(MAX_SOLDIERS);
     const m = new THREE.Matrix4();
@@ -763,7 +809,7 @@ export class BattleScene {
       flagBase = b.base;
     }
     return {
-      group, soldiers, material, banner, flag, flagBase, generalId: u.generalId,
+      group, soldiers, mats, banner, flag, flagBase, generalId: u.generalId,
       factionId: u.factionId, offsets: offs, heading: 0, moving: 0,
       basePos: new THREE.Vector3(), target: new THREE.Vector3(), placed: false, shakeUntil: 0, engagedUntil: 0,
     };
