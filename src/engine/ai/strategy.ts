@@ -1,3 +1,4 @@
+import { GRID_SCALE } from '../constants.js';
 import { adjacentCities, citiesAdjacent, citiesOf, manhattanDistance } from '../map.js';
 import { factionPower, factionTotals, powerLeader } from '../selectors.js';
 import type {
@@ -11,10 +12,13 @@ import type {
 import type { PersonalityParams } from './personality.js';
 
 // Cities within this manhattan distance are treated as "directly bordering"
-// for the garrison-overmatch threat check. The full adjacency radius (18) is
-// used for marching purposes but is too broad for threat detection — on a
-// 100x40 grid with 40 cities it would flag almost every city as threatened.
-const DIRECT_BORDER_DISTANCE = 12;
+// for the garrison-overmatch threat check. The full adjacency radius
+// (18 * GRID_SCALE) is used for marching purposes but is too broad for threat
+// detection — on the base 100x40 grid with 40 cities it would flag almost every
+// city as threatened. Both this bound and ADJACENCY_THRESHOLD scale with
+// GRID_SCALE in lockstep with the (scaled) city coordinates, so the threat
+// gate is gameplay-invariant.
+const DIRECT_BORDER_DISTANCE = 12 * GRID_SCALE;
 
 // A city is "threatened" when an enemy army is on its way or massed next
 // door. Reads state.pendingOps and adjacency — pure, deterministic.

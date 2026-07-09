@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildInitialState } from '../../src/engine/scenario.js';
+import { GRID_SCALE } from '../../src/engine/constants.js';
 import { SCENARIO_DONGZHUO } from '../../src/data/scenarios/s1-dongzhuo.js';
 import { REF_DATA } from '../../src/data/index.js';
 import {
@@ -133,9 +134,9 @@ describe('concentrationCommands', () => {
   it('moves troops from a safe interior city toward the staging city', () => {
     // luoyang (staging, borders enemy chenliu) + anding (interior, safe).
     const state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 8000 },
-      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 8000 },
-      { id: 'anding', factionId: 'dongzhuo', pos: { x: 60, y: 30 }, garrison: 10000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 8000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 8000 },
+      { id: 'anding', factionId: 'dongzhuo', pos: { x: 60 * GRID_SCALE, y: 30 * GRID_SCALE }, garrison: 10000 },
     ]);
     const generals = factionGenerals(state, 'dongzhuo');
     const strategy: FactionStrategy = {
@@ -160,8 +161,8 @@ describe('concentrationCommands', () => {
 
   it('grabs an adjacent neutral city when troops are spare', () => {
     const state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 9000 },
-      { id: 'chenliu', factionId: null, pos: { x: 12, y: 10 }, garrison: 1000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 9000 },
+      { id: 'chenliu', factionId: null, pos: { x: 12 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 1000 },
     ]);
     const generals = factionGenerals(state, 'dongzhuo');
     const strategy: FactionStrategy = {
@@ -187,9 +188,9 @@ describe('concentrationCommands', () => {
 describe('strategicRules (composed)', () => {
   it('emits a move command when handed an expand strategy with a staging city', () => {
     const state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 8000 },
-      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 8000 },
-      { id: 'anding', factionId: 'dongzhuo', pos: { x: 60, y: 30 }, garrison: 12000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 8000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 8000 },
+      { id: 'anding', factionId: 'dongzhuo', pos: { x: 60 * GRID_SCALE, y: 30 * GRID_SCALE }, garrison: 12000 },
     ]);
     const strategy: FactionStrategy = {
       posture: 'expand',
@@ -207,8 +208,8 @@ describe('strategicRules (composed)', () => {
 describe('militaryCommands', () => {
   it('assaults the target once the staging force clears the threshold', () => {
     const state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 30000 },
-      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 4000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 30000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 4000 },
     ]);
     const generals = factionGenerals(state, 'dongzhuo');
     const strategy: FactionStrategy = {
@@ -232,8 +233,8 @@ describe('militaryCommands', () => {
 
   it('does not assault while the staging force is too thin', () => {
     const state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 4000 },
-      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 30000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 4000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 30000 },
     ]);
     const generals = factionGenerals(state, 'dongzhuo');
     const strategy: FactionStrategy = {
@@ -255,9 +256,9 @@ describe('militaryCommands', () => {
 
   it('reinforces a threatened city from a safe neighbor when defending', () => {
     let state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 2000 },
-      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 9000 },
-      { id: 'anding', factionId: 'dongzhuo', pos: { x: 11, y: 11 }, garrison: 10000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 2000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 9000 },
+      { id: 'anding', factionId: 'dongzhuo', pos: { x: 11 * GRID_SCALE, y: 11 * GRID_SCALE }, garrison: 10000 },
     ]);
     state = { ...state, pendingOps: [siegeOp('luoyang', 'caocao')] };
     const generals = factionGenerals(state, 'dongzhuo');

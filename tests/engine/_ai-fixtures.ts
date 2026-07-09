@@ -1,6 +1,7 @@
 // Controlled-topology builders for AI unit tests. Not a test file (no
 // `.test.` in the name) so vitest won't execute it directly.
 import { buildInitialState } from '../../src/engine/scenario.js';
+import { GRID_SCALE } from '../../src/engine/constants.js';
 import { SCENARIO_DONGZHUO } from '../../src/data/scenarios/s1-dongzhuo.js';
 import { REF_DATA } from '../../src/data/index.js';
 import type { City, CityId, FactionId, GameState, PendingOp } from '../../src/engine/types.js';
@@ -33,7 +34,7 @@ export function makeTopology(placed: PlacedCity[]): GameState {
   const cities: Record<string, City> = {};
   for (const [id, city] of Object.entries(base.cities)) {
     if (placedIds.has(id)) continue;
-    cities[id] = { ...city, pos: { x: 99, y: 39 }, factionId: null, generals: [] };
+    cities[id] = { ...city, pos: { x: 99 * GRID_SCALE, y: 39 * GRID_SCALE }, factionId: null, generals: [] };
   }
   for (const p of placed) {
     const src = base.cities[p.id];

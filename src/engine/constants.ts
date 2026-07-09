@@ -2,8 +2,18 @@
 //
 // All values live here so the engine and UI both reference one source.
 
-export const MAP_WIDTH = 100;
-export const MAP_HEIGHT = 40;
+// Logical grid resolution multiplier. The map is authored at a base
+// 100x40 resolution but operated at BASE * GRID_SCALE so downstream 3D
+// rendering has room for smooth relief. GRID_SCALE is a gameplay-invariant
+// transform: coordinates and every distance threshold/cost scale together,
+// so adjacency, march cost, and AI classifications are unchanged (proven by
+// tests/engine/grid-invariance.test.ts). GRID_SCALE=1 reproduces the old grid.
+export const GRID_SCALE = 5;
+export const BASE_MAP_WIDTH = 100;
+export const BASE_MAP_HEIGHT = 40;
+
+export const MAP_WIDTH = BASE_MAP_WIDTH * GRID_SCALE;
+export const MAP_HEIGHT = BASE_MAP_HEIGHT * GRID_SCALE;
 
 // Default terminal viewport. 80x24 is the universal lower bound; we use
 // 60x18 for the map portion and reserve the rest for status bar, sidebar

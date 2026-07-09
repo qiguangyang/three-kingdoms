@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildInitialState } from '../../src/engine/scenario.js';
+import { GRID_SCALE } from '../../src/engine/constants.js';
 import { SCENARIO_DONGZHUO } from '../../src/data/scenarios/s1-dongzhuo.js';
 import { REF_DATA } from '../../src/data/index.js';
 import { PERSONALITY_PRESETS } from '../../src/engine/ai/personality.js';
@@ -51,7 +52,7 @@ describe('personality presets', () => {
 describe('threat detection', () => {
   it('flags a city that is under siege', () => {
     let state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 8000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 8000 },
     ]);
     state = { ...state, pendingOps: [siegeOp('luoyang', 'caocao')] };
     expect(threatenedCityIds(state, 'dongzhuo')).toContain('luoyang');
@@ -60,8 +61,8 @@ describe('threat detection', () => {
 
   it('flags a city targeted by an inbound enemy attack-march', () => {
     let state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 8000 },
-      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 8000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 8000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 8000 },
     ]);
     state = { ...state, pendingOps: [attackMarchOp('chenliu', 'luoyang', 'caocao')] };
     expect(threatenedCityIds(state, 'dongzhuo')).toContain('luoyang');
@@ -69,36 +70,38 @@ describe('threat detection', () => {
 
   it('flags a city with a hostile neighbor holding a big garrison edge', () => {
     const state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 2000 },
-      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 9000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 2000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 9000 },
     ]);
     expect(threatenedCityIds(state, 'dongzhuo')).toContain('luoyang');
   });
 
   it('reports no threat for a quiet faction', () => {
     const state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 8000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 8000 },
     ]);
     expect(isFactionThreatened(state, 'dongzhuo')).toBe(false);
   });
 
   it('does not flag a city targeted by a friendly reinforce-march', () => {
     let state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 8000 },
-      { id: 'chenliu', factionId: 'dongzhuo', pos: { x: 12, y: 10 }, garrison: 8000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 8000 },
+      { id: 'chenliu', factionId: 'dongzhuo', pos: { x: 12 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 8000 },
     ]);
     const op = { ...attackMarchOp('chenliu', 'luoyang', 'dongzhuo'), intent: 'reinforce' as const };
     state = { ...state, pendingOps: [op] };
     expect(isFactionThreatened(state, 'dongzhuo')).toBe(false);
   });
 
-  it('does not flag garrison-overmatch for a far (distance > 12) enemy neighbor', () => {
-    // chenliu is within ADJACENCY_THRESHOLD (manhattan 16 <= 18) but beyond
-    // DIRECT_BORDER_DISTANCE (16 > 12), so its big garrison is not an
-    // imminent threat — it's a multi-month march away, not on the doorstep.
+  it('does not flag garrison-overmatch for a far (base distance > 12) enemy neighbor', () => {
+    // chenliu is within ADJACENCY_THRESHOLD (manhattan 16*GRID_SCALE <=
+    // 18*GRID_SCALE) but beyond DIRECT_BORDER_DISTANCE (16*GRID_SCALE >
+    // 12*GRID_SCALE), so its big garrison is not an imminent threat — it's a
+    // multi-month march away, not on the doorstep. Both coords and thresholds
+    // scale by GRID_SCALE, so the boundary classification is unchanged.
     const state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 2000 },
-      { id: 'chenliu', factionId: 'caocao', pos: { x: 24, y: 12 }, garrison: 9000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 2000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 24 * GRID_SCALE, y: 12 * GRID_SCALE }, garrison: 9000 },
     ]);
     expect(isFactionThreatened(state, 'dongzhuo')).toBe(false);
   });
@@ -108,9 +111,9 @@ describe('expansion target selection', () => {
   // dongzhuo borders a weak caocao city and a strong yuanshao city.
   function bordersState() {
     return makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 10000 },
-      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 500 },
-      { id: 'puyang', factionId: 'yuanshao', pos: { x: 14, y: 10 }, garrison: 14000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 10000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 500 },
+      { id: 'puyang', factionId: 'yuanshao', pos: { x: 14 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 14000 },
     ]);
   }
 
@@ -135,7 +138,7 @@ describe('expansion target selection', () => {
 
   it('returns null when the faction has no enemy-adjacent cities', () => {
     const state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 10000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 10000 },
     ]);
     expect(selectExpansionTarget(state, 'dongzhuo', PERSONALITY_PRESETS.balanced)).toBeNull();
   });
@@ -144,8 +147,8 @@ describe('expansion target selection', () => {
 describe('reassessStrategy', () => {
   function healthyBorders() {
     return makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 30000 },
-      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 4000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 30000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 4000 },
     ]);
   }
 
@@ -229,11 +232,12 @@ describe('reassessStrategy', () => {
   });
 
   it('drops an expand strategy when staging and target are no longer adjacent', () => {
-    // staging luoyang (10,10) and target chenliu (40,10) are 30 apart —
-    // well beyond ADJACENCY_THRESHOLD (18), so no assault is possible.
+    // staging luoyang (base 10,10) and target chenliu (base 40,10) are
+    // 30*GRID_SCALE apart — well beyond ADJACENCY_THRESHOLD (18*GRID_SCALE),
+    // so no assault is possible.
     const state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 30000 },
-      { id: 'chenliu', factionId: 'caocao', pos: { x: 40, y: 10 }, garrison: 4000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 30000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 40 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 4000 },
     ]);
     const stale: FactionStrategy = {
       posture: 'expand',
@@ -249,8 +253,8 @@ describe('reassessStrategy', () => {
 describe('makeDefaultAgent.reassess', () => {
   it('produces a strategy for the faction', () => {
     const state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 30000 },
-      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 4000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 30000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 4000 },
     ]);
     const agent = makeDefaultAgent('dongzhuo', 'balanced');
     const strategy = agent.reassess({ state, factionId: 'dongzhuo' }, null);
@@ -309,8 +313,8 @@ describe('AI lifecycle wiring', () => {
 describe('factionRankings', () => {
   it('ranks every faction by power, strongest first, with 1-based rank', () => {
     const state = makeTopology([
-      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10, y: 10 }, garrison: 90000 },
-      { id: 'chenliu', factionId: 'caocao', pos: { x: 12, y: 10 }, garrison: 1000 },
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 90000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 12 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 1000 },
     ]);
     const rankings = factionRankings(state);
     expect(rankings.length).toBe(Object.keys(state.factions).length);
