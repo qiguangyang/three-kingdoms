@@ -177,3 +177,9 @@
 .battle-caption {
   animation: battleCaption 2.5s ease-out forwards;
 }
+
+/* Pre-battle title card fade-in */
+@keyframes battleIntroIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

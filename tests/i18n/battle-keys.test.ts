@@ -10,6 +10,8 @@ const KEYS = [
   'battle.gambit.ambush',
   'battle.caption.fire', 'battle.caption.flood', 'battle.caption.duel', 'battle.caption.rout',
   'battle.caption.charge', 'battle.caption.clash', 'battle.caption.volley',
+  'battle.intro.tag', 'battle.intro.title', 'battle.intro.era', 'battle.intro.commanders',
+  'battle.intro.garrison', 'battle.intro.narr', 'battle.intro.begin',
 ] as const;
 
 describe('battle screen i18n keys', () => {

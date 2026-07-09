@@ -5,8 +5,11 @@ import {
   chooseBattleGambit, finishBattle, quickResolveBattle, resolveBattleDay,
   setBattleSpeed, submitBattleOrders,
 } from '../../state/store.js';
-import { t } from '../../i18n/locale.js';
-import { factionColor } from '../theme.js';
+import { selectGame } from '../../state/selectors.js';
+import { t, pickName } from '../../i18n/locale.js';
+import { factionColor, FACTION_GLYPH } from '../theme.js';
+import { CITIES } from '../../data/cities.js';
+import { GENERALS } from '../../data/generals/index.js';
 import {
   playCharge, playClash, playDuel, playFire, playGong, playRetreat, playRout, playVolley,
 } from '../audio/battle.js';
@@ -39,7 +42,12 @@ function troopTotal(session: BattleSession, factionId: string): number {
 export const BattleScreen: React.FC = () => {
   useSession(selectLocale);
   const session = useSession(selectBattle);
+  const game = useSession(selectGame);
   const [playing, setPlaying] = React.useState(false);
+  // Pre-battle cinematic title card, shown once per battle (reset on a new city).
+  const [introOpen, setIntroOpen] = React.useState(true);
+  const cityId = session?.battle.cityId;
+  useEffect(() => { setIntroOpen(true); }, [cityId]);
   // A brief cinematic caption for the most dramatic event of the day just resolved.
   const [caption, setCaption] = React.useState<{ key: MessageKey; n: number } | null>(null);
   const capN = React.useRef(0);
@@ -235,9 +243,105 @@ export const BattleScreen: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Pre-battle cinematic title card */}
+      {introOpen && !resolved && (
+        <BattleIntro session={session} game={game} onBegin={() => setIntroOpen(false)} />
+      )}
     </div>
   );
 };
+
+// The reference's signature: a dark cinematic title card that opens each battle —
+// battle name in large calligraphy, the era, a one-line dispatch of the setup, the
+// two forces with their commanders and strengths, and a Begin control.
+const BattleIntro: React.FC<{ session: BattleSession; game: import('../../engine/types.js').GameState | null; onBegin: () => void }> = ({ session, game, onBegin }) => {
+  const b = session.battle;
+  const atk = b.attackerFactionId;
+  const def = b.defenderFactionId;
+  const atkT = troopTotal(session, atk);
+  const defT = troopTotal(session, def);
+  const maxT = Math.max(atkT, defT, 1);
+  const city = CITIES[b.cityId]?.name;
+  const cityStr = city ? pickName(city) : b.cityId;
+  const leadUnit = b.units
+    .filter((u) => u.factionId === atk && u.generalId && u.troops > 0)
+    .sort((p, q) => q.troops - p.troops)[0];
+  const leadName = leadUnit ? pickName(GENERALS[leadUnit.generalId]?.name ?? { zh: '', en: '' }) : '';
+  const atkGenerals = b.units
+    .filter((u) => u.factionId === atk && u.generalId)
+    .map((u) => pickName(GENERALS[u.generalId]?.name ?? { zh: '', en: '' }))
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(' · ');
+  const title = t('battle.intro.title', city ? { city } : { city: cityStr });
+
+  return (
+    <div
+      className="absolute inset-0 z-20 overflow-hidden"
+      style={{ background: 'radial-gradient(120% 90% at 32% 46%, rgba(60,26,14,.55), rgba(10,13,18,.94) 62%), #0a0d12', animation: 'battleIntroIn .5s ease-out' }}
+    >
+      {/* huge faded calligraphy of the title on the right */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-[4%] flex items-center font-display"
+        style={{ writingMode: 'vertical-rl', fontSize: 'clamp(80px, 15vw, 200px)', fontWeight: 900, letterSpacing: '0.08em', color: 'rgba(201,163,92,.14)', whiteSpace: 'nowrap', textShadow: '0 6px 40px #000' }}
+      >
+        {cityStr}
+      </div>
+
+      <div className="absolute left-[7%] top-1/2 w-[min(560px,60vw)] -translate-y-1/2">
+        <div className="text-[11px]" style={{ letterSpacing: '0.42em', color: GOLD }}>
+          <span className="mr-2 inline-block h-1.5 w-1.5 rounded-full align-middle" style={{ background: '#b3382c' }} />
+          {t('battle.intro.tag')}
+        </div>
+        <div className="mt-3 font-display" style={{ fontSize: 'clamp(34px, 5vw, 60px)', fontWeight: 900, letterSpacing: '0.12em', color: PAPER, textShadow: '0 3px 22px #000' }}>
+          {title}
+        </div>
+        {game && (
+          <div className="mt-1 text-xs" style={{ letterSpacing: '0.24em', color: PAPER_DIM }}>
+            {t('battle.intro.era', { year: game.year, month: game.month })}
+          </div>
+        )}
+        <div className="mt-4 h-px w-40" style={{ background: `linear-gradient(90deg, ${GOLD}, transparent)` }} />
+        <p className="mt-4 text-sm leading-loose" style={{ color: PAPER_DIM, fontWeight: 300, maxWidth: '46ch' }}>
+          {t('battle.intro.narr', { attacker: leadName, atk: atkT.toLocaleString(), city: city ?? cityStr, def: defT.toLocaleString() })}
+        </p>
+
+        <div className="mt-6 flex flex-col gap-3">
+          <IntroForce label={atkGenerals || t('battle.attackers')} glyph={FACTION_GLYPH[atk] ?? '·'} color={factionColor(atk)} troops={atkT} max={maxT} />
+          <IntroForce label={t('battle.intro.garrison')} glyph={FACTION_GLYPH[def] ?? '·'} color={factionColor(def)} troops={defT} max={maxT} />
+        </div>
+
+        <button
+          onClick={onBegin}
+          className="mt-8 rounded px-8 py-2.5 font-display"
+          style={{ background: 'linear-gradient(180deg, rgba(179,56,44,.9), rgba(120,32,26,.9))', border: `1px solid ${GOLD}`, color: '#f4e6cb', letterSpacing: '0.3em', fontWeight: 700, boxShadow: '0 6px 26px rgba(0,0,0,.5)' }}
+        >
+          {t('battle.intro.begin')}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// One force row inside the title card: seal glyph, commanders, strength bar.
+const IntroForce: React.FC<{ label: string; glyph: string; color: string; troops: number; max: number }> = ({ label, glyph, color, troops, max }) => (
+  <div className="flex items-center gap-3">
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded font-display" style={{ background: `${color}22`, border: `1px solid ${color}`, color, fontWeight: 900, fontSize: 18 }}>
+      {glyph}
+    </span>
+    <div className="min-w-0 flex-1">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="truncate text-sm" style={{ color: PAPER }}>{label}</span>
+        <span className="font-mono text-xs tabular-nums" style={{ color: PAPER_DIM }}>{troops.toLocaleString()}</span>
+      </div>
+      <div className="mt-1 h-[5px] overflow-hidden rounded" style={{ background: 'rgba(255,255,255,.08)' }}>
+        <span className="block h-full rounded" style={{ width: `${(troops / max) * 100}%`, background: `linear-gradient(90deg, ${color}55, ${color})` }} />
+      </div>
+    </div>
+  </div>
+);
 
 // A single faction's strength: colour swatch, name, troop count, and a bar
 // filling relative to the stronger side — the campaign-map "power" read.
