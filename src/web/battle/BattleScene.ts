@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import type { BattleSession } from '../../state/battleSession.js';
 import type { BattleEvent, BattleField, GeneralId, Vec2 } from '../../engine/battle/types.js';
 import type { BattleUnit, TroopType } from '../../engine/types.js';
@@ -97,11 +98,19 @@ interface UnitVisual {
   soldiers: THREE.InstancedMesh;
   material: THREE.MeshStandardMaterial;
   banner?: THREE.Mesh;
+  label?: CSS2DObject;
   generalId: string;
   basePos: THREE.Vector3;
   target: THREE.Vector3;
   placed: boolean;
   shakeUntil: number;
+}
+
+// Text the renderer floats over the battle (resolved in React, where the name
+// data + locale live; the scene only positions and shows the strings).
+export interface BattleLabelData {
+  units: Record<string, { title: string; sub: string; color: string }>;
+  landmark?: { text: string; cell: { x: number; y: number } };
 }
 interface Effect {
   obj: THREE.Object3D;
@@ -120,6 +129,8 @@ export class BattleScene {
   // A small fixed pool of fire lights kept permanently in the scene so the WebGL
   // light count never changes (adding/removing lights recompiles materials).
   private readonly fireLights: THREE.PointLight[] = [];
+  private readonly labelRenderer: CSS2DRenderer;
+  private landmarkLabel: CSS2DObject | null = null;
   private skyMat!: THREE.ShaderMaterial;
   private sun!: THREE.DirectionalLight;
   private hemi!: THREE.HemisphereLight;
@@ -143,6 +154,16 @@ export class BattleScene {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
+
+    // A CSS2D layer over the canvas for crisp HTML labels (general/army names,
+    // landmarks) projected onto 3D positions — the reference's documentary look.
+    this.labelRenderer = new CSS2DRenderer();
+    const lr = this.labelRenderer.domElement;
+    lr.style.position = 'absolute';
+    lr.style.inset = '0';
+    lr.style.pointerEvents = 'none';
+    lr.style.overflow = 'hidden';
+    canvas.parentElement?.appendChild(lr);
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x1e2a48);
@@ -191,7 +212,10 @@ export class BattleScene {
   }
 
   private addSky(): void {
-    const geo = new THREE.SphereGeometry(260, 24, 12);
+    // High-segment dome + fragment dithering: a coarse sphere with a smooth
+    // gradient shows facet seams and 8-bit banding as streaks in the sky, so
+    // subdivide finely and add sub-LSB noise to break the bands up.
+    const geo = new THREE.SphereGeometry(300, 64, 32);
     const mat = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       uniforms: {
@@ -199,9 +223,14 @@ export class BattleScene {
         horizon: { value: new THREE.Color(0x93a0b4) },
       },
       vertexShader:
-        'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+        'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
       fragmentShader:
-        'varying vec3 vP; uniform vec3 top; uniform vec3 horizon; void main(){ float h = clamp((normalize(vP).y+0.04)/0.5, 0.0, 1.0); gl_FragColor = vec4(mix(horizon, top, pow(h, 0.8)), 1.0); }',
+        'varying vec3 vP; uniform vec3 top; uniform vec3 horizon;' +
+        'void main(){ float h = clamp((normalize(vP).y + 0.04) / 0.5, 0.0, 1.0);' +
+        ' vec3 c = mix(horizon, top, pow(h, 0.8));' +
+        ' float d = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;' +
+        ' c += d * (1.6 / 255.0);' +
+        ' gl_FragColor = vec4(c, 1.0); }',
     });
     this.skyMat = mat;
     this.scene.add(new THREE.Mesh(geo, mat));
@@ -211,6 +240,7 @@ export class BattleScene {
     const w = this.canvas.clientWidth || 800;
     const h = this.canvas.clientHeight || 500;
     this.renderer.setSize(w, h, false);
+    this.labelRenderer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -410,7 +440,7 @@ export class BattleScene {
     this.scene.add(rocks);
   }
 
-  syncUnits(session: BattleSession): void {
+  syncUnits(session: BattleSession, labels?: BattleLabelData): void {
     const field = session.battle.field;
     const alive = new Set<string>();
     for (const u of session.battle.units) {
@@ -433,6 +463,17 @@ export class BattleScene {
       const routing = u.state === 'routing';
       v.material.transparent = routing;
       v.material.opacity = routing ? 0.4 : 1;
+
+      const info = labels?.units[u.id];
+      if (info) {
+        if (!v.label) {
+          v.label = new CSS2DObject(makeLabelEl('unit'));
+          v.label.position.set(0, 3.1, 0);
+          v.group.add(v.label);
+        }
+        v.label.element.innerHTML = unitLabelHtml(info);
+        v.label.visible = !routing;
+      }
     }
     for (const [id, v] of this.units) {
       if (alive.has(id)) continue;
@@ -440,7 +481,20 @@ export class BattleScene {
       v.soldiers.dispose();
       v.material.dispose();
       if (v.banner) disposeObject(v.banner);
+      if (v.label) { v.label.removeFromParent(); v.label.element.remove(); }
       this.units.delete(id);
+    }
+
+    // Landmark: the besieged city, floated over its gate (built once).
+    if (labels?.landmark && !this.landmarkLabel && this.field) {
+      const cell = labels.landmark.cell;
+      const { x, z } = cellWorldXZ(cell.x, cell.y, this.field);
+      const y = terrainHeight(cell.x, cell.y, this.field);
+      const el = makeLabelEl('landmark');
+      el.innerHTML = `<span style="opacity:.7">◈</span> ${escapeText(labels.landmark.text)}`;
+      this.landmarkLabel = new CSS2DObject(el);
+      this.landmarkLabel.position.set(x, y + 5.5, z);
+      this.scene.add(this.landmarkLabel);
     }
   }
 
@@ -898,6 +952,7 @@ export class BattleScene {
       this.updateCamera(t, dt);
     }
     this.renderer.render(this.scene, this.camera);
+    this.labelRenderer.render(this.scene, this.camera);
   };
 
   dispose(): void {
@@ -913,6 +968,7 @@ export class BattleScene {
       if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose();
     });
     this.renderer.dispose();
+    this.labelRenderer.domElement.remove();
   }
 }
 
@@ -972,6 +1028,28 @@ function disposeObject(o: THREE.Object3D): void {
     // geometry.dispose() — free it too (e.g. spawned arrow volleys).
     if ((c as THREE.InstancedMesh).isInstancedMesh) (c as THREE.InstancedMesh).dispose();
   });
+}
+
+// ---- Floating CSS2D labels ----
+function escapeText(s: string): string {
+  return s.replace(/[&<>]/g, (c) => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;'));
+}
+function makeLabelEl(kind: 'unit' | 'landmark'): HTMLDivElement {
+  const el = document.createElement('div');
+  el.style.cssText =
+    kind === 'landmark'
+      ? 'padding:3px 11px;border-radius:5px;white-space:nowrap;pointer-events:none;' +
+        "font:700 13px/1.3 'Noto Serif TC',serif;letter-spacing:2px;color:#f1e4c6;" +
+        'background:rgba(10,13,18,.6);border:1px solid rgba(201,163,92,.5);text-shadow:0 1px 4px #000'
+      : 'padding:2px 7px;border-radius:5px;white-space:nowrap;pointer-events:none;' +
+        "font:600 11px/1.25 'Noto Sans TC',system-ui,sans-serif;color:#e8dcc3;" +
+        'background:rgba(10,13,18,.66);border:1px solid rgba(201,163,92,.28);text-shadow:0 1px 3px #000';
+  return el;
+}
+function unitLabelHtml(info: { title: string; sub: string; color: string }): string {
+  const dot = `<span style="color:${info.color}">●</span>`;
+  const name = info.title ? `<b>${escapeText(info.title)}</b> ` : '';
+  return `${dot} ${name}<span style="opacity:.68;font-weight:400">${escapeText(info.sub)}</span>`;
 }
 
 // ---- Environment scatter/shape noise (deterministic, seeded) ----

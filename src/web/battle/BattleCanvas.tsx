@@ -2,6 +2,30 @@ import React from 'react';
 import type { BattleSession } from '../../state/battleSession.js';
 import { BattleField2D } from './BattleField2D.js';
 import { BattleScene } from './BattleScene.js';
+import type { BattleLabelData } from './BattleScene.js';
+import { pickName } from '../../i18n/locale.js';
+import { GENERALS } from '../../data/generals/index.js';
+import { CITIES } from '../../data/cities.js';
+import { factionColor } from '../theme.js';
+
+// Resolve the floating-label strings here in React, where the name data and the
+// active locale live; the scene just positions and renders them.
+function buildLabelData(session: BattleSession): BattleLabelData {
+  const b = session.battle;
+  const units: BattleLabelData['units'] = {};
+  for (const u of b.units) {
+    const g = GENERALS[u.generalId];
+    units[u.id] = {
+      title: g ? pickName(g.name) : '',
+      sub: u.troops.toLocaleString(),
+      color: factionColor(u.factionId),
+    };
+  }
+  const city = CITIES[b.cityId];
+  const gate = b.field.wall?.gate;
+  const landmark = city && gate ? { text: pickName(city.name), cell: gate } : undefined;
+  return { units, landmark };
+}
 
 // React <-> BattleScene bridge. Builds the Three.js scene once per battle
 // (keyed on the field identity, which is stable across days), then syncs units
@@ -19,7 +43,7 @@ export const BattleCanvas: React.FC<{ session: BattleSession }> = ({ session }) 
     try {
       const scene = new BattleScene(canvas);
       scene.setField(session.battle.field);
-      scene.syncUnits(session);
+      scene.syncUnits(session, buildLabelData(session));
       scene.frameBattle(session);
       sceneRef.current = scene;
       const onResize = (): void => scene.resize();
@@ -44,7 +68,7 @@ export const BattleCanvas: React.FC<{ session: BattleSession }> = ({ session }) 
   React.useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
-    scene.syncUnits(session);
+    scene.syncUnits(session, buildLabelData(session));
     scene.frameBattle(session);
     scene.playEvents(session.lastEvents);
   }, [session]);
