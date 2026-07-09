@@ -339,23 +339,105 @@ export class BattleScene {
       this.scene.add(water);
     }
 
-    if (field.wall) {
-      const gate = field.wall.gate;
-      const wallMat = new THREE.MeshStandardMaterial({ color: 0x7a6a50, roughness: 0.95 });
-      const gateMat = new THREE.MeshStandardMaterial({ color: 0x4a3722, roughness: 0.9 });
-      for (const c of field.wall.cells) {
-        const isGate = c.x === gate.x && c.y === gate.y;
-        const box = new THREE.Mesh(
-          new THREE.BoxGeometry(CELL_SIZE * 1.02, isGate ? 1.4 : 3.0, CELL_SIZE * 1.4),
-          isGate ? gateMat : wallMat,
-        );
-        const { x, z } = cellWorldXZ(c.x, c.y, field);
-        box.position.set(x, terrainHeight(c.x, c.y, field) + (isGate ? 0.7 : 1.5), z);
-        box.castShadow = true;
-        box.receiveShadow = true;
-        this.scene.add(box);
+    if (field.wall) this.addFortification(field, field.wall);
+    this.addCamps(field);
+  }
+
+  // A besieged city's fortifications along the defender edge: a crenellated
+  // curtain wall, corner towers with roofs, a gatehouse, and a keep behind the
+  // gate — replacing the row of bare boxes so the objective reads as a city.
+  private addFortification(field: BattleField, wall: { cells: Vec2[]; gate: Vec2 }): void {
+    const stoneMat = new THREE.MeshStandardMaterial({ color: 0x6f665c, roughness: 0.95 });
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x7a6a50, roughness: 0.95 });
+    const gateMat = new THREE.MeshStandardMaterial({ color: 0x2c1f14, roughness: 0.9 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x50322f, roughness: 0.85 });
+    const WH = 3.2;
+    const gate = wall.gate;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    for (const c of wall.cells) { minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x); }
+    const add = (m: THREE.Mesh): void => { m.castShadow = true; m.receiveShadow = true; this.scene.add(m); };
+
+    for (const c of wall.cells) {
+      const { x, z } = cellWorldXZ(c.x, c.y, field);
+      const y = terrainHeight(c.x, c.y, field);
+      if (c.x === gate.x && c.y === gate.y) {
+        for (const dx of [-0.72, 0.72]) {
+          const tw = new THREE.Mesh(new THREE.BoxGeometry(0.8, WH + 1.9, CELL_SIZE * 1.35), stoneMat);
+          tw.position.set(x + dx, y + (WH + 1.9) / 2, z);
+          add(tw);
+        }
+        const lintel = new THREE.Mesh(new THREE.BoxGeometry(CELL_SIZE * 1.05, 1.1, CELL_SIZE * 1.4), stoneMat);
+        lintel.position.set(x, y + WH + 0.55, z);
+        add(lintel);
+        const door = new THREE.Mesh(new THREE.BoxGeometry(1.15, WH * 0.72, CELL_SIZE * 0.7), gateMat);
+        door.position.set(x, y + WH * 0.36, z);
+        add(door);
+      } else if (c.x === minX || c.x === maxX) {
+        const tw = new THREE.Mesh(new THREE.BoxGeometry(CELL_SIZE * 1.25, WH + 2.4, CELL_SIZE * 1.25), stoneMat);
+        tw.position.set(x, y + (WH + 2.4) / 2, z);
+        add(tw);
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(CELL_SIZE * 1.02, 1.9, 4), roofMat);
+        roof.position.set(x, y + WH + 2.4 + 0.95, z);
+        roof.rotation.y = Math.PI / 4;
+        add(roof);
+      } else {
+        const seg = new THREE.Mesh(new THREE.BoxGeometry(CELL_SIZE * 1.02, WH, CELL_SIZE * 1.15), wallMat);
+        seg.position.set(x, y + WH / 2, z);
+        add(seg);
+        for (const mx of [-0.62, 0, 0.62]) {
+          const mer = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.55, CELL_SIZE * 1.15), wallMat);
+          mer.position.set(x + mx * CELL_SIZE * 0.5, y + WH + 0.28, z);
+          add(mer);
+        }
       }
     }
+
+    // Keep: a roofed tower just behind the gate (toward the defender edge).
+    const by = Math.max(0, gate.y - 1);
+    const { x: kx, z: kz } = cellWorldXZ(gate.x, by, field);
+    const ky = terrainHeight(gate.x, by, field);
+    const keep = new THREE.Mesh(new THREE.BoxGeometry(CELL_SIZE * 1.6, WH + 2.6, CELL_SIZE * 1.6), stoneMat);
+    keep.position.set(kx, ky + (WH + 2.6) / 2, kz);
+    add(keep);
+    const keepRoof = new THREE.Mesh(new THREE.ConeGeometry(CELL_SIZE * 1.35, 2.3, 4), roofMat);
+    keepRoof.position.set(kx, ky + WH + 2.6 + 1.15, kz);
+    keepRoof.rotation.y = Math.PI / 4;
+    add(keepRoof);
+  }
+
+  // A war camp of canvas tents at the attacker's staging edge, so the field has
+  // an encampment behind the assault rather than empty ground.
+  private addCamps(field: BattleField): void {
+    const seed = Math.abs(field.seed) | 0;
+    const tentMat = new THREE.MeshStandardMaterial({ color: 0xcdc2a6, roughness: 1 });
+    const tentGeo = new THREE.ConeGeometry(0.85, 1.5, 6);
+    const camp = new THREE.Group();
+    const cx = Math.floor(field.width / 2);
+    const cy = field.height - 1; // attacker's back edge
+    const { x: wx, z: wz } = cellWorldXZ(cx, cy, field);
+    const tents = new THREE.InstancedMesh(tentGeo, tentMat, 9);
+    const M = new THREE.Matrix4();
+    const P = new THREE.Vector3();
+    const Q = new THREE.Quaternion();
+    const S = new THREE.Vector3(1, 1, 1);
+    let k = 0;
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2;
+      const tx = wx + Math.cos(a) * 3.2 + (envHash(i, 2, seed) - 0.5) * 1.4;
+      const tz = wz + Math.sin(a) * 2.4 + (envHash(i, 5, seed) - 0.5) * 1.4 + 2.5; // nudge off the field edge
+      P.set(tx, terrainHeight((tx / CELL_SIZE) + (field.width - 1) / 2, (tz / CELL_SIZE) + (field.height - 1) / 2, field) + 0.75, tz);
+      const sc = 0.85 + envHash(i, 8, seed) * 0.4;
+      S.set(sc, sc, sc);
+      M.compose(P, Q, S);
+      tents.setMatrixAt(k++, M);
+    }
+    tents.count = k;
+    tents.instanceMatrix.needsUpdate = true;
+    tents.castShadow = true;
+    tents.receiveShadow = true;
+    camp.add(tents);
+    this.scene.add(camp);
   }
 
   // Wraps the bare playfield in a landscape: a rolling-hills basin the battle sits
