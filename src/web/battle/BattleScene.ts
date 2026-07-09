@@ -31,6 +31,9 @@ const UP = new THREE.Vector3(0, 1, 0);
 const MAX_SOLDIERS = 48;
 const WATER_Y = 0.2;
 const FLAG_W = 0.5;
+// Azimuths the shot director rotates through on each cut, so consecutive shots
+// look at the action from visibly different angles.
+const CUT_AZIMUTHS = [-1.15, 0.4, -0.55, 1.2, -2.05, 0.9];
 
 // Final film-grade pass (runs after tone mapping, on display-space colour).
 const GRADE_SHADER = {
@@ -172,10 +175,18 @@ export class BattleScene {
   private raf = 0;
   private disposed = false;
   // Cinematic camera director state.
-  private readonly focusC = new THREE.Vector3(0, 1.5, 0);
+  private readonly focusC = new THREE.Vector3(0, 1.5, 0); // centroid of the armies
+  private readonly camFocus = new THREE.Vector3(0, 1.5, 0); // where the camera currently looks
+  private readonly hotPoint = new THREE.Vector3(0, 1.5, 0); // where the action just happened
   private focusSpan = 40;
   private introT = 0;
-  private pullbackUntil = 0;
+  private hotUntil = 0; // while > now, frame the hot point instead of the centroid
+  private shotKind: 'establish' | 'action' | 'hero' | 'rout' = 'establish';
+  private shotBorn = 0; // when the current shot started (for the cut-in ease)
+  private shotAz = -1.1; // azimuth of the current shot
+  private cutUntil = 0; // don't cut again before this (avoid strobing cuts)
+  private shotSeq = 0; // rotates the angle each cut for variety
+  private shakeAmp = 0;
   private autoPausedUntil = 0;
   private lastT = 0;
 
@@ -648,13 +659,23 @@ export class BattleScene {
   playEvents(events: BattleEvent[]): void {
     for (const e of events) {
       switch (e.kind) {
-        case 'fire':
+        case 'fire': {
           this.spawnFire(e.at);
+          if (this.field) {
+            const w = cellWorldXZ(e.at.x, e.at.y, this.field);
+            this.cutTo(new THREE.Vector3(w.x, terrainHeight(e.at.x, e.at.y, this.field), w.z), 'hero');
+            this.cameraShake(0.3);
+          }
           break;
-        case 'flood':
+        }
+        case 'flood': {
           this.spawnFlood(e.from, e.cells);
-          this.pullbackUntil = nowMs() + 3500; // pull the shot back to take in the whole flood
+          if (this.field) {
+            const w = cellWorldXZ(e.from.x, e.from.y, this.field);
+            this.cutTo(new THREE.Vector3(w.x, terrainHeight(e.from.x, e.from.y, this.field), w.z), 'action');
+          }
           break;
+        }
         case 'volley': {
           const a = this.units.get(e.unitId);
           const b = this.units.get(e.targetUnitId);
@@ -670,24 +691,28 @@ export class BattleScene {
             this.spawnSparks(mid, 0xffd070, 22);
             a.shakeUntil = nowMs() + 260;
             b.shakeUntil = nowMs() + 260;
+            this.cutTo(mid, 'hero'); // low, close on the melee
+            this.cameraShake(0.35);
           }
           break;
         }
         case 'charge': {
           const a = this.units.get(e.unitId);
-          if (a) this.spawnDust(a.group.position);
+          if (a) { this.spawnDust(a.group.position); this.cutTo(a.group.position, 'action'); }
           break;
         }
         case 'moraleBreak':
         case 'rout': {
-          this.pullbackUntil = nowMs() + 3500;
           const a = this.units.get(e.unitId);
-          if (a) this.spawnDust(a.group.position);
+          if (a) { this.spawnDust(a.group.position); this.cutTo(a.group.position, 'rout'); this.cameraShake(0.2); }
           break;
         }
-        case 'duel':
+        case 'duel': {
           this.spawnDuel(e.a, e.b);
+          const va = this.findByGeneral(e.a);
+          if (va) { this.cutTo(va.group.position, 'hero'); this.cameraShake(0.25); }
           break;
+        }
         default:
           break;
       }
@@ -968,22 +993,62 @@ export class BattleScene {
     });
   }
 
+  // Reactive shot director: frame where the action is (a fresh clash/fire/rout),
+  // cut to a new angle on each beat, push low + close on combat, pull back on a
+  // rout, and shake on impact — instead of one unbroken take on the empty middle.
   private updateCamera(t: number, dt: number): void {
     this.introT = Math.min(1, this.introT + dt / 3500);
     const e = easeInOut(this.introT);
-    const rout = t < this.pullbackUntil;
-    const az = lerp(-1.15, 0.16 * Math.sin(t * 0.00008), e);
-    const radius = lerp(this.focusSpan * 1.95, this.focusSpan * (rout ? 1.75 : 1.18), e);
-    const elev = lerp(0.26, rout ? 0.72 : 0.5, e);
+    // Frame the hot point while the action is fresh, otherwise the army centroid.
+    const hot = t < this.hotUntil;
+    this.camFocus.lerp(hot ? this.hotPoint : this.focusC, 0.045);
+    if (!hot && this.shotKind === 'hero') this.shotKind = 'action'; // ease back out after the beat
+
+    const span = this.focusSpan;
+    let radius: number;
+    let elev: number;
+    let az: number;
+    switch (this.shotKind) {
+      case 'hero': radius = span * 0.62; elev = 0.17; az = this.shotAz; break; // low, close on the clash
+      case 'action': radius = span * 1.0; elev = 0.4; az = this.shotAz + Math.sin(t * 0.00007) * 0.12; break;
+      case 'rout': radius = span * 1.55; elev = 0.66; az = this.shotAz; break;
+      default: radius = span * 1.7; elev = 0.5; az = -1.05 + t * 0.00003; break; // establish
+    }
+    radius = lerp(span * 2.0, radius, e); // intro: start high & wide, ease into the shot
+    elev = lerp(0.28, elev, e);
+
     const ce = Math.cos(elev);
     TMP.set(
-      this.focusC.x + radius * ce * Math.sin(az),
-      this.focusC.y + radius * Math.sin(elev),
-      this.focusC.z + radius * ce * Math.cos(az),
+      this.camFocus.x + radius * ce * Math.sin(az),
+      this.camFocus.y + radius * Math.sin(elev),
+      this.camFocus.z + radius * ce * Math.cos(az),
     );
-    this.camera.position.lerp(TMP, rout ? 0.035 : 0.05);
-    this.controls.target.lerp(this.focusC, 0.06);
+    const sinceCut = (t - this.shotBorn) / 1000;
+    this.camera.position.lerp(TMP, sinceCut < 0.28 ? 0.3 : 0.05); // snap in on a cut, then settle
+    if (this.shakeAmp > 0.02) {
+      this.camera.position.x += (fxRand() - 0.5) * this.shakeAmp;
+      this.camera.position.y += (fxRand() - 0.5) * this.shakeAmp * 0.6;
+      this.shakeAmp *= 0.9;
+    }
+    this.controls.target.lerp(this.camFocus, 0.08);
     this.camera.lookAt(this.controls.target);
+  }
+
+  // Cut to frame a point where the action is, from a fresh dramatic angle.
+  private cutTo(p: THREE.Vector3, kind: 'action' | 'hero' | 'rout'): void {
+    const t = nowMs();
+    this.hotPoint.set(p.x, p.y + 0.5, p.z);
+    this.hotUntil = t + 3200;
+    if (t < this.cutUntil) return; // don't cut again too soon
+    this.shotKind = kind;
+    this.shotBorn = t;
+    this.shotSeq++;
+    this.shotAz = CUT_AZIMUTHS[this.shotSeq % CUT_AZIMUTHS.length]!;
+    this.cutUntil = t + 2600;
+  }
+
+  private cameraShake(a: number): void {
+    this.shakeAmp = Math.max(this.shakeAmp, a);
   }
 
   private loop = (): void => {
