@@ -10,6 +10,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import type { BattleSession } from '../../state/battleSession.js';
 import type { BattleEvent, BattleField, GeneralId, Vec2 } from '../../engine/battle/types.js';
 import type { BattleUnit, TroopType } from '../../engine/types.js';
@@ -30,6 +31,25 @@ const UP = new THREE.Vector3(0, 1, 0);
 const MAX_SOLDIERS = 48;
 const WATER_Y = 0.2;
 const FLAG_W = 0.5;
+
+// Final film-grade pass (runs after tone mapping, on display-space colour).
+const GRADE_SHADER = {
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader:
+    'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+  fragmentShader:
+    'uniform sampler2D tDiffuse; varying vec2 vUv;' +
+    'void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb;' +
+    ' c = (c - 0.5) * 1.09 + 0.5;' + // gentle S-ish contrast around mid
+    ' float l = dot(c, vec3(0.299, 0.587, 0.114));' +
+    ' c = mix(vec3(l), c, 1.2);' + // +saturation
+    ' float lum = clamp(l, 0.0, 1.0);' +
+    ' vec3 splitt = mix(vec3(-0.015, 0.008, 0.05), vec3(0.06, 0.03, -0.02), smoothstep(0.15, 0.85, lum));' +
+    ' c += splitt;' + // teal shadows, warm highlights
+    ' vec2 q = vUv - 0.5;' +
+    ' c *= 1.0 - dot(q, q) * 0.42;' + // soft vignette
+    ' gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0); }',
+};
 
 // Time-of-day / weather looks, chosen deterministically per battle so different
 // fields feel distinct. Values (sky/fog/sun/ambient) are tuned here, not copied.
@@ -227,6 +247,10 @@ export class BattleScene {
     const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.55, 0.7, 0.82);
     this.composer.addPass(bloom);
     this.composer.addPass(new OutputPass());
+    // Film grade (after tone mapping, in display space): lift saturation, add an
+    // S-curve, a teal-shadow/warm-highlight split-tone, and a soft vignette — so
+    // the frame reads painterly and cinematic instead of flat ACES grey-green.
+    this.composer.addPass(new ShaderPass(GRADE_SHADER));
 
     this.resize();
     this.loop();
