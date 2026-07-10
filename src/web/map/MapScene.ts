@@ -521,15 +521,22 @@ export class MapScene {
       }
     }
     if (mtxs.length === 0) return;
-    const peak = new THREE.ConeGeometry(6.5, 15, 4); // four-sided pyramid = a painted peak
-    peak.translate(0, 7.5, 0);
-    const mat = new THREE.MeshStandardMaterial({ color: 0x876440, roughness: 0.96, flatShading: true });
-    const mesh = new THREE.InstancedMesh(peak, mat, mtxs.length);
-    for (let i = 0; i < mtxs.length; i++) mesh.setMatrixAt(i, mtxs[i]!);
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    this.scene.add(mesh);
+    // Three rocky, snow-capped mountain silhouettes, distributed round-robin so
+    // a range reads as a jumble of distinct peaks rather than one repeated shape.
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true });
+    const variants = [mountainGeometry(0), mountainGeometry(31), mountainGeometry(67)];
+    const buckets: THREE.Matrix4[][] = [[], [], []];
+    for (let i = 0; i < mtxs.length; i++) buckets[i % 3]!.push(mtxs[i]!);
+    for (let v = 0; v < variants.length; v++) {
+      const bucket = buckets[v]!;
+      if (bucket.length === 0) continue;
+      const mesh = new THREE.InstancedMesh(variants[v]!, mat, bucket.length);
+      for (let i = 0; i < bucket.length; i++) mesh.setMatrixAt(i, bucket[i]!);
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.scene.add(mesh);
+    }
   }
 
   // Translucent faction-territory overlay draped on the land — the "kingdom map"
@@ -1292,6 +1299,42 @@ function biomeColor(gx: number, gy: number, h: number): RGB {
     clamp01(base[1] + mottle * 0.95),
     clamp01(base[2] + mottle * 0.8 - 0.02),
   ];
+}
+
+// A realistic rocky, snow-capped mountain geometry: a cone whose flanks are
+// jagged by angular noise (ridges + gullies) and vertex-coloured dark rock at
+// the base, grey rock up the sides, and white snow on the peak — faceted via
+// flat shading. `seedOff` varies the silhouette so a few variants read as
+// different mountains. Base sits at y=0 so instances seat on the ground.
+function mountainGeometry(seedOff: number): THREE.BufferGeometry {
+  const R = 7;
+  const H = 18;
+  const geo = new THREE.ConeGeometry(R, H, 11, 5);
+  const posA = geo.attributes.position as THREE.BufferAttribute;
+  const colors: number[] = [];
+  const rockDark: RGB = [0.33, 0.3, 0.26];
+  const rock: RGB = [0.5, 0.46, 0.4];
+  const snow: RGB = [0.92, 0.93, 0.95];
+  const half = H / 2;
+  for (let i = 0; i < posA.count; i++) {
+    const x = posA.getX(i);
+    const y = posA.getY(i);
+    const z = posA.getZ(i);
+    const ang = Math.atan2(z, x);
+    const yn = clamp01((y + half) / H); // 0 base .. 1 tip
+    const n = fbm(Math.cos(ang) * 3 + 8 + seedOff, Math.sin(ang) * 3 + 8 + seedOff, 5); // 0..1
+    const rf = 1 + (n - 0.5) * 0.6 * (1 - yn * 0.55); // jag the silhouette, more at the base
+    posA.setX(i, x * rf);
+    posA.setZ(i, z * rf);
+    posA.setY(i, y + (n - 0.5) * 2.4 * (1 - yn)); // rough the flanks
+    let c = mixRGB(rockDark, rock, clamp01(yn * 1.4));
+    if (yn > 0.6) c = mixRGB(c, snow, clamp01((yn - 0.6) / 0.32));
+    colors.push(c[0], c[1], c[2]);
+  }
+  geo.translate(0, half, 0); // base at y=0
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  return geo;
 }
 
 function envHash(ix: number, iy: number, seed: number): number {
