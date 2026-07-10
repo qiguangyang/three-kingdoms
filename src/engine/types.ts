@@ -219,7 +219,8 @@ export type TacticalCommand =
   | { kind: 'commitReserves'; factionId: FactionId }
   | { kind: 'gambit'; gambitId: GambitId; unitIds: string[] }
   | { kind: 'hold'; unitId: string }
-  | { kind: 'retreat'; unitId: string };
+  | { kind: 'retreat'; unitId: string }
+  | { kind: 'rally'; unitId: string; targetUnitId: string };
 
 export interface AgentContext {
   state: GameState;

@@ -29,6 +29,10 @@ export const BATTLE_TUNING = {
   moralePer10pctLoss: 8,
   // Morale lost when a friendly general loses a duel adjacent to the unit.
   moraleDuelLoss: 15,
+  // Extra morale the target loses when hit by a charge (beyond casualties).
+  chargeMoraleShock: 12,
+  // Base morale a rally restores, scaled by the rallying general's leadership.
+  rallyBaseMorale: 25,
   // A unit routs when morale drops to or below this.
   routMoraleThreshold: 20,
   // Duel auto-triggers when two enemy generals of at least this wu (martial)

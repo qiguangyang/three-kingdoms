@@ -145,6 +145,58 @@ describe('stepBattle — movement + melee', () => {
     ]);
     expect(stepBattle({ battle: mk(), commands: [] })).toEqual(stepBattle({ battle: mk(), commands: [] }));
   });
+
+  it('a charge order shocks the target morale and emits a charge event', () => {
+    const b = battle([
+      unit({ id: 'a', factionId: 'A', pos: { x: 4, y: 4 }, troopType: 'cavalry', wu: 90, command: 80 }),
+      unit({ id: 'e', factionId: 'B', pos: { x: 5, y: 4 }, morale: 100 }),
+    ]);
+    const { battle: next, events } = stepBattle({ battle: b, commands: [{ kind: 'charge', unitId: 'a', targetUnitId: 'e' }] });
+    const e = next.units.find((x) => x.id === 'e')!;
+    expect(e.morale).toBeLessThan(100); // took a morale shock beyond casualties alone
+    expect(events.some((ev) => ev.kind === 'charge' && ev.unitId === 'a')).toBe(true);
+  });
+
+  it('a rally command restores a wavering ally\'s morale and emits a rally event', () => {
+    const b = battle([
+      unit({ id: 'gen', factionId: 'A', pos: { x: 4, y: 4 }, wu: 90, command: 95 }),
+      unit({ id: 'weak', factionId: 'A', pos: { x: 5, y: 4 }, morale: 30 }),
+      unit({ id: 'e', factionId: 'B', pos: { x: 9, y: 0 } }), // far, so no combat morale drop this day
+    ]);
+    const { battle: next, events } = stepBattle({ battle: b, commands: [{ kind: 'rally', unitId: 'gen', targetUnitId: 'weak' }] });
+    const weak = next.units.find((x) => x.id === 'weak')!;
+    expect(weak.morale).toBeGreaterThan(30);
+    expect(events.some((ev) => ev.kind === 'rally' && ev.targetUnitId === 'weak')).toBe(true);
+  });
+
+  it('rally cannot exceed 100 morale and only targets same-faction fielded units', () => {
+    // `foe` is placed far away so no combat touches its morale — isolating the
+    // "rally ignores enemies" behavior from casualty-driven morale changes.
+    const b = battle([
+      unit({ id: 'gen', factionId: 'A', pos: { x: 4, y: 4 }, wu: 90, command: 95 }),
+      unit({ id: 'ally', factionId: 'A', pos: { x: 5, y: 4 }, morale: 95 }),
+      unit({ id: 'foe', factionId: 'B', pos: { x: 9, y: 0 }, morale: 40 }),
+    ]);
+    const { battle: next } = stepBattle({ battle: b, commands: [
+      { kind: 'rally', unitId: 'gen', targetUnitId: 'ally' },
+      { kind: 'rally', unitId: 'gen', targetUnitId: 'foe' }, // enemy — must be ignored
+      // Hold ally + foe so neither marches into a clash: isolates rally from casualty-driven morale.
+      { kind: 'hold', unitId: 'ally' },
+      { kind: 'hold', unitId: 'foe' },
+    ] });
+    expect(next.units.find((x) => x.id === 'ally')!.morale).toBe(100); // 95 + gain, clamped to 100
+    expect(next.units.find((x) => x.id === 'foe')!.morale).toBe(40); // untouched (enemy, and far from combat)
+  });
+
+  it('rally + charge steps are deterministic', () => {
+    const mk = () => battle([
+      unit({ id: 'gen', factionId: 'A', pos: { x: 4, y: 4 }, wu: 90, command: 95 }),
+      unit({ id: 'weak', factionId: 'A', pos: { x: 5, y: 4 }, morale: 30 }),
+      unit({ id: 'e', factionId: 'B', pos: { x: 6, y: 4 }, troopType: 'cavalry', wu: 88, command: 80 }),
+    ]);
+    const cmds = [{ kind: 'rally', unitId: 'gen', targetUnitId: 'weak' }, { kind: 'charge', unitId: 'e', targetUnitId: 'weak' }] as const;
+    expect(stepBattle({ battle: mk(), commands: [...cmds] })).toEqual(stepBattle({ battle: mk(), commands: [...cmds] }));
+  });
 });
 
 describe('stepBattle — ranged, duel, morale, end', () => {
