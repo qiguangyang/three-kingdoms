@@ -16,7 +16,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { CHINA_LAND } from '../../data/map/geography.js';
+import { CHINA_LAND, RIVERS } from '../../data/map/geography.js';
 import type { City, GameState } from '../../engine/types.js';
 import { FACTION_GLYPH, factionColor } from '../theme.js';
 import { gridToWorld, worldToGrid, markerScale, WORLD_W, WORLD_D } from './mapGeometry.js';
@@ -33,6 +33,9 @@ const WATER_Y = 1.4; // sea level; land emerges above this, coast fringe sits be
 const RELIEF_FREQ = 0.035; // fbm frequency over logical grid coords
 const LAND_SEGMENTS_X = 280; // landmass plane subdivisions (~2 world units/cell)
 const LAND_SEGMENTS_Z = 240;
+const RIVER_WIDTH = 2.0; // world-unit radius of a river ribbon
+const RIVER_COLOR = 0x3f6f96; // blue-grey river water
+const YELLOW_RIVER_COLOR = 0xb79149; // the Yellow River runs ochre with loess silt
 
 // Dusk look, borrowed from BattleScene's `dusk` environment preset so the two
 // scenes read as the same time of day.
@@ -214,6 +217,7 @@ export class MapScene {
 
     this.buildLandmass();
     this.buildSea();
+    this.buildRivers();
 
     // Post-processing: a gentle bloom so the gold coastline, water sparkle, and
     // bright sky glow filmically. RenderPass renders linear HDR; OutputPass
@@ -356,6 +360,34 @@ export class MapScene {
     const water = new THREE.Mesh(wgeo, this.waterMat);
     water.position.y = WATER_Y;
     this.scene.add(water);
+  }
+
+  // Draw the named rivers as blue water ribbons draped on the terrain surface.
+  // Each authored river path is sampled into points, seated on the relief via a
+  // downward raycast, and swept into a thin tube along a smooth curve. The Yellow
+  // River runs ochre (loess silt); the rest are blue-grey. Must run after
+  // buildLandmass (needs this.land to seat the ribbons).
+  private buildRivers(): void {
+    for (const r of RIVERS) {
+      const sampled = samplePath(r.path);
+      if (sampled.length < 2) continue;
+      const pts = sampled.map(([lx, lz]) => {
+        const [wx, wz] = toWorldXZ(lx, lz);
+        return new THREE.Vector3(wx, this.terrainHeightAt(wx, wz) + 0.4, wz);
+      });
+      const curve = new THREE.CatmullRomCurve3(pts);
+      const geo = new THREE.TubeGeometry(curve, pts.length * 3, RIVER_WIDTH, 6, false);
+      const isYellow = r.id === 'huanghe';
+      const mat = new THREE.MeshStandardMaterial({
+        color: isYellow ? YELLOW_RIVER_COLOR : RIVER_COLOR,
+        roughness: 0.34,
+        metalness: 0.12,
+        emissive: isYellow ? 0x2a1e08 : 0x0a1a26,
+      });
+      const river = new THREE.Mesh(geo, mat);
+      river.renderOrder = 1;
+      this.scene.add(river);
+    }
   }
 
   resize(): void {
