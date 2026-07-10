@@ -20,6 +20,8 @@ const KEYS = [
   'battle.reveal.ambush', 'battle.mute', 'battle.unmute',
   'battle.decision.tray', 'battle.decision.holdLine', 'battle.decision.focusFire',
   'battle.decision.pivotal', 'battle.decision.continue',
+  'battle.decision.challengeDuel', 'battle.decision.rally', 'battle.decision.heroCharge',
+  'battle.narr.rally',
 ] as const;
 
 describe('battle screen i18n keys', () => {
