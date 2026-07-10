@@ -8,7 +8,7 @@ import { assessBattle } from './assessment.js';
 
 export interface OfferedDecision {
   id: string; // 'commitReserves' | 'holdLine' | `focusFire:${targetUnitId}`
-  family: 'maneuver';
+  family: 'maneuver' | 'hero';
   labelKey: string; // i18n MessageKey
   salient: boolean; // pause auto-play for this decision
   commands: TacticalCommand[];
@@ -72,6 +72,38 @@ export function offerPlayerDecisions(battle: Battle, factionId: FactionId): Offe
         return { kind: 'march', unitId: u.id, target: { x: target.pos.x, y: target.pos.y } };
       });
       out.push({ id: `focusFire:${target.id}`, family: 'maneuver', labelKey: 'battle.decision.focusFire', salient: false, commands });
+    }
+  }
+
+  // HERO — Challenge Duel: a high-wu player general beside a high-wu enemy general.
+  const myGeneral = mine.find((u) => u.wu !== undefined && u.wu >= BATTLE_TUNING.duelWuMin);
+  if (myGeneral) {
+    const foeGeneral = enemies.find((e) => e.wu !== undefined && e.wu >= BATTLE_TUNING.duelWuMin && chebyshev(myGeneral.pos, e.pos) <= 1);
+    if (foeGeneral) {
+      out.push({ id: `challengeDuel:${foeGeneral.id}`, family: 'hero', labelKey: 'battle.decision.challengeDuel', salient: true,
+        commands: [{ kind: 'challengeDuel', unitId: myGeneral.id, targetUnitId: foeGeneral.id }] });
+    }
+  }
+
+  // HERO — Rally: a wavering ally with a friendly general within reach.
+  const wavering = mine.find((u) => u.morale <= BATTLE_TUNING.routMoraleThreshold + 10);
+  if (wavering) {
+    const gen = mine.find((u) => u.command !== undefined && u.id !== wavering.id && chebyshev(u.pos, wavering.pos) <= 3);
+    if (gen) {
+      out.push({ id: `rally:${wavering.id}`, family: 'hero', labelKey: 'battle.decision.rally', salient: true,
+        commands: [{ kind: 'rally', unitId: gen.id, targetUnitId: wavering.id }] });
+    }
+  }
+
+  // HERO — Hero Charge: a cavalry unit that can reach an enemy this turn.
+  const cav = mine.find((u) => (u.troopType === 'cavalry' || u.troopType === 'heavyCav'));
+  if (cav) {
+    let target: typeof enemies[number] | undefined;
+    let best = Infinity;
+    for (const e of enemies) { const d = chebyshev(cav.pos, e.pos); if (d < best) { best = d; target = e; } }
+    if (target && best <= (BATTLE_TUNING.moveRange[cav.troopType] ?? 4)) {
+      out.push({ id: `heroCharge:${target.id}`, family: 'hero', labelKey: 'battle.decision.heroCharge', salient: false,
+        commands: [{ kind: 'charge', unitId: cav.id, targetUnitId: target.id }] });
     }
   }
 

@@ -81,3 +81,41 @@ describe('offerPlayerDecisions', () => {
     expect(offerPlayerDecisions(build(), 'A')).toEqual(offerPlayerDecisions(build(), 'A'));
   });
 });
+
+describe('offerPlayerDecisions — hero levers', () => {
+  it('offers Challenge Duel when the player has a high-wu general beside an enemy general', () => {
+    const b = mk([
+      u({ id: 'me', factionId: 'A', pos: { x: 4, y: 4 }, wu: 97, command: 80 }),
+      u({ id: 'foe', factionId: 'B', pos: { x: 5, y: 4 }, wu: 95, command: 85 }),
+    ]);
+    const d = find(offerPlayerDecisions(b, 'A'), 'challengeDuel')!;
+    expect(d).toBeDefined();
+    expect(d.family).toBe('hero');
+    expect(d.salient).toBe(true);
+    expect(d.commands).toEqual([{ kind: 'challengeDuel', unitId: 'me', targetUnitId: 'foe' }]);
+  });
+
+  it('offers Rally (salient) when a player unit is near rout and a general is close', () => {
+    const b = mk([
+      u({ id: 'gen', factionId: 'A', pos: { x: 4, y: 4 }, wu: 80, command: 92 }),
+      u({ id: 'weak', factionId: 'A', pos: { x: 5, y: 4 }, morale: 16, troops: 1500 }),
+      u({ id: 'e', factionId: 'B', pos: { x: 6, y: 4 } }),
+    ]);
+    const d = find(offerPlayerDecisions(b, 'A'), 'rally')!;
+    expect(d).toBeDefined();
+    expect(d.family).toBe('hero');
+    expect(d.commands).toEqual([{ kind: 'rally', unitId: 'gen', targetUnitId: 'weak' }]);
+  });
+
+  it('offers Hero Charge (non-salient) for a cavalry unit that can reach a target', () => {
+    const b = mk([
+      u({ id: 'cav', factionId: 'A', pos: { x: 4, y: 6 }, troopType: 'cavalry', wu: 88 }),
+      u({ id: 'e', factionId: 'B', pos: { x: 4, y: 4 }, troops: 3000 }),
+    ]);
+    const d = find(offerPlayerDecisions(b, 'A'), 'heroCharge')!;
+    expect(d).toBeDefined();
+    expect(d.family).toBe('hero');
+    expect(d.salient).toBe(false);
+    expect(d.commands[0]).toEqual({ kind: 'charge', unitId: 'cav', targetUnitId: 'e' });
+  });
+});
