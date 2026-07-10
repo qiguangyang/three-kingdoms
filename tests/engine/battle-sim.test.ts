@@ -157,6 +157,20 @@ describe('stepBattle — movement + melee', () => {
     expect(events.some((ev) => ev.kind === 'charge' && ev.unitId === 'a')).toBe(true);
   });
 
+  it('a defender charge shocks its target even when the target precedes it in unit order', () => {
+    // 'atk' (the charge TARGET) is listed BEFORE 'def' (the charger). Under the
+    // old in-loop shock this pair resolved during atk's iteration and the shock
+    // was silently dropped; the command-driven pass fixes it.
+    const b = battle([
+      unit({ id: 'atk', factionId: 'A', pos: { x: 4, y: 4 }, morale: 100 }),
+      unit({ id: 'def', factionId: 'B', pos: { x: 5, y: 4 }, troopType: 'cavalry', wu: 90, command: 80 }),
+    ]);
+    const { battle: next, events } = stepBattle({ battle: b, commands: [{ kind: 'charge', unitId: 'def', targetUnitId: 'atk' }] });
+    const atk = next.units.find((x) => x.id === 'atk')!;
+    expect(atk.morale).toBeLessThan(100 - 8); // shock (12) beyond any small casualty morale drop
+    expect(events.some((ev) => ev.kind === 'charge' && ev.unitId === 'def' && ev.targetUnitId === 'atk')).toBe(true);
+  });
+
   it('a rally command restores a wavering ally\'s morale and emits a rally event', () => {
     const b = battle([
       unit({ id: 'gen', factionId: 'A', pos: { x: 4, y: 4 }, wu: 90, command: 95 }),

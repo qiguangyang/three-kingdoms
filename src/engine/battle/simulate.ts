@@ -223,10 +223,20 @@ export function stepBattle(input: StepInput): StepResult {
     u.troops -= aLoss;
     enemy.troops -= bLoss;
     events.push({ kind: 'clash', unitId: u.id, targetUnitId: enemy.id, casualties: bLoss, defCasualties: aLoss });
-    if (order && order.kind === 'charge') {
-      enemy.morale = Math.max(0, enemy.morale - BATTLE_TUNING.chargeMoraleShock);
-      events.push({ kind: 'charge', unitId: u.id, targetUnitId: enemy.id });
-    }
+  }
+
+  // ---------------- CHARGE SHOCK ----------------
+  // A charging unit that reached its target shakes the target's morale (beyond
+  // casualties). Command-driven + order-independent, so a defender's charge is
+  // not silently dropped by the melee loop's pair-dedup ordering.
+  for (const c of input.commands) {
+    if (c.kind !== 'charge') continue;
+    const src = byId(c.unitId);
+    const tgt = byId(c.targetUnitId);
+    if (!src || !tgt || !isActive(src) || src.factionId === tgt.factionId) continue;
+    if (chebyshev(src.pos, tgt.pos) > 1) continue; // never reached contact
+    tgt.morale = Math.max(0, tgt.morale - BATTLE_TUNING.chargeMoraleShock);
+    events.push({ kind: 'charge', unitId: src.id, targetUnitId: tgt.id });
   }
 
   // ---------------- DUEL PHASE ----------------
