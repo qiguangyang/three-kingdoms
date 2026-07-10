@@ -16,11 +16,12 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { CHINA_LAND, RIVERS, PROVINCE_LABELS } from '../../data/map/geography.js';
+import { CHINA_LAND, RIVERS, PROVINCE_LABELS, FORESTS, MOUNTAINS } from '../../data/map/geography.js';
 import type { City, GameState } from '../../engine/types.js';
 import { FACTION_GLYPH, factionColor } from '../theme.js';
 import { pickName } from '../../i18n/locale.js';
 import { gridToWorld, worldToGrid, markerScale, WORLD_W, WORLD_D } from './mapGeometry.js';
+import { MAP_WIDTH, MAP_HEIGHT } from '../../engine/constants.js';
 
 // ---- render-layer tuning (world units; the map spans WORLD_W x WORLD_D,
 // ~575 x 540 world units, centered on the origin via gridToWorld — the render
@@ -32,18 +33,18 @@ const UPLAND_H = 26; // extra elevation the fbm relief adds toward the interior
 const SEA_FLOOR = -3; // elevation of sea-floor vertices (below the water plane)
 const WATER_Y = 1.4; // sea level; land emerges above this, coast fringe sits below
 const RELIEF_FREQ = 0.035; // fbm frequency over logical grid coords
-const LAND_SEGMENTS_X = 280; // landmass plane subdivisions (~2 world units/cell)
-const LAND_SEGMENTS_Z = 240;
+const LAND_SEGMENTS_X = 460; // landmass plane subdivisions (higher-res relief + colour)
+const LAND_SEGMENTS_Z = 400;
 const RIVER_WIDTH = 2.0; // world-unit radius of a river ribbon
 const RIVER_COLOR = 0x3f6f96; // blue-grey river water
 const YELLOW_RIVER_COLOR = 0xb79149; // the Yellow River runs ochre with loess silt
 
 // Dusk look, borrowed from BattleScene's `dusk` environment preset so the two
 // scenes read as the same time of day.
-const SKY_TOP = 0x2a3b60;
-const SKY_HORIZON = 0x93a0b4;
-const FOG_COLOR = 0x93a0b4;
-const FOG_DENSITY = 0.0009; // low: the far landmass stays visible, edges haze out
+const SKY_TOP = 0x9a8a6a; // warm sepia backdrop for the painted-scroll look
+const SKY_HORIZON = 0xc7b790;
+const FOG_COLOR = 0xc7b790;
+const FOG_DENSITY = 0.0006; // very low: crisp, satellite-like, edges barely haze
 
 // ---- city-marker tuning (world units) ----
 // markerScale() returns ~1..2.2 (economic importance); multiply into world units
@@ -172,6 +173,12 @@ export class MapScene {
     lr.style.inset = '0';
     lr.style.pointerEvents = 'none';
     lr.style.overflow = 'hidden';
+    // CSS2DRenderer assigns each label its own z-index (depth-sorting among
+    // labels); left uncontained those values leak into the page and can paint
+    // OVER the HUD panels and modals. Giving the overlay its own z-index makes it
+    // a stacking context, so the labels stay contained below the floating HUD
+    // (z-20) and the command modals (z-30/40).
+    lr.style.zIndex = '1';
     canvas.parentElement?.appendChild(lr);
 
     this.scene = new THREE.Scene();
@@ -184,28 +191,41 @@ export class MapScene {
 
     // Free-orbit camera framed on the whole landmass. near/far span the large
     // world extent plus the sky dome.
-    this.camera = new THREE.PerspectiveCamera(44, 1, 1, 5000);
-    this.camera.position.set(0, 470, 380);
+    this.camera = new THREE.PerspectiveCamera(40, 1, 1, 5000);
+    this.camera.position.set(0, 700, 95); // high and near top-down, like a painted scroll map
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
     this.controls.enableZoom = true; // wheel zooms in/out toward the map
     this.controls.zoomSpeed = 1.1;
+    // Left-drag PANS the map (reposition, like a satellite map); right-drag
+    // rotates, wheel zooms. Touch: one finger pans, two fingers zoom/rotate.
+    this.controls.enablePan = true;
+    this.controls.screenSpacePanning = true;
+    this.controls.panSpeed = 1.0;
+    this.controls.mouseButtons = {
+      LEFT: THREE.MOUSE.PAN,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.ROTATE,
+    };
+    this.controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
     this.controls.target.set(0, 0, 0);
     // Clamp so the map stays legible and you can't dip under the ground:
     // minPolar keeps a near-top-down cap; maxPolar stops just above the horizon.
-    this.controls.minPolarAngle = 0.12;
-    this.controls.maxPolarAngle = 1.45;
-    this.controls.minDistance = 160;
-    this.controls.maxDistance = 1000;
+    // Keep the camera near top-down (a painted-map look); a small tilt is allowed
+    // but you can't swing down to the horizon.
+    this.controls.minPolarAngle = 0;
+    this.controls.maxPolarAngle = 0.42;
+    this.controls.minDistance = 220;
+    this.controls.maxDistance = 1150;
 
     // Dusk lighting, mirroring the battle's `dusk` preset (warm low sun, cool
     // sky fill, faint ambient).
-    this.hemi = new THREE.HemisphereLight(0xaec4e8, 0x4a3d28, 0.55);
+    this.hemi = new THREE.HemisphereLight(0xd0dcec, 0x5c5344, 0.75);
     this.scene.add(this.hemi);
-    this.sun = new THREE.DirectionalLight(0xffd9a0, 2.1);
-    this.sun.position.set(-180, 260, 220);
+    this.sun = new THREE.DirectionalLight(0xfff4e2, 2.4);
+    this.sun.position.set(-110, 340, 180);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.camera.near = 1;
@@ -217,12 +237,14 @@ export class MapScene {
     this.sun.shadow.camera.bottom = -s;
     this.sun.shadow.bias = -0.0006;
     this.scene.add(this.sun);
-    this.ambient = new THREE.AmbientLight(0x30364a, 0.4);
+    this.ambient = new THREE.AmbientLight(0x59616e, 0.5);
     this.scene.add(this.ambient);
 
     this.buildLandmass();
     this.buildSea();
     this.buildRivers();
+    this.buildMountains();
+    this.buildForests();
     this.buildProvinceLabels();
 
     // Post-processing: a gentle bloom so the gold coastline, water sparkle, and
@@ -231,7 +253,7 @@ export class MapScene {
     // finish. Threshold is kept high so the land itself does not bloom.
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.6, 0.75, 0.8));
+    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.16, 0.7, 0.9));
     this.composer.addPass(new OutputPass());
     this.composer.addPass(new ShaderPass(GRADE_SHADER));
 
@@ -299,7 +321,13 @@ export class MapScene {
       const wz = pos.getZ(i);
       const h = this.landHeightAt(wx, wz);
       pos.setY(i, h);
-      const c = h > SEA_FLOOR + 0.001 ? landRamp(h) : SEABED_COLOR;
+      let c: RGB;
+      if (h > SEA_FLOOR + 0.001) {
+        const g = worldToGrid(wx, wz);
+        c = biomeColor(g.x, g.y, h);
+      } else {
+        c = SEABED_COLOR;
+      }
       colors.push(c[0], c[1], c[2]);
     }
     geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -335,7 +363,7 @@ export class MapScene {
     wgeo.rotateX(-Math.PI / 2);
     this.waterMat = new THREE.ShaderMaterial({
       transparent: true,
-      uniforms: { uT: { value: 0 }, uCol: { value: new THREE.Color(0x1a3850) } },
+      uniforms: { uT: { value: 0 }, uCol: { value: new THREE.Color(0x51748f) } },
       vertexShader:
         'uniform float uT; varying float vR; varying vec3 vW;' +
         'void main(){ vec3 p = position;' +
@@ -383,6 +411,131 @@ export class MapScene {
       const river = new THREE.Mesh(geo, mat);
       river.renderOrder = 1;
       this.scene.add(river);
+    }
+  }
+
+  // Painted forest clusters: dark-green canopy cones scattered across the land —
+  // dense inside the authored forest polygons, and elsewhere by a "forestness"
+  // that rises toward the wet south-east and on the wooded hills, clumped by
+  // noise so it reads as illustrated woodland rather than an even carpet. One
+  // InstancedMesh; seated on the relief.
+  private buildForests(): void {
+    const mtxs: THREE.Matrix4[] = [];
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const scl = new THREE.Vector3();
+    const pos = new THREE.Vector3();
+    let seed = 20260710;
+    const rnd = (): number => {
+      seed = (seed * 16807) % 2147483647;
+      return seed / 2147483647;
+    };
+    const forestPolys = FORESTS.map((f) => f.polygon.map((p) => toWorldXZ(p[0], p[1])));
+    const halfW = WORLD_W / 2;
+    const halfD = WORLD_D / 2;
+    const STEP = 7.5;
+    for (let x = -halfW; x < halfW; x += STEP) {
+      for (let z = -halfD; z < halfD; z += STEP) {
+        const jx = x + (rnd() - 0.5) * STEP * 1.4;
+        const jz = z + (rnd() - 0.5) * STEP * 1.4;
+        const h = this.landHeightAt(jx, jz);
+        if (h <= SEA_FLOOR + 0.5) continue; // sea
+        let chance = 0;
+        let inPoly = false;
+        for (const poly of forestPolys) {
+          if (pointInPolygon(jx, jz, poly)) {
+            inPoly = true;
+            break;
+          }
+        }
+        if (inPoly) {
+          chance = 0.85;
+        } else {
+          const g = worldToGrid(jx, jz);
+          const lon = clamp01(g.x / MAP_WIDTH);
+          const lat = clamp01(g.y / MAP_HEIGHT);
+          const wet = clamp01(lon * 0.48 + lat * 0.6);
+          const clump = fbm(g.x * 0.07, g.y * 0.07, MAP_SEED + 31); // broad woodland clumps
+          const clump2 = fbm(g.x * 0.19, g.y * 0.18, MAP_SEED + 53);
+          const hf = h < 4 ? 0.35 : h < 22 ? 1.0 : clamp01((32 - h) / 10); // hills wooded, peaks/plains less
+          let f = (wet * 0.85 + 0.12) * hf;
+          f *= smoothstep(0.42, 0.72, clump);
+          f *= 0.5 + clump2 * 0.7;
+          chance = clamp01(f) * 0.9;
+        }
+        if (rnd() >= chance) continue;
+        const s = 0.7 + rnd() * 0.6;
+        pos.set(jx, h, jz);
+        q.setFromAxisAngle(UP, rnd() * Math.PI * 2);
+        scl.set(s, s * (0.85 + rnd() * 0.5), s);
+        m.compose(pos, q, scl);
+        mtxs.push(m.clone());
+      }
+    }
+    if (mtxs.length === 0) return;
+    const canopy = new THREE.ConeGeometry(4.0, 8.5, 6);
+    canopy.translate(0, 4.3, 0); // base sits on the ground
+    const mat = new THREE.MeshStandardMaterial({ color: 0x3c4d26, roughness: 0.95, flatShading: true });
+    const mesh = new THREE.InstancedMesh(canopy, mat, mtxs.length);
+    for (let i = 0; i < mtxs.length; i++) mesh.setMatrixAt(i, mtxs[i]!);
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+  }
+
+  // Painted mountain ridges: brown four-sided pyramids stamped along the authored
+  // mountain-range ridge lines and seated on the relief, reading as illustrated
+  // ranges from the top-down scroll view. One InstancedMesh.
+  private buildMountains(): void {
+    const mtxs: THREE.Matrix4[] = [];
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const scl = new THREE.Vector3();
+    const pos = new THREE.Vector3();
+    let seed = 77713;
+    const rnd = (): number => {
+      seed = (seed * 16807) % 2147483647;
+      return seed / 2147483647;
+    };
+    for (const range of MOUNTAINS) {
+      const ridge = range.ridge.map((p) => toWorldXZ(p[0], p[1]));
+      for (let i = 0; i < ridge.length - 1; i++) {
+        const a = ridge[i]!;
+        const b = ridge[i + 1]!;
+        const segLen = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        const n = Math.max(1, Math.round(segLen / 9));
+        for (let k = 0; k < n; k++) {
+          const t = (k + rnd() * 0.6) / n;
+          const px = a[0] + (b[0] - a[0]) * t + (rnd() - 0.5) * 6;
+          const pz = a[1] + (b[1] - a[1]) * t + (rnd() - 0.5) * 6;
+          const h = this.landHeightAt(px, pz);
+          if (h <= SEA_FLOOR + 0.5) continue;
+          const s = 0.8 + rnd() * 0.9;
+          pos.set(px, h, pz);
+          q.setFromAxisAngle(UP, rnd() * Math.PI * 2);
+          scl.set(s, s * (1.0 + rnd() * 0.7), s);
+          m.compose(pos, q, scl);
+          mtxs.push(m.clone());
+        }
+      }
+    }
+    if (mtxs.length === 0) return;
+    // Three rocky, snow-capped mountain silhouettes, distributed round-robin so
+    // a range reads as a jumble of distinct peaks rather than one repeated shape.
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true });
+    const variants = [mountainGeometry(0), mountainGeometry(31), mountainGeometry(67)];
+    const buckets: THREE.Matrix4[][] = [[], [], []];
+    for (let i = 0; i < mtxs.length; i++) buckets[i % 3]!.push(mtxs[i]!);
+    for (let v = 0; v < variants.length; v++) {
+      const bucket = buckets[v]!;
+      if (bucket.length === 0) continue;
+      const mesh = new THREE.InstancedMesh(variants[v]!, mat, bucket.length);
+      for (let i = 0; i < bucket.length; i++) mesh.setMatrixAt(i, bucket[i]!);
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.scene.add(mesh);
     }
   }
 
@@ -435,11 +588,11 @@ export class MapScene {
       if (bf && pointInPolygon(wx, wz, landPolyWorld)) {
         // Lighten toward a soft pastel so the realms read like the reference
         // atlas's flat fills rather than a dark wash over the terrain.
-        col.set(factionColor(bf)).lerp(PASTEL, 0.28);
+        col.set(factionColor(bf)).lerp(PASTEL, 0.22);
         cols[i * 3] = col.r;
         cols[i * 3 + 1] = col.g;
         cols[i * 3 + 2] = col.b;
-        alphas[i] = 0.5;
+        alphas[i] = 0.32;
       } else {
         alphas[i] = 0;
       }
@@ -1097,32 +1250,91 @@ function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: n
 // ---------------------------------------------------------------- colour +
 // noise (seeded value-noise fbm, copied from BattleScene's env noise)
 
+const UP = new THREE.Vector3(0, 1, 0); // y-axis, for instanced-tree yaw
 const SEABED_COLOR: [number, number, number] = [0.1, 0.18, 0.24];
 
 // Height -> land colour: coast sand -> lowland green -> upland brown -> pale rock.
-function landRamp(h: number): [number, number, number] {
-  const stops: Array<[number, [number, number, number]]> = [
-    [0.0, [0.78, 0.71, 0.52]], // waterline sand
-    [2.5, [0.72, 0.66, 0.47]], // shore sand
-    [7, [0.34, 0.44, 0.26]], // lowland green
-    [16, [0.3, 0.4, 0.24]], // rolling green
-    [24, [0.42, 0.35, 0.26]], // upland brown
-    [30, [0.52, 0.5, 0.47]], // pale rock
-  ];
-  if (h <= stops[0]![0]) return stops[0]![1];
-  for (let i = 1; i < stops.length; i++) {
-    if (h <= stops[i]![0]) {
-      const a = stops[i - 1]!;
-      const b = stops[i]!;
-      const t = (h - a[0]) / (b[0] - a[0]);
-      return [
-        a[1][0] + (b[1][0] - a[1][0]) * t,
-        a[1][1] + (b[1][1] - a[1][1]) * t,
-        a[1][2] + (b[1][2] - a[1][2]) * t,
-      ];
-    }
+type RGB = [number, number, number];
+const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
+const mixRGB = (a: RGB, b: RGB, t: number): RGB => [
+  a[0] + (b[0] - a[0]) * t,
+  a[1] + (b[1] - a[1]) * t,
+  a[2] + (b[2] - a[2]) * t,
+];
+
+// Hand-painted, aged-scroll ground colour — warm parchment tans for the open
+// land, dark muted greens for the wetter/forested south-east, and painted brown
+// ridges on the mountains, all sepia-toned like an antique illustrated map.
+// gx in 0..MAP_WIDTH (west->east), gy in 0..MAP_HEIGHT (north->south), h = height.
+function biomeColor(gx: number, gy: number, h: number): RGB {
+  const lon = clamp01(gx / MAP_WIDTH); // 0 west .. 1 east
+  const lat = clamp01(gy / MAP_HEIGHT); // 0 north .. 1 south
+  // Two octaves of high-frequency noise: one biases greenery, both add paper grain.
+  const m = fbm(gx * 0.12, gy * 0.12, MAP_SEED + 7) - 0.5; // -0.5..0.5
+  const m2 = fbm(gx * 0.34, gy * 0.31, MAP_SEED + 19) - 0.5;
+  const mottle = m * 0.06 + m2 * 0.045; // warm paper grain
+  // Greener toward the south-east, drier parchment toward the NW.
+  const wet = clamp01(lon * 0.5 + lat * 0.62 + m * 0.28);
+  const paleSand: RGB = [0.85, 0.76, 0.58]; // dry parchment
+  const tan: RGB = [0.76, 0.66, 0.46]; // open land
+  const olive: RGB = [0.58, 0.57, 0.36]; // scrub / fields
+  const forest: RGB = [0.33, 0.4, 0.21]; // painted forest green
+  let base: RGB =
+    wet < 0.34
+      ? mixRGB(paleSand, tan, wet / 0.34)
+      : wet < 0.62
+        ? mixRGB(tan, olive, (wet - 0.34) / 0.28)
+        : mixRGB(olive, forest, (wet - 0.62) / 0.38);
+  // Pale parchment shore fading into the land over the first height units.
+  if (h < 1.6) base = mixRGB([0.86, 0.79, 0.62], base, clamp01(h / 1.6));
+  // Painted brown mountain ridges on the uplands (no snow — this is a scroll map).
+  if (h > 12) {
+    const ridge: RGB = [0.55, 0.42, 0.28];
+    base = mixRGB(base, ridge, clamp01((h - 12) / 14) * 0.88);
+    if (h > 24) base = mixRGB(base, [0.4, 0.3, 0.2], clamp01((h - 24) / 8) * 0.7);
   }
-  return stops[stops.length - 1]![1];
+  // Warm the whole palette slightly toward sepia and apply the paper grain.
+  return [
+    clamp01(base[0] + mottle + 0.03),
+    clamp01(base[1] + mottle * 0.95),
+    clamp01(base[2] + mottle * 0.8 - 0.02),
+  ];
+}
+
+// A realistic rocky, snow-capped mountain geometry: a cone whose flanks are
+// jagged by angular noise (ridges + gullies) and vertex-coloured dark rock at
+// the base, grey rock up the sides, and white snow on the peak — faceted via
+// flat shading. `seedOff` varies the silhouette so a few variants read as
+// different mountains. Base sits at y=0 so instances seat on the ground.
+function mountainGeometry(seedOff: number): THREE.BufferGeometry {
+  const R = 7;
+  const H = 18;
+  const geo = new THREE.ConeGeometry(R, H, 11, 5);
+  const posA = geo.attributes.position as THREE.BufferAttribute;
+  const colors: number[] = [];
+  const rockDark: RGB = [0.33, 0.3, 0.26];
+  const rock: RGB = [0.5, 0.46, 0.4];
+  const snow: RGB = [0.92, 0.93, 0.95];
+  const half = H / 2;
+  for (let i = 0; i < posA.count; i++) {
+    const x = posA.getX(i);
+    const y = posA.getY(i);
+    const z = posA.getZ(i);
+    const ang = Math.atan2(z, x);
+    const yn = clamp01((y + half) / H); // 0 base .. 1 tip
+    const n = fbm(Math.cos(ang) * 3 + 8 + seedOff, Math.sin(ang) * 3 + 8 + seedOff, 5); // 0..1
+    const rf = 1 + (n - 0.5) * 0.6 * (1 - yn * 0.55); // jag the silhouette, more at the base
+    posA.setX(i, x * rf);
+    posA.setZ(i, z * rf);
+    posA.setY(i, y + (n - 0.5) * 2.4 * (1 - yn)); // rough the flanks
+    let c = mixRGB(rockDark, rock, clamp01(yn * 1.4));
+    if (yn > 0.6) c = mixRGB(c, snow, clamp01((yn - 0.6) / 0.32));
+    colors.push(c[0], c[1], c[2]);
+  }
+  geo.translate(0, half, 0); // base at y=0
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  return geo;
 }
 
 function envHash(ix: number, iy: number, seed: number): number {
