@@ -300,6 +300,12 @@ export const zh: MessageCatalog = {
   'faction.you': '（你）',
   'faction.eliminated': '已灭',
 
+  'map.legend.title': '州郡形势',
+  'map.legend.territory': '势力疆域',
+  'map.legend.province': '州',
+  'map.legend.city': '城池',
+  'map.legend.capital': '治所',
+
   'digest.heading': '此间天下事…',
   'digest.dismiss': '继续',
 };

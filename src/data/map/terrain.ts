@@ -1,19 +1,30 @@
-import { MAP_HEIGHT, MAP_WIDTH } from '../../engine/constants.js';
+import {
+  BASE_MAP_HEIGHT,
+  BASE_MAP_WIDTH,
+  GRID_SCALE,
+  MAP_HEIGHT,
+  MAP_WIDTH,
+} from '../../engine/constants.js';
 import type { Terrain } from '../../engine/types.js';
 
-// Procedurally-generated 100x40 terrain grid honoring the rough geography
-// described in SCENARIOS.md:
+// Procedurally-generated terrain grid honoring the rough geography described
+// in SCENARIOS.md:
 //   - The Yellow River (黄河) cuts west-to-east around y=14..17
 //   - The Yangtze (长江) cuts west-to-east around y=28..31
 //   - Qinling / Taihang ranges in the west and north (mountains)
 //   - Wuling / Wuyi ranges in the deep south (forest)
 //   - Everything else is plain
+//
+// The grid is generated at the BASE 100x40 resolution (the coordinate meaning
+// `classify` was authored against) and decoupled from GRID_SCALE. `terrainAt`
+// samples it by dividing runtime (scaled) coordinates back down, so we neither
+// balloon the grid to 100k cells nor break the hardcoded sin-frequencies.
 
 function genTerrain(): Terrain[][] {
   const grid: Terrain[][] = [];
-  for (let y = 0; y < MAP_HEIGHT; y++) {
+  for (let y = 0; y < BASE_MAP_HEIGHT; y++) {
     const row: Terrain[] = [];
-    for (let x = 0; x < MAP_WIDTH; x++) {
+    for (let x = 0; x < BASE_MAP_WIDTH; x++) {
       row.push(classify(x, y));
     }
     grid.push(row);
@@ -63,7 +74,10 @@ function classify(x: number, y: number): Terrain {
 
 export const TERRAIN_GRID: Terrain[][] = genTerrain();
 
+// Sample the base-resolution grid from runtime (scaled) coordinates. Runtime
+// coords span 0..MAP_WIDTH/MAP_HEIGHT (500x200); dividing by GRID_SCALE maps
+// back to the 100x40 cell whose classification applies.
 export function terrainAt(x: number, y: number): Terrain {
   if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT) return 'plain';
-  return TERRAIN_GRID[y]?.[x] ?? 'plain';
+  return classify(Math.floor(x / GRID_SCALE), Math.floor(y / GRID_SCALE));
 }

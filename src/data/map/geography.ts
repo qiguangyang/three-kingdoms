@@ -16,6 +16,24 @@
 //   - Closed jagged paths for mountains (silhouette style).
 //   - Polygons for lakes and forest patches.
 // Nothing here is surveyor-grade — it's a stylized historical atlas.
+//
+// AUTHORING vs EXPORT SCALE: the literals below are authored against the
+// readable 100x40 base grid for legibility, but every exported coordinate
+// payload is multiplied by GRID_SCALE (via scale.ts) so it lines up with the
+// runtime 500x200 grid that city positions and the 3D renderer operate on.
+// Phase 2 will re-author this data directly at 500x200 and drop the wrapping.
+
+import { GRID_SCALE } from '../../engine/constants.js';
+import { scalePath, scalePoints } from './scale.js';
+
+// Scale a lone scalar (mountain baseline) or an [x, y] label anchor. Mirrors
+// scale.ts rounding so exported magnitudes match scalePath/scalePoints output.
+function scaleN(n: number): number {
+  return Math.round(n * GRID_SCALE * 1e6) / 1e6;
+}
+function scaleXY([x, y]: [number, number]): [number, number] {
+  return [scaleN(x), scaleN(y)];
+}
 
 export interface NamedFeature {
   id: string;
@@ -48,19 +66,21 @@ export interface LabelPlacement {
 //   - Jiangsu / Yangtze delta jut at (74, 30)
 //   - Hangzhou bay concave near (70, 32)
 //   - Fujian coast rugged toward (66, 38)
-export const SEA_PATH =
+export const SEA_PATH = scalePath(
   'M 100 0 L 100 40 L 66 40 ' +
-  'C 67 38 67 36 67 34 ' +
-  'C 70 33 71 32 70 30 ' +
-  'C 73 29 75 29 75 28 ' +
-  'C 73 26 71 23 71 21 ' +
-  'C 71 19 67 18 66 18 ' +
-  'C 68 16 71 15 72 15 ' +
-  'C 71 13 67 13 64 12 ' +
-  'C 64 10 66 8 70 5 ' +
-  'C 76 3 80 4 82 6 ' +
-  'C 84 4 88 3 92 2 ' +
-  'L 100 2 Z';
+    'C 67 38 67 36 67 34 ' +
+    'C 70 33 71 32 70 30 ' +
+    'C 73 29 75 29 75 28 ' +
+    'C 73 26 71 23 71 21 ' +
+    'C 71 19 67 18 66 18 ' +
+    'C 68 16 71 15 72 15 ' +
+    'C 71 13 67 13 64 12 ' +
+    'C 64 10 66 8 70 5 ' +
+    'C 76 3 80 4 82 6 ' +
+    'C 84 4 88 3 92 2 ' +
+    'L 100 2 Z',
+  GRID_SCALE,
+);
 
 // Bohai bay inset — gives it visual weight as a named gulf.
 export const BOHAI_BAY: NamedFeature = {
@@ -84,21 +104,74 @@ export const EAST_SEA: NamedFeature = {
 
 // Decorative coastline that hugs the inland side of the sea polygon. Same
 // shape, rendered as a darker stroke.
-export const COASTLINE_PATH =
+export const COASTLINE_PATH = scalePath(
   'M 92 2 L 88 3 L 84 4 ' +
-  'C 80 4 76 3 70 5 ' +
-  'C 66 8 64 10 64 12 ' +
-  'C 67 13 71 13 72 15 ' +
-  'C 71 15 68 16 66 18 ' +
-  'C 67 18 71 19 71 21 ' +
-  'C 71 23 73 26 75 28 ' +
-  'C 75 29 73 29 70 30 ' +
-  'C 71 32 70 33 67 34 ' +
-  'C 67 36 67 38 66 40';
+    'C 80 4 76 3 70 5 ' +
+    'C 66 8 64 10 64 12 ' +
+    'C 67 13 71 13 72 15 ' +
+    'C 71 15 68 16 66 18 ' +
+    'C 67 18 71 19 71 21 ' +
+    'C 71 23 73 26 75 28 ' +
+    'C 75 29 73 29 70 30 ' +
+    'C 71 32 70 33 67 34 ' +
+    'C 67 36 67 38 66 40',
+  GRID_SCALE,
+);
+
+// Closed outline of Han China in logical base coords (x east 0..100, y south
+// 0..40), traced to real proportions AROUND the fixed city positions. Clockwise
+// from the northwest: the northern steppe frontier, the NE Liaodong peninsula,
+// the Bohai gulf sweeping inland, the Shandong peninsula, the Yangtze delta +
+// Hangzhou bay, the SE/Fujian coast, the southern coast curving out to Jiaozhou, and
+// the western/interior taper of Liangzhou/Yizhou. The 3D map fills this polygon
+// as land and floods everything outside it as sea, so its whole outline reads as
+// coast. Every city sits inside it.
+const CHINA_LAND_RAW: Array<[number, number]> = [
+  [2, 12],   // NW, west of Xiliang (5,13)
+  [3, 6],    // north-west frontier
+  [9, 3],
+  [18, 2],
+  [28, 2],   // north of Jinyang
+  [40, 1],
+  [52, 1],   // north of Yecheng/Beiping
+  [61, 2],   // north of Beiping (60,5)
+  [70, 2],   // toward Liaodong
+  [78, 2],   // Liaodong base, Xiangping (75,3)
+  [85, 3],   // Liaodong / far NE
+  [90, 4],   // NE tip
+  [85, 7],   // sea coast: Liaodong east side descends
+  [79, 8],
+  [73, 8],   // into the Bohai approach
+  [67, 10],  // Bohai gulf mouth
+  [61, 13],  // Bohai gulf bottom (Nanpi 58,10 / Pingyuan 55,15 sit west of here)
+  [63, 16],  // Shandong base
+  [70, 17],  // Shandong peninsula tip (Beihai 63,18 inside)
+  [73, 19],  // Shandong SE
+  [67, 20],  // Laizhou bay indent
+  [66, 23],  // east coast (Pengcheng 58,20 / Xiapi 55,22 inside)
+  [70, 26],
+  [75, 29],  // Yangtze delta bulge (Wujun 68,28 inside)
+  [77, 32],  // near Kuaiji (73,32)
+  [73, 33],  // Hangzhou bay indent
+  [72, 35],  // Fujian coast
+  [69, 38],
+  [64, 40],  // SE corner
+  [56, 41],  // south coast toward Jiaozhou
+  [48, 42],  // far-south bulge (Panyu / Guangzhou)
+  [40, 41],
+  [30, 40],  // south of Guiyang (40,35)
+  [22, 40],  // south of Jianning (20,35)
+  [15, 39],  // Yunnan (15,37) inside
+  [9, 37],   // southwest
+  [5, 32],   // west of Chengdu (15,30)
+  [3, 25],
+  [2, 18],   // west of Tianshui (10,18)
+];
+export const CHINA_LAND: Array<[number, number]> = scalePoints(CHINA_LAND_RAW, GRID_SCALE);
 
 // ---------------------------------------------------------------- rivers
 
-export const RIVERS: NamedFeature[] = [
+const RIVERS_RAW: NamedFeature[] = [
   {
     id: 'huanghe',
     name: { zh: '黄河', en: 'Yellow River' },
@@ -171,6 +244,11 @@ export const RIVERS: NamedFeature[] = [
   },
 ];
 
+export const RIVERS: NamedFeature[] = RIVERS_RAW.map((r) => ({
+  ...r,
+  path: scalePath(r.path, GRID_SCALE),
+}));
+
 // ---------------------------------------------------------------- mountains
 
 // Mountain ridges: each rendered as a jagged silhouette polygon. The
@@ -187,7 +265,7 @@ export interface MountainRange {
   labelAt: [number, number];
 }
 
-export const MOUNTAINS: MountainRange[] = [
+const MOUNTAINS_RAW: MountainRange[] = [
   {
     id: 'qinling',
     name: { zh: '秦岭', en: 'Qinling Range' },
@@ -377,6 +455,13 @@ export const MOUNTAINS: MountainRange[] = [
   },
 ];
 
+export const MOUNTAINS: MountainRange[] = MOUNTAINS_RAW.map((m) => ({
+  ...m,
+  ridge: scalePoints(m.ridge, GRID_SCALE),
+  baseline: scaleN(m.baseline),
+  labelAt: scaleXY(m.labelAt),
+}));
+
 // ---------------------------------------------------------------- lakes
 
 export interface Lake {
@@ -387,7 +472,7 @@ export interface Lake {
   labelAt: [number, number];
 }
 
-export const LAKES: Lake[] = [
+const LAKES_RAW: Lake[] = [
   {
     id: 'dongting',
     name: { zh: '洞庭湖', en: 'Dongting Lake' },
@@ -445,6 +530,12 @@ export const LAKES: Lake[] = [
   },
 ];
 
+export const LAKES: Lake[] = LAKES_RAW.map((l) => ({
+  ...l,
+  polygon: scalePoints(l.polygon, GRID_SCALE),
+  labelAt: scaleXY(l.labelAt),
+}));
+
 // ---------------------------------------------------------------- forests
 
 // Approximate forested regions — drawn as a scattered cluster of small
@@ -457,7 +548,7 @@ export interface ForestPatch {
   density?: number; // 0..1, default 0.5
 }
 
-export const FORESTS: ForestPatch[] = [
+const FORESTS_RAW: ForestPatch[] = [
   {
     id: 'wuling-forest',
     name: { zh: '武陵林', en: 'Wuling Forest' },
@@ -504,12 +595,17 @@ export const FORESTS: ForestPatch[] = [
   },
 ];
 
+export const FORESTS: ForestPatch[] = FORESTS_RAW.map((f) => ({
+  ...f,
+  polygon: scalePoints(f.polygon, GRID_SCALE),
+}));
+
 // ---------------------------------------------------------------- regions
 
 // Province / state labels with rough centroid placements. These render
 // large and dim behind everything else, like the gazetteer text on an
 // antique map.
-export const PROVINCE_LABELS: LabelPlacement[] = [
+const PROVINCE_LABELS_RAW: LabelPlacement[] = [
   { text: { zh: '幽州', en: 'Youzhou' }, x: 55, y: 7, size: 1.4 },
   { text: { zh: '冀州', en: 'Jizhou' }, x: 50, y: 13, size: 1.4 },
   { text: { zh: '并州', en: 'Bingzhou' }, x: 30, y: 9, size: 1.4 },
@@ -526,21 +622,35 @@ export const PROVINCE_LABELS: LabelPlacement[] = [
   { text: { zh: '辽东', en: 'Liaodong' }, x: 78, y: 4, size: 1.2 },
 ];
 
+export const PROVINCE_LABELS: LabelPlacement[] = PROVINCE_LABELS_RAW.map((p) => ({
+  ...p,
+  x: scaleN(p.x),
+  y: scaleN(p.y),
+}));
+
 // The Great Wall — represented as a single hand-drawn path running along
 // the northern frontier from Liaodong west to Hexi. In Han times the wall
 // ran roughly north of the Yin Mountains; we approximate it as a wavy line
 // through y=2..5 across the top of the map.
-export const GREAT_WALL_PATH =
+export const GREAT_WALL_PATH = scalePath(
   'M 78 4 ' +
-  'C 72 5 68 4 64 4 ' +
-  'C 58 4 54 5 50 4 ' +
-  'C 46 3 40 4 34 4 ' +
-  'C 28 3 22 4 16 5 ' +
-  'C 12 5 8 6 4 7';
+    'C 72 5 68 4 64 4 ' +
+    'C 58 4 54 5 50 4 ' +
+    'C 46 3 40 4 34 4 ' +
+    'C 28 3 22 4 16 5 ' +
+    'C 12 5 8 6 4 7',
+  GRID_SCALE,
+);
 
 // Sea labels.
-export const SEA_LABELS: LabelPlacement[] = [
+const SEA_LABELS_RAW: LabelPlacement[] = [
   { text: { zh: '渤  海', en: 'Bohai Sea' }, x: 80, y: 8, size: 1.3 },
   { text: { zh: '黄  海', en: 'Yellow Sea' }, x: 86, y: 18, size: 1.3 },
   { text: { zh: '东  海', en: 'East Sea' }, x: 88, y: 30, size: 1.3 },
 ];
+
+export const SEA_LABELS: LabelPlacement[] = SEA_LABELS_RAW.map((p) => ({
+  ...p,
+  x: scaleN(p.x),
+  y: scaleN(p.y),
+}));

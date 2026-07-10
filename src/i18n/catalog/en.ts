@@ -304,6 +304,12 @@ export const en: MessageCatalog = {
   'faction.you': '(you)',
   'faction.eliminated': 'fallen',
 
+  'map.legend.title': 'Provinces & Powers',
+  'map.legend.territory': 'Territory',
+  'map.legend.province': 'Province',
+  'map.legend.city': 'City',
+  'map.legend.capital': 'Seat',
+
   'digest.heading': 'While you were occupied…',
   'digest.dismiss': 'Continue',
 };

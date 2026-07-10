@@ -337,6 +337,13 @@ export type MessageKey =
   | 'faction.you'
   | 'faction.eliminated'
 
+  // Campaign map (3D) legend
+  | 'map.legend.title'
+  | 'map.legend.territory'
+  | 'map.legend.province'
+  | 'map.legend.city'
+  | 'map.legend.capital'
+
   // Between-turn digest
   | 'digest.heading'
   | 'digest.dismiss';

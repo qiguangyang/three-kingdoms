@@ -1,8 +1,11 @@
+import { GRID_SCALE } from '../engine/constants.js';
 import type { City } from '../engine/types.js';
 
-// Forty cities placed on the 100x40 grid. Coordinates and primary terrain
-// follow SCENARIOS.md §1. Initial economy is set to a modest baseline; the
-// scenario file overrides with faction-specific resources.
+// Forty cities authored on the base 100x40 grid. Coordinates and primary
+// terrain follow SCENARIOS.md §1. Initial economy is set to a modest baseline;
+// the scenario file overrides with faction-specific resources. The authored
+// literals stay at 100x40 for readability; positions are scaled by GRID_SCALE
+// at buildCity so the live grid runs at BASE * GRID_SCALE (gameplay-invariant).
 
 interface CityDef {
   id: string;
@@ -85,7 +88,7 @@ function buildCity(def: CityDef): City {
   return {
     id: def.id,
     name: { zh: def.zh, en: def.en },
-    pos: { x: def.x, y: def.y },
+    pos: { x: def.x * GRID_SCALE, y: def.y * GRID_SCALE },
     terrain: def.terrain,
     factionId: null,
     agriculture: def.agriculture,

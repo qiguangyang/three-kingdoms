@@ -10,6 +10,7 @@
 // that need synchronous state transitions.
 
 import { createBattle } from './battle/index.js';
+import { GRID_SCALE } from './constants.js';
 import { resolveQuickBattle } from './combat.js';
 import { runScenarioEvents } from './events.js';
 import {
@@ -58,12 +59,14 @@ export const OP_DURATION_DAYS: Record<OpKind, number> = {
   siege: 0, // computed from engagement scale
 };
 
-// March duration from grid distance — 0.5 day per cell of manhattan
-// distance, with a 4-day minimum so even neighbors take a beat.
+// March duration from grid distance — 0.5 day per base cell of manhattan
+// distance, with a 4-day minimum so even neighbors take a beat. The
+// coefficient is divided by GRID_SCALE so that scaling city coordinates by
+// GRID_SCALE leaves the day count unchanged (gameplay-invariant).
 export function marchDuration(from: City, to: City): number {
   const dx = Math.abs(from.pos.x - to.pos.x);
   const dy = Math.abs(from.pos.y - to.pos.y);
-  return Math.max(4, Math.ceil((dx + dy) * 0.5));
+  return Math.max(4, Math.ceil((dx + dy) * (0.5 / GRID_SCALE)));
 }
 
 // Siege duration grows with the defender's troop pool: 1 day per ~1200

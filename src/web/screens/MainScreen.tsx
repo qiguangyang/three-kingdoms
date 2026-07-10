@@ -12,7 +12,7 @@ import {
   setSelectedCity,
   toggleLocale,
 } from '../../state/store.js';
-import { MapView } from '../components/MapView.js';
+import { WorldMapView } from '../map/WorldMapView.js';
 import { StatusBar } from '../components/StatusBar.js';
 import { Sidebar } from '../components/Sidebar.js';
 import { WorldNewsFeed } from '../components/WorldNewsFeed.js';
@@ -21,6 +21,7 @@ import { TurnDigest } from '../components/TurnDigest.js';
 import { CommandMenu, type MenuOption } from '../components/CommandMenu.js';
 import { Dialog } from '../components/Dialog.js';
 import { adjacentCities } from '../../engine/map.js';
+import { marchDuration } from '../../engine/pendingOp.js';
 import { factionGenerals } from '../../engine/selectors.js';
 import type { City, GameState, General, StrategicCommand } from '../../engine/types.js';
 import { pickName, t } from '../../i18n/locale.js';
@@ -287,7 +288,7 @@ export const MainScreen: React.FC = () => {
       <div className="relative flex flex-1 overflow-hidden">
         <div className="flex flex-1 flex-col">
           <div className="relative flex-1 overflow-hidden">
-            <MapView
+            <WorldMapView
               game={game}
               selectedCityId={selectedCityId}
               onSelectCity={setSelectedCity}
@@ -626,8 +627,9 @@ const AttackComposer: React.FC<{
   const [troops, setTroops] = useState(defaultTroops);
 
   const canConfirm = selectedIds.size > 0 && troops > 0 && troops <= maxTroops;
-  const distance = Math.abs(from.pos.x - target.pos.x) + Math.abs(from.pos.y - target.pos.y);
-  const marchDays = Math.max(4, Math.ceil(distance * 0.5));
+  // Single source of truth for march timing: the engine's marchDuration
+  // (grid-scale-aware). Avoids a duplicate inline calc drifting from the engine.
+  const marchDays = marchDuration(from, target);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

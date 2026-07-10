@@ -1,4 +1,4 @@
-import { MAP_HEIGHT, MAP_WIDTH, TERRAIN_MOVE_COST } from './constants.js';
+import { GRID_SCALE, MAP_HEIGHT, MAP_WIDTH, TERRAIN_MOVE_COST } from './constants.js';
 import type { City, CityId, GameState, Terrain } from './types.js';
 
 export interface Coord {
@@ -21,10 +21,11 @@ export function manhattanDistance(a: Coord, b: Coord): number {
 }
 
 // Two cities are "adjacent" when they are within an unobstructed radius. In
-// this game cities are sparsely placed (40 on a 100x40 grid), so we treat
+// this game cities are sparsely placed (40 on a 100x40 base grid), so we treat
 // "adjacent" as: among the four nearest cities by manhattan distance and
-// within a configurable threshold.
-const ADJACENCY_THRESHOLD = 18; // tuned for the SCENARIOS.md city layout
+// within a configurable threshold. Scaled by GRID_SCALE so the threshold
+// tracks the (also scaled) city coordinates — adjacency is invariant.
+const ADJACENCY_THRESHOLD = 18 * GRID_SCALE; // tuned for the SCENARIOS.md city layout
 
 export function citiesAdjacent(a: City, b: City): boolean {
   if (a.id === b.id) return false;
@@ -44,7 +45,7 @@ export function marchCost(a: City, b: City): number {
   const tb = (b.terrain[0] ?? 'plain') as Terrain;
   const costA = TERRAIN_MOVE_COST[ta] ?? 1;
   const costB = TERRAIN_MOVE_COST[tb] ?? 1;
-  return (costA + costB) / 2 + manhattanDistance(a.pos, b.pos) / 8;
+  return (costA + costB) / 2 + manhattanDistance(a.pos, b.pos) / (8 * GRID_SCALE);
 }
 
 // Build a quick lookup: cityId -> [cityId, ...adjacent].
