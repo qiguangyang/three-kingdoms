@@ -7,6 +7,7 @@ import { REF_DATA } from '../../src/data/index.js';
 import { createBattle } from '../../src/engine/battle/setup.js';
 import { gameStore, loadGame } from '../../src/state/store.js';
 import { BattleScreen } from '../../src/web/battle/BattleScreen.js';
+import { pendingPivotalDecision } from '../../src/state/battleSession.js';
 import { t } from '../../src/i18n/locale.js';
 
 function enterBattle() {
@@ -18,6 +19,25 @@ function enterBattle() {
     attackingGeneralIds: ['caocao', 'xiahoudun'], attackingTroops: 20000,
   });
   loadGame({ game: { ...weak, pendingBattle: battle }, locale: 'zh' });
+}
+
+// Seed a battle where the player is DEFENDING with a small garrison held partly
+// in reserve, against a much larger Cao Cao expedition. That gives the player a
+// reserve in hand while advantage < 1.0, so pendingPivotalDecision (Commit
+// Reserves) is salient — the exact condition that must pause auto-play.
+function enterSalientBattle(): void {
+  const s = buildInitialState({ scenario: SCENARIO_DONGZHUO, playerFactionId: 'caocao', refData: REF_DATA, seed: 100 });
+  const target = Object.values(s.cities).find((c) => c.factionId && c.factionId !== 'caocao')!;
+  const held = {
+    ...s,
+    playerFactionId: target.factionId!,
+    cities: { ...s.cities, [target.id]: { ...target, garrison: 800, generals: [] } },
+  };
+  const battle = createBattle(held, {
+    cityId: target.id, attackerFactionId: 'caocao', defenderFactionId: target.factionId!,
+    attackingGeneralIds: ['caocao', 'xiahoudun'], attackingTroops: 20000,
+  });
+  loadGame({ game: { ...held, pendingBattle: battle }, locale: 'zh' });
 }
 
 describe('BattleScreen', () => {
@@ -43,5 +63,18 @@ describe('BattleScreen', () => {
     // Focus Fire is always offered when the player has units and an enemy exists
     // (default test locale is zh -> '集火猛攻').
     expect(getAllByText(t('battle.decision.focusFire')).length).toBeGreaterThan(0);
+  });
+
+  it('shows the pivotal prompt (Continue watching) while auto-playing on a salient decision', async () => {
+    enterSalientBattle();
+    const session = gameStore.getState().battle!;
+    // Precondition: the seeded battle really does have a salient pending decision.
+    expect(pendingPivotalDecision(session)).not.toBeNull();
+    const { getByText, findByText } = render(<BattleScreen />);
+    // Begin the battle to turn on auto-play (zh 'Begin' — battle.intro.begin).
+    fireEvent.click(getByText(t('battle.intro.begin')));
+    // Auto-play pauses on the salient decision and surfaces the "Continue
+    // watching" resume (zh '继续观战' — battle.decision.continue).
+    expect(await findByText(t('battle.decision.continue'))).toBeInTheDocument();
   });
 });

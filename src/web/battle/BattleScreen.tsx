@@ -15,6 +15,7 @@ import {
   startBattleMusic, stopBattleMusic, setBattleIntensity, isMuted, toggleMuted,
 } from '../audio/battle.js';
 import { BattleView } from './BattleView.js';
+import { pendingPivotalDecision, chargeableUnitIds } from '../../state/battleSession.js';
 import type { BattleSession } from '../../state/battleSession.js';
 import type { MessageKey } from '../../i18n/types.js';
 
@@ -64,6 +65,12 @@ export const BattleScreen: React.FC = () => {
   const [reveal, setReveal] = React.useState<{ nameKey: MessageKey; descKey: MessageKey; n: number } | null>(null);
   const revealN = React.useRef(0);
   const [muted, setMuted] = React.useState(isMuted());
+  // Signature of the pivotal decision the player waved past ("Continue
+  // watching"). This is STATE, not a ref, so setting it re-runs the auto-play
+  // effect and resumes the battle; a new day changes the signature and can
+  // re-pause. (A ref + same-value setState would not re-render, so the effect
+  // would never re-run and the battle would stay frozen — use state here.)
+  const [dismissedPivotal, setDismissedPivotal] = React.useState<string | null>(null);
   // Reset the per-battle presentation state when a new battle (city) opens.
   const cityId = session?.battle.cityId;
   useEffect(() => { setIntroOpen(true); combatStarted.current = false; setNarr(null); setReveal(null); }, [cityId]);
@@ -78,12 +85,18 @@ export const BattleScreen: React.FC = () => {
   // fight instead of freezing on the first opportunity.
   useEffect(() => {
     if (!session || !playing || session.phase !== 'awaitingOrders') return;
+    // Pivotal-only pause: hold auto-play when a salient decision is pending and
+    // the player hasn't waved it past yet. The prompt (below) offers the lever
+    // or a "Continue watching" resume.
+    const pivotal = pendingPivotalDecision(session);
+    const sig = pivotal ? `${session.battle.daysElapsed}:${pivotal.id}` : null;
+    if (pivotal && dismissedPivotal !== sig) return; // paused, awaiting the player
     const delay = session.gambits.length > 0 ? 2600 : 900 / session.speed;
     const id = setTimeout(() => {
-      // Press the assault: order the player's blocks to charge the nearest foe so
-      // the battle closes and actually fights, instead of the passive default
-      // "dripping advance" that stalls in front of a walled garrison.
-      const mine = session.battle.units.filter((u) => u.factionId === session.playerFactionId && u.state === 'fielded');
+      // Press the assault, but only for units the player has NOT given an order
+      // to — so a Hold/Focus lever is not overwritten next tick.
+      const chargeable = new Set(chargeableUnitIds(session));
+      const mine = session.battle.units.filter((u) => chargeable.has(u.id));
       const foe = session.battle.units.find((e) => e.factionId !== session.playerFactionId && (e.state === 'fielded' || e.state === 'reserve'));
       if (foe && mine.length > 0) {
         submitBattleOrders(mine.map((u) => ({ kind: 'charge', unitId: u.id, targetUnitId: foe.id })));
@@ -91,7 +104,7 @@ export const BattleScreen: React.FC = () => {
       resolveBattleDay();
     }, delay);
     return () => clearTimeout(id);
-  }, [session, playing]);
+  }, [session, playing, dismissedPivotal]);
 
   // Play at most one cue per event kind for the day just resolved (works for
   // both the 3D and SVG views; silent no-op when muted or WebAudio is absent).
@@ -261,6 +274,26 @@ export const BattleScreen: React.FC = () => {
               ))}
             </div>
           )}
+
+          {/* Pivotal decision prompt — the only thing that pauses auto-play. */}
+          {playing && (() => {
+            const pivotal = pendingPivotalDecision(session);
+            const sig = pivotal ? `${session.battle.daysElapsed}:${pivotal.id}` : null;
+            if (!pivotal || dismissedPivotal === sig) return null;
+            return (
+              <div className="flex flex-col items-center gap-2 px-5 py-3" style={{ ...PANEL, borderColor: 'rgba(201,163,92,.6)' }}>
+                <span className="font-display text-sm" style={{ letterSpacing: '0.26em', color: GOLD }}>{t('battle.decision.pivotal')}</span>
+                <div className="flex items-center gap-2">
+                  <CinBtn variant="gold" onClick={() => { chooseBattleDecision(pivotal.id); resolveBattleDay(); }}>
+                    {t(pivotal.labelKey as MessageKey)}
+                  </CinBtn>
+                  <CinBtn onClick={() => setDismissedPivotal(sig)}>
+                    {t('battle.decision.continue')}
+                  </CinBtn>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Maneuver levers — the commander's contextual moves. */}
           {session.offeredDecisions.length > 0 && (
