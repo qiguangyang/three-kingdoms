@@ -83,6 +83,21 @@ describe('stepBattle — movement + melee', () => {
     ]);
     expect(stepBattle({ battle: mk(), commands: [] })).toEqual(stepBattle({ battle: mk(), commands: [] }));
   });
+
+  it('a holding unit brace-defends: it inflicts more and suffers less than when idle', () => {
+    const mk = () => battle([
+      unit({ id: 'a', factionId: 'A', pos: { x: 4, y: 4 }, troops: 6000 }),
+      unit({ id: 'e', factionId: 'B', pos: { x: 5, y: 4 }, troops: 6000 }),
+    ]);
+    const idle = stepBattle({ battle: mk(), commands: [] });
+    const held = stepBattle({ battle: mk(), commands: [{ kind: 'hold', unitId: 'a' }] });
+    const eIdle = idle.battle.units.find((x) => x.id === 'e')!;
+    const eHeld = held.battle.units.find((x) => x.id === 'e')!;
+    const aIdle = idle.battle.units.find((x) => x.id === 'a')!;
+    const aHeld = held.battle.units.find((x) => x.id === 'a')!;
+    expect(6000 - eHeld.troops).toBeGreaterThan(6000 - eIdle.troops); // held unit inflicts more
+    expect(6000 - aHeld.troops).toBeLessThan(6000 - aIdle.troops); // and suffers less
+  });
 });
 
 describe('stepBattle — ranged, duel, morale, end', () => {

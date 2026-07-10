@@ -66,9 +66,11 @@ function unitLeadership(u: BattleUnit): number {
 function meleePower(battle: Battle, u: BattleUnit, orders: Map<string, TacticalCommand>): number {
   const t = cellTerrain(cellAt(battle, u.pos));
   const mod = COMBAT_MODIFIER[u.troopType]?.[t] ?? 1.0;
-  const charging = orders.get(u.id)?.kind === 'charge' ? BATTLE_TUNING.chargeBonus : 1.0;
+  const order = orders.get(u.id)?.kind;
+  const charging = order === 'charge' ? BATTLE_TUNING.chargeBonus : 1.0;
+  const holding = order === 'hold' ? BATTLE_TUNING.holdBonus : 1.0;
   const elev = 1 + heightAt(battle, u.pos) * BATTLE_TUNING.elevationPerLevel;
-  return u.troops * mod * unitLeadership(u) * charging * elev;
+  return u.troops * mod * unitLeadership(u) * charging * holding * elev;
 }
 
 function nearestEnemy(u: BattleUnit, units: BattleUnit[]): BattleUnit | undefined {
