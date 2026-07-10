@@ -118,7 +118,7 @@ export const BattleScreen: React.FC = () => {
     lastEventsRef.current = session.lastEvents;
     const kinds = new Set<string>(session.lastEvents.map((e) => e.kind));
     if (kinds.has('duel')) playDuel();
-    if (kinds.has('fire')) playFire();
+    if (kinds.has('fire') || kinds.has('ambushSprung')) playFire();
     if (kinds.has('volley')) playVolley();
     if (kinds.has('charge') || kinds.has('reserveCommitted') || kinds.has('rally')) playCharge();
     if (kinds.has('clash')) playClash();
@@ -132,6 +132,7 @@ export const BattleScreen: React.FC = () => {
     const CAPTIONS: Array<[string, MessageKey]> = [
       ['fire', 'battle.caption.fire'],
       ['flood', 'battle.caption.flood'],
+      ['ambushSprung', 'battle.caption.ambush'],
       ['duel', 'battle.caption.duel'],
       ['moraleBreak', 'battle.caption.rout'],
       ['rout', 'battle.caption.rout'],
@@ -149,6 +150,8 @@ export const BattleScreen: React.FC = () => {
     const NARR: Array<[string, MessageKey]> = [
       ['fire', 'battle.narr.fire'],
       ['flood', 'battle.narr.flood'],
+      ['ambushSprung', 'battle.narr.ambush'],
+      ['feint', 'battle.narr.feint'],
       ['duel', 'battle.narr.duel'],
       ['moraleBreak', 'battle.narr.rout'],
       ['rout', 'battle.narr.rout'],

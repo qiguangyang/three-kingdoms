@@ -21,6 +21,7 @@ const KEYS = [
   'battle.decision.tray', 'battle.decision.holdLine', 'battle.decision.focusFire',
   'battle.decision.pivotal', 'battle.decision.continue',
   'battle.decision.challengeDuel', 'battle.decision.rally', 'battle.decision.heroCharge',
+  'battle.decision.feignRetreat', 'battle.caption.ambush', 'battle.narr.ambush', 'battle.narr.feint',
   'battle.narr.rally',
 ] as const;
 
