@@ -73,7 +73,7 @@ export const BattleScreen: React.FC = () => {
   const [dismissedPivotal, setDismissedPivotal] = React.useState<string | null>(null);
   // Reset the per-battle presentation state when a new battle (city) opens.
   const cityId = session?.battle.cityId;
-  useEffect(() => { setIntroOpen(true); combatStarted.current = false; setNarr(null); setReveal(null); }, [cityId]);
+  useEffect(() => { setIntroOpen(true); combatStarted.current = false; setNarr(null); setReveal(null); setDismissedPivotal(null); }, [cityId]);
   // Music bed: stop on unmount, and stop once the battle is decided.
   useEffect(() => () => stopBattleMusic(), []);
   const phase = session?.phase;
@@ -174,7 +174,6 @@ export const BattleScreen: React.FC = () => {
   const defT = troopTotal(session, def);
   const maxT = Math.max(atkT, defT, 1);
   const playerUnits = battle.units.filter((u) => u.factionId === session.playerFactionId && u.state === 'fielded');
-  const reserves = battle.units.filter((u) => u.factionId === session.playerFactionId && u.state === 'reserve');
   const resolved = session.phase === 'resolved';
   const won = session.attackerWon === session.playerIsAttacker;
   const act: MessageKey = resolved ? 'battle.act.decide' : combatStarted.current ? 'battle.act.engage' : 'battle.act.deploy';
@@ -299,11 +298,15 @@ export const BattleScreen: React.FC = () => {
           {session.offeredDecisions.length > 0 && (
             <div className="flex flex-wrap items-center justify-center gap-2 px-3 py-2" style={PANEL}>
               <span className="font-display text-xs" style={{ letterSpacing: '0.28em', color: GOLD }}>{t('battle.decision.tray')}</span>
-              {session.offeredDecisions.map((d) => (
-                <CinBtn key={d.id} onClick={() => { chooseBattleDecision(d.id); resolveBattleDay(); }}>
-                  {t(d.labelKey as MessageKey)}
-                </CinBtn>
-              ))}
+              {/* Don't list the currently-pivotal decision here while its prompt is
+                  up — otherwise the same lever would appear twice. */}
+              {session.offeredDecisions
+                .filter((d) => !(playing && pendingPivotalDecision(session)?.id === d.id))
+                .map((d) => (
+                  <CinBtn key={d.id} onClick={() => { chooseBattleDecision(d.id); resolveBattleDay(); }}>
+                    {t(d.labelKey as MessageKey)}
+                  </CinBtn>
+                ))}
             </div>
           )}
 
@@ -317,14 +320,6 @@ export const BattleScreen: React.FC = () => {
                 {t('battle.speed')} ×{sp}
               </CinBtn>
             ))}
-            {reserves.length > 0 && (
-              <>
-                <span className="mx-1 h-5 w-px" style={{ background: LINE }} />
-                <CinBtn onClick={() => submitBattleOrders([{ kind: 'commitReserves', factionId: session.playerFactionId }])}>
-                  {t('battle.commitReserves')}
-                </CinBtn>
-              </>
-            )}
             <span className="mx-1 h-5 w-px" style={{ background: LINE }} />
             <CinBtn onClick={() => quickResolveBattle()}>{t('battle.quickResolve')}</CinBtn>
             <CinBtn onClick={() => {

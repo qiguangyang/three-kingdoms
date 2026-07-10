@@ -15,7 +15,6 @@ function mk(units: BattleUnit[], f: BattleField = field()): Battle {
   return { cityId: 'c', attackerFactionId: 'A', defenderFactionId: 'B', daysElapsed: 0,
     units, field: f, seed: 9, rngCursor: 9, log: [] };
 }
-const ids = (ds: ReturnType<typeof offerPlayerDecisions>) => ds.map((d) => d.id);
 const find = (ds: ReturnType<typeof offerPlayerDecisions>, id: string) => ds.find((d) => d.id === id || d.id.startsWith(id));
 
 describe('offerPlayerDecisions', () => {
