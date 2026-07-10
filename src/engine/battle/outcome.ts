@@ -5,7 +5,7 @@
 // runs the sim to completion with AI orders for both sides.
 import { BATTLE_DAY_LIMIT } from '../constants.js';
 import { adjacentCities } from '../map.js';
-import { tacticalRules } from '../ai/tactical.js';
+import { planTactical } from '../ai/tactics/index.js';
 import type { QuickBattleResult } from '../combat.js';
 import type {
   Battle,
@@ -25,7 +25,7 @@ export function defaultTacticalCommands(
   factionId: FactionId,
   personality: Personality,
 ): TacticalCommand[] {
-  return tacticalRules(battle, factionId, personality);
+  return planTactical(battle, factionId, personality);
 }
 
 // Troops still actively holding the field for a side. Only 'fielded' units
