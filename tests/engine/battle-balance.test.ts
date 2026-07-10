@@ -48,4 +48,13 @@ describe('battle balance harness', () => {
       defender: { troops: 7000, wu: 70, zhi: 75, command: 85, personality: 'turtle' } };
     expect(simulateHeadless(m)).toEqual(simulateHeadless(m));
   });
+
+  it('duels are reachable: two high-wu commanders in a sweep produce at least one duel', () => {
+    const seeds = [1, 2, 3, 4, 5, 6, 7, 8];
+    const matchups = seeds.map((seed) => ({ seed,
+      attacker: { troops: 8000, wu: 98, zhi: 40, command: 75, personality: 'active' as const },
+      defender: { troops: 8000, wu: 96, zhi: 60, command: 80, personality: 'active' as const } }));
+    const sweep = runBalanceSweep(matchups);
+    expect(sweep.leverTotals.challengeDuel ?? 0).toBeGreaterThan(0);
+  });
 });
