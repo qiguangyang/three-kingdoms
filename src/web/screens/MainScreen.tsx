@@ -18,6 +18,8 @@ import { Sidebar } from '../components/Sidebar.js';
 import { WorldNewsFeed } from '../components/WorldNewsFeed.js';
 import { FactionPanel } from '../components/FactionPanel.js';
 import { TurnDigest } from '../components/TurnDigest.js';
+import { FloatingPanel } from '../components/FloatingPanel.js';
+import { factionColor } from '../theme.js';
 import { CommandMenu, type MenuOption } from '../components/CommandMenu.js';
 import { Dialog } from '../components/Dialog.js';
 import { adjacentCities } from '../../engine/map.js';
@@ -282,55 +284,81 @@ export const MainScreen: React.FC = () => {
   if (!game) return null;
   const selectedCity = selectedCityId ? game.cities[selectedCityId] : undefined;
 
+  const playerFaction = game.factions[game.playerFactionId];
   return (
-    <div className="flex h-full flex-col">
-      <StatusBar game={game} />
-      <div className="relative flex flex-1 overflow-hidden">
-        <div className="flex flex-1 flex-col">
-          <div className="relative flex-1 overflow-hidden">
-            <WorldMapView
-              game={game}
-              selectedCityId={selectedCityId}
-              onSelectCity={setSelectedCity}
-              pendingMarches={pendingMarches}
-              siegeCityIds={siegeCityIds}
-              internalOps={internalOpsByCity}
-            />
-            {/* On-map action hint when a friendly city is selected. Hidden
-                during the post-attack animation so the live counters get
-                clear real estate at the bottom. */}
-            {modal.kind === 'none' && selectedCity && selectedCity.factionId === game.playerFactionId && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                <button className="btn btn-primary" onClick={openBuildForSelected}>
-                  {t('menu.internalAffairs')}
-                </button>
-                <button className="btn" onClick={openAttackForSelected}>
-                  {t('menu.attack')}
-                </button>
-                <button className="btn btn-ghost" onClick={() => endTurn()}>
-                  {t('menu.endTurn')} (n)
-                </button>
-              </div>
-            )}
-            {/* Hint: pick a city */}
-            {modal.kind === 'none' && !selectedCity && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-parchment-100/90 px-3 py-1 text-xs text-ink-600 shadow-sm">
-                {t('help.select')}
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col gap-2 px-3 py-2">
-            <WorldNewsFeed game={game} />
-            <FactionPanel game={game} />
-          </div>
-        </div>
-        <Sidebar
+    <div className="relative h-full w-full overflow-hidden">
+      {/* Full-screen campaign map — everything else floats on top of it. */}
+      <div className="absolute inset-0">
+        <WorldMapView
           game={game}
           selectedCityId={selectedCityId}
-          onDefect={(g) => setModal({ kind: 'defect', target: g })}
-          onTransfer={(g) => setModal({ kind: 'transfer', general: g })}
+          onSelectCity={setSelectedCity}
+          pendingMarches={pendingMarches}
+          siegeCityIds={siegeCityIds}
+          internalOps={internalOpsByCity}
         />
       </div>
+
+      {/* Floating, collapsible HUD panels (collapsed by default so the map stays
+          clear). Status top-left, city detail top-right, chronicle bottom-left,
+          the powers ranking bottom-right. */}
+      <FloatingPanel
+        position="left-3 top-3"
+        bodyClass="w-max"
+        title={
+          <span className="flex items-center gap-1.5">
+            {playerFaction && (
+              <span className="stamp-square" style={{ backgroundColor: factionColor(playerFaction.id) }} aria-hidden>
+                {playerFaction.id === '__neutral__' ? '·' : pickName(playerFaction.name)[0] ?? '·'}
+              </span>
+            )}
+            <span>{playerFaction ? pickName(playerFaction.name) : t('status.faction')}</span>
+            <span className="text-ink-500">{t('status.month_long', { year: game.year, month: game.month })}</span>
+            <span className="font-mono text-[10px] text-ink-400">D{game.day}/30</span>
+          </span>
+        }
+      >
+        <StatusBar game={game} />
+      </FloatingPanel>
+
+      <FloatingPanel position="right-3 top-3" align="right" title={t('sidebar.city')} bodyClass="w-80 max-h-[72vh]">
+        <div className="max-h-[72vh]">
+          <Sidebar
+            game={game}
+            selectedCityId={selectedCityId}
+            onDefect={(g) => setModal({ kind: 'defect', target: g })}
+            onTransfer={(g) => setModal({ kind: 'transfer', general: g })}
+          />
+        </div>
+      </FloatingPanel>
+
+      <FloatingPanel position="left-3 bottom-3" title={t('news.heading')} bodyClass="w-80 max-h-[46vh]">
+        <WorldNewsFeed game={game} />
+      </FloatingPanel>
+
+      <FloatingPanel position="right-3 bottom-3" align="right" title={t('faction.rankHeading')} bodyClass="w-80 max-h-[62vh]">
+        <FactionPanel game={game} />
+      </FloatingPanel>
+
+      {/* On-map action buttons when a friendly city is selected; otherwise a hint. */}
+      {modal.kind === 'none' && selectedCity && selectedCity.factionId === game.playerFactionId && (
+        <div className="pointer-events-auto absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 gap-2">
+          <button className="btn btn-primary" onClick={openBuildForSelected}>
+            {t('menu.internalAffairs')}
+          </button>
+          <button className="btn" onClick={openAttackForSelected}>
+            {t('menu.attack')}
+          </button>
+          <button className="btn btn-ghost" onClick={() => endTurn()}>
+            {t('menu.endTurn')} (n)
+          </button>
+        </div>
+      )}
+      {modal.kind === 'none' && !selectedCity && (
+        <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded bg-parchment-100/90 px-3 py-1 text-xs text-ink-600 shadow-sm">
+          {t('help.select')}
+        </div>
+      )}
 
       {modal.kind === 'menu' && (
         <CommandMenu

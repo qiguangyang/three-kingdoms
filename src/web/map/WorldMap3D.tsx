@@ -107,7 +107,7 @@ const MapLegend: React.FC = () => {
   const swatch: React.CSSProperties = { width: 15, height: 11, borderRadius: 2, flex: '0 0 auto' };
   return (
     <div
-      className="pointer-events-none absolute left-3 top-3 select-none"
+      className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 select-none"
       style={{
         background: 'rgba(10,13,18,.72)',
         border: `1px solid rgba(201,163,92,.34)`,
