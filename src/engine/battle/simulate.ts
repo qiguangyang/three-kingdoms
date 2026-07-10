@@ -211,9 +211,15 @@ export function stepBattle(input: StepInput): StepResult {
 
     const pa = meleePower(input.battle, u, orders);
     const pb = meleePower(input.battle, enemy, orders);
-    const jitter = 0.85 + rint(0, 30) / 100; // 0.85..1.15
-    const bLoss = Math.min(enemy.troops, Math.floor(BATTLE_TUNING.meleeBaseLoss * (pa / Math.max(pb, 1)) * enemy.troops * jitter));
-    const aLoss = Math.min(u.troops, Math.floor(BATTLE_TUNING.meleeBaseLoss * (pb / Math.max(pa, 1)) * u.troops * jitter));
+    // Independent per-side luck: evenly matched forces should NOT annihilate each
+    // other identically. A single shared jitter makes a mirror-image clash perfectly
+    // symmetric (both sides lose the same each day and rout together), which erases
+    // tactical variance and lets a defender's uncommitted reserve always break the
+    // tie. Two draws give each side its own daily luck.
+    const jitterB = 0.85 + rint(0, 30) / 100; // 0.85..1.15 — enemy's (u's target) casualties
+    const jitterA = 0.85 + rint(0, 30) / 100; // 0.85..1.15 — u's own casualties
+    const bLoss = Math.min(enemy.troops, Math.floor(BATTLE_TUNING.meleeBaseLoss * (pa / Math.max(pb, 1)) * enemy.troops * jitterB));
+    const aLoss = Math.min(u.troops, Math.floor(BATTLE_TUNING.meleeBaseLoss * (pb / Math.max(pa, 1)) * u.troops * jitterA));
     u.troops -= aLoss;
     enemy.troops -= bLoss;
     events.push({ kind: 'clash', unitId: u.id, targetUnitId: enemy.id, casualties: bLoss, defCasualties: aLoss });
