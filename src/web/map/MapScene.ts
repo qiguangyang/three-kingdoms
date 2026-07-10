@@ -16,7 +16,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { CHINA_LAND, RIVERS, PROVINCE_LABELS } from '../../data/map/geography.js';
+import { CHINA_LAND, RIVERS, PROVINCE_LABELS, FORESTS } from '../../data/map/geography.js';
 import type { City, GameState } from '../../engine/types.js';
 import { FACTION_GLYPH, factionColor } from '../theme.js';
 import { pickName } from '../../i18n/locale.js';
@@ -41,9 +41,9 @@ const YELLOW_RIVER_COLOR = 0xb79149; // the Yellow River runs ochre with loess s
 
 // Dusk look, borrowed from BattleScene's `dusk` environment preset so the two
 // scenes read as the same time of day.
-const SKY_TOP = 0x5b7fb0; // daylight sky for a flat, satellite-imagery feel
-const SKY_HORIZON = 0xbfc9d4;
-const FOG_COLOR = 0xbfc9d4;
+const SKY_TOP = 0x9a8a6a; // warm sepia backdrop for the painted-scroll look
+const SKY_HORIZON = 0xc7b790;
+const FOG_COLOR = 0xc7b790;
 const FOG_DENSITY = 0.0006; // very low: crisp, satellite-like, edges barely haze
 
 // ---- city-marker tuning (world units) ----
@@ -191,8 +191,8 @@ export class MapScene {
 
     // Free-orbit camera framed on the whole landmass. near/far span the large
     // world extent plus the sky dome.
-    this.camera = new THREE.PerspectiveCamera(44, 1, 1, 5000);
-    this.camera.position.set(0, 470, 380);
+    this.camera = new THREE.PerspectiveCamera(40, 1, 1, 5000);
+    this.camera.position.set(0, 700, 95); // high and near top-down, like a painted scroll map
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
@@ -213,10 +213,12 @@ export class MapScene {
     this.controls.target.set(0, 0, 0);
     // Clamp so the map stays legible and you can't dip under the ground:
     // minPolar keeps a near-top-down cap; maxPolar stops just above the horizon.
-    this.controls.minPolarAngle = 0.12;
-    this.controls.maxPolarAngle = 1.45;
-    this.controls.minDistance = 160;
-    this.controls.maxDistance = 1000;
+    // Keep the camera near top-down (a painted-map look); a small tilt is allowed
+    // but you can't swing down to the horizon.
+    this.controls.minPolarAngle = 0;
+    this.controls.maxPolarAngle = 0.42;
+    this.controls.minDistance = 220;
+    this.controls.maxDistance = 1150;
 
     // Dusk lighting, mirroring the battle's `dusk` preset (warm low sun, cool
     // sky fill, faint ambient).
@@ -241,6 +243,7 @@ export class MapScene {
     this.buildLandmass();
     this.buildSea();
     this.buildRivers();
+    this.buildForests();
     this.buildProvinceLabels();
 
     // Post-processing: a gentle bloom so the gold coastline, water sparkle, and
@@ -359,7 +362,7 @@ export class MapScene {
     wgeo.rotateX(-Math.PI / 2);
     this.waterMat = new THREE.ShaderMaterial({
       transparent: true,
-      uniforms: { uT: { value: 0 }, uCol: { value: new THREE.Color(0x1c4d6b) } },
+      uniforms: { uT: { value: 0 }, uCol: { value: new THREE.Color(0x51748f) } },
       vertexShader:
         'uniform float uT; varying float vR; varying vec3 vW;' +
         'void main(){ vec3 p = position;' +
@@ -408,6 +411,61 @@ export class MapScene {
       river.renderOrder = 1;
       this.scene.add(river);
     }
+  }
+
+  // Painted forest clusters: dark-green canopy cones scattered inside the forest
+  // polygons and seated on the relief, reading as illustrated woodland patches
+  // from the top-down scroll view. One InstancedMesh for the whole set.
+  private buildForests(): void {
+    const mtxs: THREE.Matrix4[] = [];
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const scl = new THREE.Vector3();
+    const pos = new THREE.Vector3();
+    let seed = 20260710;
+    const rnd = (): number => {
+      seed = (seed * 16807) % 2147483647;
+      return seed / 2147483647;
+    };
+    for (const f of FORESTS) {
+      const poly = f.polygon.map((p) => toWorldXZ(p[0], p[1]));
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
+      for (const [x, z] of poly) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (z < minZ) minZ = z;
+        if (z > maxZ) maxZ = z;
+      }
+      const step = 9 - (f.density ?? 0.5) * 5; // denser polygons pack trees tighter
+      for (let x = minX; x < maxX; x += step) {
+        for (let z = minZ; z < maxZ; z += step) {
+          const jx = x + (rnd() - 0.5) * step * 1.3;
+          const jz = z + (rnd() - 0.5) * step * 1.3;
+          if (!pointInPolygon(jx, jz, poly)) continue;
+          const h = this.landHeightAt(jx, jz);
+          if (h <= SEA_FLOOR + 0.5) continue;
+          const s = 0.75 + rnd() * 0.6;
+          pos.set(jx, h, jz);
+          q.setFromAxisAngle(UP, rnd() * Math.PI * 2);
+          scl.set(s, s * (0.85 + rnd() * 0.5), s);
+          m.compose(pos, q, scl);
+          mtxs.push(m.clone());
+        }
+      }
+    }
+    if (mtxs.length === 0) return;
+    const canopy = new THREE.ConeGeometry(4.2, 9, 6);
+    canopy.translate(0, 4.5, 0); // base sits on the ground
+    const mat = new THREE.MeshStandardMaterial({ color: 0x3c4d26, roughness: 0.95, flatShading: true });
+    const mesh = new THREE.InstancedMesh(canopy, mat, mtxs.length);
+    for (let i = 0; i < mtxs.length; i++) mesh.setMatrixAt(i, mtxs[i]!);
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
   }
 
   // Translucent faction-territory overlay draped on the land — the "kingdom map"
@@ -1121,6 +1179,7 @@ function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: n
 // ---------------------------------------------------------------- colour +
 // noise (seeded value-noise fbm, copied from BattleScene's env noise)
 
+const UP = new THREE.Vector3(0, 1, 0); // y-axis, for instanced-tree yaw
 const SEABED_COLOR: [number, number, number] = [0.1, 0.18, 0.24];
 
 // Height -> land colour: coast sand -> lowland green -> upland brown -> pale rock.
@@ -1132,39 +1191,43 @@ const mixRGB = (a: RGB, b: RGB, t: number): RGB => [
   a[2] + (b[2] - a[2]) * t,
 ];
 
-// Satellite-style ground colour keyed on logical position + elevation, like real
-// aerial imagery of China: arid tans/loess in the northwest greening toward the
-// wet southeast, grey rock and snow on the high peaks, sandy beaches at the
-// waterline, with fine noise mottling for texture. gx in 0..MAP_WIDTH (west->
-// east), gy in 0..MAP_HEIGHT (north->south), h = terrain height.
+// Hand-painted, aged-scroll ground colour — warm parchment tans for the open
+// land, dark muted greens for the wetter/forested south-east, and painted brown
+// ridges on the mountains, all sepia-toned like an antique illustrated map.
+// gx in 0..MAP_WIDTH (west->east), gy in 0..MAP_HEIGHT (north->south), h = height.
 function biomeColor(gx: number, gy: number, h: number): RGB {
   const lon = clamp01(gx / MAP_WIDTH); // 0 west .. 1 east
   const lat = clamp01(gy / MAP_HEIGHT); // 0 north .. 1 south
-  // Two octaves of high-frequency noise: one biases wetness, both add texture.
+  // Two octaves of high-frequency noise: one biases greenery, both add paper grain.
   const m = fbm(gx * 0.12, gy * 0.12, MAP_SEED + 7) - 0.5; // -0.5..0.5
   const m2 = fbm(gx * 0.34, gy * 0.31, MAP_SEED + 19) - 0.5;
-  const mottle = m * 0.08 + m2 * 0.05;
-  // Wetness rises toward the south-east (monsoon), falls toward the arid NW.
+  const mottle = m * 0.06 + m2 * 0.045; // warm paper grain
+  // Greener toward the south-east, drier parchment toward the NW.
   const wet = clamp01(lon * 0.5 + lat * 0.62 + m * 0.28);
-  const desert: RGB = [0.82, 0.73, 0.54];
-  const steppe: RGB = [0.64, 0.59, 0.4];
-  const grass: RGB = [0.48, 0.55, 0.31];
-  const forest: RGB = [0.28, 0.43, 0.21];
+  const paleSand: RGB = [0.85, 0.76, 0.58]; // dry parchment
+  const tan: RGB = [0.76, 0.66, 0.46]; // open land
+  const olive: RGB = [0.58, 0.57, 0.36]; // scrub / fields
+  const forest: RGB = [0.33, 0.4, 0.21]; // painted forest green
   let base: RGB =
     wet < 0.34
-      ? mixRGB(desert, steppe, wet / 0.34)
+      ? mixRGB(paleSand, tan, wet / 0.34)
       : wet < 0.62
-        ? mixRGB(steppe, grass, (wet - 0.34) / 0.28)
-        : mixRGB(grass, forest, (wet - 0.62) / 0.38);
-  // Sandy beach fading into the ground over the first couple of height units.
-  if (h < 1.6) base = mixRGB([0.8, 0.74, 0.58], base, clamp01(h / 1.6));
-  // Grey rock on the uplands, white snow on the highest peaks.
-  if (h > 14) {
-    const rock: RGB = [0.52, 0.48, 0.42];
-    base = mixRGB(base, rock, clamp01((h - 14) / 12) * 0.82);
-    if (h > 24) base = mixRGB(base, [0.93, 0.95, 0.97], clamp01((h - 24) / 6));
+        ? mixRGB(tan, olive, (wet - 0.34) / 0.28)
+        : mixRGB(olive, forest, (wet - 0.62) / 0.38);
+  // Pale parchment shore fading into the land over the first height units.
+  if (h < 1.6) base = mixRGB([0.86, 0.79, 0.62], base, clamp01(h / 1.6));
+  // Painted brown mountain ridges on the uplands (no snow — this is a scroll map).
+  if (h > 12) {
+    const ridge: RGB = [0.55, 0.42, 0.28];
+    base = mixRGB(base, ridge, clamp01((h - 12) / 14) * 0.88);
+    if (h > 24) base = mixRGB(base, [0.4, 0.3, 0.2], clamp01((h - 24) / 8) * 0.7);
   }
-  return [clamp01(base[0] + mottle), clamp01(base[1] + mottle * 0.9), clamp01(base[2] + mottle * 0.8)];
+  // Warm the whole palette slightly toward sepia and apply the paper grain.
+  return [
+    clamp01(base[0] + mottle + 0.03),
+    clamp01(base[1] + mottle * 0.95),
+    clamp01(base[2] + mottle * 0.8 - 0.02),
+  ];
 }
 
 function envHash(ix: number, iy: number, seed: number): number {

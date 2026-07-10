@@ -93,10 +93,44 @@ export const WorldMap3D: React.FC<MapViewProps> = (props) => {
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden">
       <canvas ref={canvasRef} className="block h-full w-full" />
+      <ScrollFrame />
       <MapLegend />
     </div>
   );
 };
+
+// Aged-scroll frame: a warm sepia vignette + a subtle paper wash + a vertical
+// calligraphy cartouche, evoking a hand-painted antique map. Sits above the map
+// labels (z-1) but below the HUD panels (z-20). Purely decorative, no pointer
+// events so it never blocks map interaction.
+const ScrollFrame: React.FC = () => (
+  <>
+    <div
+      className="pointer-events-none absolute inset-0"
+      style={{
+        zIndex: 4,
+        boxShadow: 'inset 0 0 130px 34px rgba(48,32,12,.5), inset 0 0 34px 6px rgba(30,20,8,.34)',
+        background:
+          'radial-gradient(ellipse at 50% 44%, rgba(150,120,70,0) 52%, rgba(66,44,20,.3) 100%)',
+      }}
+    />
+    <div
+      className="pointer-events-none absolute right-5 top-16 select-none"
+      style={{
+        zIndex: 5,
+        writingMode: 'vertical-rl',
+        fontFamily: "'Noto Serif TC','Noto Serif SC',serif",
+        fontWeight: 700,
+        fontSize: 30,
+        letterSpacing: '.14em',
+        color: 'rgba(58,38,18,.8)',
+        textShadow: '0 1px 2px rgba(250,242,224,.5)',
+      }}
+    >
+      天下
+    </div>
+  </>
+);
 
 // Atlas-style legend, echoing the reference Three Kingdoms map's key box: a dark-glass panel
 // with a title and a small key for the territory colours, province boxes, and
