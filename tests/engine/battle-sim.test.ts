@@ -236,6 +236,25 @@ describe('stepBattle — ranged, duel, morale, end', () => {
     expect(events.some((ev) => ev.kind === 'fire')).toBe(true);
   });
 
+  it('fire spreads downwind: it burns an enemy beyond the base radius when the wind blows toward it', () => {
+    // All three hold so nobody advances before the fire phase — this isolates the
+    // downwind spread (units otherwise close distance in the movement phase first).
+    const b = battle([
+      unit({ id: 'a', factionId: 'A', pos: { x: 3, y: 4 } }),
+      unit({ id: 'down', factionId: 'B', pos: { x: 7, y: 4 }, troops: 8000 }), // 4 cells east (downwind)
+      unit({ id: 'up', factionId: 'B', pos: { x: 3, y: 0 }, troops: 8000 }),   // 4 cells north (crosswind/upwind)
+    ]);
+    b.wind = { dir: { x: 1, y: 0 }, strength: 0.9 }; // strong east wind -> reach 2 + round(2.7)=5
+    const { battle: next } = stepBattle({ battle: b, commands: [
+      { kind: 'gambit', gambitId: 'fireAttack', unitIds: ['a'] },
+      { kind: 'hold', unitId: 'a' }, { kind: 'hold', unitId: 'down' }, { kind: 'hold', unitId: 'up' },
+    ] });
+    const down = next.units.find((x) => x.id === 'down')!;
+    const up = next.units.find((x) => x.id === 'up')!;
+    expect(down.troops).toBeLessThan(8000); // caught by the downwind spread (dist 4 > base 2)
+    expect(up.troops).toBe(8000);           // upwind, beyond the base radius -> untouched
+  });
+
   it('a floodAttack gambit drowns enemies in the flooded cells and emits a flood event', () => {
     const b = battle([
       unit({ id: 'a', factionId: 'A', pos: { x: 3, y: 4 } }),

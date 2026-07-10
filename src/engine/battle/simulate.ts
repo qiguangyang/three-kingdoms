@@ -278,10 +278,17 @@ export function stepBattle(input: StepInput): StepResult {
       const src = byId(uid);
       if (!src || !isActive(src)) continue;
       const at = { ...src.pos };
-      events.push({ kind: 'fire', at, spread: 2 });
+      const wind = input.battle.wind;
+      const reach = wind ? 2 + Math.round(wind.strength * 3) : 2;
+      events.push({ kind: 'fire', at, spread: reach });
       for (const e of units) {
         if (e.factionId === src.factionId || !isActive(e)) continue;
-        if (chebyshev(e.pos, at) <= 2) {
+        const dx = e.pos.x - at.x;
+        const dy = e.pos.y - at.y;
+        const cheb = Math.max(Math.abs(dx), Math.abs(dy));
+        // Base blaze, or caught downwind within the extended reach.
+        const downwind = wind ? dx * wind.dir.x + dy * wind.dir.y > 0 : false;
+        if (cheb <= 2 || (downwind && cheb <= reach)) {
           const loss = Math.min(e.troops, Math.floor(e.troops * 0.2));
           e.troops -= loss;
           e.morale = Math.max(0, e.morale - 20);
