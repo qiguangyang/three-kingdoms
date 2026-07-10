@@ -353,6 +353,26 @@ export function stepBattle(input: StepInput): StepResult {
     }
   }
 
+  // ---------------- AMBUSH PHASE ----------------
+  // A concealed forest unit springs a surprise strike: modest casualties but a
+  // heavy morale shock to nearby enemies (gate-checking is the caller's job).
+  for (const c of input.commands) {
+    if (c.kind !== 'gambit' || c.gambitId !== 'ambush') continue;
+    for (const uid of c.unitIds) {
+      const src = byId(uid);
+      if (!src || !isActive(src)) continue;
+      const at = { ...src.pos };
+      events.push({ kind: 'ambushSprung', at, unitId: src.id });
+      for (const e of units) {
+        if (e.factionId === src.factionId || !isActive(e)) continue;
+        if (chebyshev(e.pos, at) <= 2) {
+          e.troops -= Math.min(e.troops, Math.floor(e.troops * 0.15));
+          e.morale = Math.max(0, e.morale - 30);
+        }
+      }
+    }
+  }
+
   // ---------------- RALLY PHASE ----------------
   // A led unit steadies a wavering same-faction ally within range, restoring
   // morale scaled by the rallying general's leadership. Runs before morale/rout

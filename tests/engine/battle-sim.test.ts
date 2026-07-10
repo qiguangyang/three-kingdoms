@@ -211,6 +211,18 @@ describe('stepBattle — movement + melee', () => {
     const cmds = [{ kind: 'rally', unitId: 'gen', targetUnitId: 'weak' }, { kind: 'charge', unitId: 'e', targetUnitId: 'weak' }] as const;
     expect(stepBattle({ battle: mk(), commands: [...cmds] })).toEqual(stepBattle({ battle: mk(), commands: [...cmds] }));
   });
+
+  it('an ambush gambit deals a heavy morale shock to nearby enemies and emits ambushSprung', () => {
+    const b = battle([
+      unit({ id: 'a', factionId: 'A', pos: { x: 4, y: 4 } }),
+      unit({ id: 'e', factionId: 'B', pos: { x: 5, y: 4 }, troops: 8000, morale: 100 }),
+    ]);
+    const { battle: next, events } = stepBattle({ battle: b, commands: [{ kind: 'gambit', gambitId: 'ambush', unitIds: ['a'] }] });
+    const e = next.units.find((x) => x.id === 'e')!;
+    expect(e.troops).toBeLessThan(8000);
+    expect(e.morale).toBeLessThan(100 - 20); // heavy surprise morale hit (>= the 30 shock, minus clamps)
+    expect(events.some((ev) => ev.kind === 'ambushSprung' && ev.unitId === 'a')).toBe(true);
+  });
 });
 
 describe('stepBattle — ranged, duel, morale, end', () => {

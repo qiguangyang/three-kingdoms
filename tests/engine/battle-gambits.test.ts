@@ -84,4 +84,15 @@ describe('detectGambits', () => {
     ], wet);
     expect(detectGambits(bWet).map((g) => g.id)).toContain('floodAttack');
   });
+
+  it('offers ambush when a unit stands in forest with an enemy nearby', () => {
+    const cells = new Array(24).fill('plain');
+    cells[1 * 6 + 2] = 'forest'; // forest at (x=2,y=1)
+    const f = field(cells);
+    const b = mk([
+      u({ id: 'a', factionId: 'A', pos: { x: 2, y: 1 } }), // stands ON the forest cell
+      u({ id: 'e', factionId: 'B', pos: { x: 3, y: 1 } }), // enemy within Chebyshev 2
+    ], f);
+    expect(detectGambits(b).some((g) => g.id === 'ambush')).toBe(true);
+  });
 });

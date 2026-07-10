@@ -65,6 +65,7 @@ export type BattleEvent =
   | { kind: 'duel'; a: GeneralId; b: GeneralId; winner: GeneralId }
   | { kind: 'fire'; at: Vec2; spread: number }
   | { kind: 'flood'; from: Vec2; cells: Vec2[] }
+  | { kind: 'ambushSprung'; at: Vec2; unitId: string }
   | { kind: 'moraleBreak'; unitId: string }
   | { kind: 'rout'; unitId: string }
   | { kind: 'reserveCommitted'; factionId: FactionId; unitIds: string[] }

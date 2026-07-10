@@ -83,6 +83,7 @@ function compileGambit(battle: Battle, g: Gambit, playerFactionId: FactionId): T
     case 'fordCrossing':
       return g.unitIds.map((id) => ({ kind: 'march', unitId: id, target: battle.field.river?.fords[0] ?? { x: 0, y: 0 } } as TacticalCommand));
     case 'ambush':
+      return [{ kind: 'gambit', gambitId: 'ambush', unitIds: g.unitIds.filter((id) => battle.units.find((u) => u.id === id)?.factionId === playerFactionId) }];
     default:
       return [];
   }

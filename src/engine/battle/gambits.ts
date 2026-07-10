@@ -60,5 +60,13 @@ export function detectGambits(battle: Battle): Gambit[] {
     if (nextToFord) { out.push({ id: 'fordCrossing', unitIds: [u.id], labelKey: 'battle.gambit.fordCrossing' }); break; }
   }
 
+  // ambush: a unit standing in forest with an enemy at striking distance.
+  for (const u of units) {
+    if (!active(u)) continue;
+    if (cellAt(battle, u.pos) !== 'forest') continue;
+    const foe = units.find((e) => e.factionId !== u.factionId && active(e) && chebyshev(u.pos, e.pos) <= 2 && chebyshev(u.pos, e.pos) >= 1);
+    if (foe) { out.push({ id: 'ambush', unitIds: [u.id], labelKey: 'battle.gambit.ambush' }); break; }
+  }
+
   return out;
 }
