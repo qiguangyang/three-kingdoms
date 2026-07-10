@@ -16,7 +16,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { CHINA_LAND, RIVERS, PROVINCE_LABELS, FORESTS } from '../../data/map/geography.js';
+import { CHINA_LAND, RIVERS, PROVINCE_LABELS, FORESTS, MOUNTAINS } from '../../data/map/geography.js';
 import type { City, GameState } from '../../engine/types.js';
 import { FACTION_GLYPH, factionColor } from '../theme.js';
 import { pickName } from '../../i18n/locale.js';
@@ -243,6 +243,7 @@ export class MapScene {
     this.buildLandmass();
     this.buildSea();
     this.buildRivers();
+    this.buildMountains();
     this.buildForests();
     this.buildProvinceLabels();
 
@@ -413,9 +414,11 @@ export class MapScene {
     }
   }
 
-  // Painted forest clusters: dark-green canopy cones scattered inside the forest
-  // polygons and seated on the relief, reading as illustrated woodland patches
-  // from the top-down scroll view. One InstancedMesh for the whole set.
+  // Painted forest clusters: dark-green canopy cones scattered across the land —
+  // dense inside the authored forest polygons, and elsewhere by a "forestness"
+  // that rises toward the wet south-east and on the wooded hills, clumped by
+  // noise so it reads as illustrated woodland rather than an even carpet. One
+  // InstancedMesh; seated on the relief.
   private buildForests(): void {
     const mtxs: THREE.Matrix4[] = [];
     const m = new THREE.Matrix4();
@@ -427,40 +430,101 @@ export class MapScene {
       seed = (seed * 16807) % 2147483647;
       return seed / 2147483647;
     };
-    for (const f of FORESTS) {
-      const poly = f.polygon.map((p) => toWorldXZ(p[0], p[1]));
-      let minX = Infinity;
-      let maxX = -Infinity;
-      let minZ = Infinity;
-      let maxZ = -Infinity;
-      for (const [x, z] of poly) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (z < minZ) minZ = z;
-        if (z > maxZ) maxZ = z;
+    const forestPolys = FORESTS.map((f) => f.polygon.map((p) => toWorldXZ(p[0], p[1])));
+    const halfW = WORLD_W / 2;
+    const halfD = WORLD_D / 2;
+    const STEP = 7.5;
+    for (let x = -halfW; x < halfW; x += STEP) {
+      for (let z = -halfD; z < halfD; z += STEP) {
+        const jx = x + (rnd() - 0.5) * STEP * 1.4;
+        const jz = z + (rnd() - 0.5) * STEP * 1.4;
+        const h = this.landHeightAt(jx, jz);
+        if (h <= SEA_FLOOR + 0.5) continue; // sea
+        let chance = 0;
+        let inPoly = false;
+        for (const poly of forestPolys) {
+          if (pointInPolygon(jx, jz, poly)) {
+            inPoly = true;
+            break;
+          }
+        }
+        if (inPoly) {
+          chance = 0.85;
+        } else {
+          const g = worldToGrid(jx, jz);
+          const lon = clamp01(g.x / MAP_WIDTH);
+          const lat = clamp01(g.y / MAP_HEIGHT);
+          const wet = clamp01(lon * 0.48 + lat * 0.6);
+          const clump = fbm(g.x * 0.07, g.y * 0.07, MAP_SEED + 31); // broad woodland clumps
+          const clump2 = fbm(g.x * 0.19, g.y * 0.18, MAP_SEED + 53);
+          const hf = h < 4 ? 0.35 : h < 22 ? 1.0 : clamp01((32 - h) / 10); // hills wooded, peaks/plains less
+          let f = (wet * 0.85 + 0.12) * hf;
+          f *= smoothstep(0.42, 0.72, clump);
+          f *= 0.5 + clump2 * 0.7;
+          chance = clamp01(f) * 0.9;
+        }
+        if (rnd() >= chance) continue;
+        const s = 0.7 + rnd() * 0.6;
+        pos.set(jx, h, jz);
+        q.setFromAxisAngle(UP, rnd() * Math.PI * 2);
+        scl.set(s, s * (0.85 + rnd() * 0.5), s);
+        m.compose(pos, q, scl);
+        mtxs.push(m.clone());
       }
-      const step = 9 - (f.density ?? 0.5) * 5; // denser polygons pack trees tighter
-      for (let x = minX; x < maxX; x += step) {
-        for (let z = minZ; z < maxZ; z += step) {
-          const jx = x + (rnd() - 0.5) * step * 1.3;
-          const jz = z + (rnd() - 0.5) * step * 1.3;
-          if (!pointInPolygon(jx, jz, poly)) continue;
-          const h = this.landHeightAt(jx, jz);
+    }
+    if (mtxs.length === 0) return;
+    const canopy = new THREE.ConeGeometry(4.0, 8.5, 6);
+    canopy.translate(0, 4.3, 0); // base sits on the ground
+    const mat = new THREE.MeshStandardMaterial({ color: 0x3c4d26, roughness: 0.95, flatShading: true });
+    const mesh = new THREE.InstancedMesh(canopy, mat, mtxs.length);
+    for (let i = 0; i < mtxs.length; i++) mesh.setMatrixAt(i, mtxs[i]!);
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+  }
+
+  // Painted mountain ridges: brown four-sided pyramids stamped along the authored
+  // mountain-range ridge lines and seated on the relief, reading as illustrated
+  // ranges from the top-down scroll view. One InstancedMesh.
+  private buildMountains(): void {
+    const mtxs: THREE.Matrix4[] = [];
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const scl = new THREE.Vector3();
+    const pos = new THREE.Vector3();
+    let seed = 77713;
+    const rnd = (): number => {
+      seed = (seed * 16807) % 2147483647;
+      return seed / 2147483647;
+    };
+    for (const range of MOUNTAINS) {
+      const ridge = range.ridge.map((p) => toWorldXZ(p[0], p[1]));
+      for (let i = 0; i < ridge.length - 1; i++) {
+        const a = ridge[i]!;
+        const b = ridge[i + 1]!;
+        const segLen = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        const n = Math.max(1, Math.round(segLen / 9));
+        for (let k = 0; k < n; k++) {
+          const t = (k + rnd() * 0.6) / n;
+          const px = a[0] + (b[0] - a[0]) * t + (rnd() - 0.5) * 6;
+          const pz = a[1] + (b[1] - a[1]) * t + (rnd() - 0.5) * 6;
+          const h = this.landHeightAt(px, pz);
           if (h <= SEA_FLOOR + 0.5) continue;
-          const s = 0.75 + rnd() * 0.6;
-          pos.set(jx, h, jz);
+          const s = 0.8 + rnd() * 0.9;
+          pos.set(px, h, pz);
           q.setFromAxisAngle(UP, rnd() * Math.PI * 2);
-          scl.set(s, s * (0.85 + rnd() * 0.5), s);
+          scl.set(s, s * (1.0 + rnd() * 0.7), s);
           m.compose(pos, q, scl);
           mtxs.push(m.clone());
         }
       }
     }
     if (mtxs.length === 0) return;
-    const canopy = new THREE.ConeGeometry(4.2, 9, 6);
-    canopy.translate(0, 4.5, 0); // base sits on the ground
-    const mat = new THREE.MeshStandardMaterial({ color: 0x3c4d26, roughness: 0.95, flatShading: true });
-    const mesh = new THREE.InstancedMesh(canopy, mat, mtxs.length);
+    const peak = new THREE.ConeGeometry(6.5, 15, 4); // four-sided pyramid = a painted peak
+    peak.translate(0, 7.5, 0);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x876440, roughness: 0.96, flatShading: true });
+    const mesh = new THREE.InstancedMesh(peak, mat, mtxs.length);
     for (let i = 0; i < mtxs.length; i++) mesh.setMatrixAt(i, mtxs[i]!);
     mesh.instanceMatrix.needsUpdate = true;
     mesh.castShadow = true;
