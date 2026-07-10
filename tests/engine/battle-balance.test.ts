@@ -1,0 +1,51 @@
+import { describe, expect, it } from 'vitest';
+import { simulateHeadless, runBalanceSweep, type Matchup } from '../../src/engine/ai/tactics/balance.js';
+
+const seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+describe('battle balance harness', () => {
+  it('every battle terminates within the 30-day limit', () => {
+    for (const seed of seeds) {
+      const r = simulateHeadless({ seed,
+        attacker: { troops: 6000, wu: 80, zhi: 60, command: 75, personality: 'balanced' },
+        defender: { troops: 6000, wu: 80, zhi: 60, command: 75, personality: 'balanced' } });
+      expect(r.days).toBeLessThanOrEqual(30);
+    }
+  });
+
+  it('a 2x quality+numbers advantage wins the clear majority of seeds', () => {
+    const matchups: Matchup[] = seeds.map((seed) => ({ seed,
+      attacker: { troops: 12000, wu: 95, zhi: 80, command: 90, personality: 'active' },
+      defender: { troops: 6000, wu: 60, zhi: 55, command: 60, personality: 'balanced' } }));
+    const sweep = runBalanceSweep(matchups);
+    expect(sweep.attackerWinRate).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it('an even matchup is not a foregone conclusion (upsets happen both ways)', () => {
+    const matchups: Matchup[] = seeds.map((seed) => ({ seed,
+      attacker: { troops: 6000, wu: 78, zhi: 60, command: 72, personality: 'balanced' },
+      defender: { troops: 6000, wu: 78, zhi: 60, command: 72, personality: 'balanced' } }));
+    const sweep = runBalanceSweep(matchups);
+    expect(sweep.attackerWinRate).toBeGreaterThan(0.1);
+    expect(sweep.attackerWinRate).toBeLessThan(0.9);
+  });
+
+  it('the maneuver levers are reachable: hold, commitReserves, and charge each fire somewhere in a sweep', () => {
+    // A cautious defender with reserves on a hill vs an aggressive cavalry attacker
+    // exercises hold (defender), commitReserves (loser), and charge (attacker).
+    const matchups: Matchup[] = seeds.map((seed) => ({ seed,
+      attacker: { troops: 14000, troopType: 'cavalry', wu: 96, zhi: 30, command: 70, personality: 'active' },
+      defender: { troops: 5000, wu: 55, zhi: 90, command: 92, personality: 'turtle' } }));
+    const sweep = runBalanceSweep(matchups);
+    expect(sweep.leverTotals.hold ?? 0).toBeGreaterThan(0);
+    expect(sweep.leverTotals.charge ?? 0).toBeGreaterThan(0);
+    expect(sweep.leverTotals.commitReserves ?? 0).toBeGreaterThan(0);
+  });
+
+  it('is deterministic for a given matchup', () => {
+    const m: Matchup = { seed: 42,
+      attacker: { troops: 8000, wu: 85, zhi: 70, command: 80, personality: 'active' },
+      defender: { troops: 7000, wu: 70, zhi: 75, command: 85, personality: 'turtle' } };
+    expect(simulateHeadless(m)).toEqual(simulateHeadless(m));
+  });
+});

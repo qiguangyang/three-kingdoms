@@ -65,4 +65,18 @@ describe('createBattle', () => {
     };
     expect(createBattle(a, input)).toEqual(createBattle(b, input));
   });
+
+  it('snapshots each led block\'s zhi (intellect) from its general', () => {
+    const s = buildInitialState({ scenario: SCENARIO_DONGZHUO, playerFactionId: 'caocao', refData: REF_DATA, seed: 7 });
+    const target = Object.values(s.cities).find((c) => c.factionId && c.factionId !== 'caocao')!;
+    const battle = createBattle(s, {
+      cityId: target.id, attackerFactionId: 'caocao', defenderFactionId: target.factionId!,
+      attackingGeneralIds: ['caocao'], attackingTroops: 6000,
+    });
+    const led = battle.units.find((u) => u.generalId === 'caocao')!;
+    expect(led.zhi).toBe(s.generals['caocao']!.stats.zhi);
+    // Unled garrison blocks carry no zhi (same as wu/command).
+    const garrison = battle.units.find((u) => u.generalId === '' && u.factionId === target.factionId);
+    if (garrison) expect(garrison.zhi).toBeUndefined();
+  });
 });

@@ -165,6 +165,7 @@ export interface BattleUnit {
   // blocks / unled mobs.
   wu?: number; // martial (wu)
   command?: number; // command (tong)
+  zhi?: number; // intellect (zhi) — used by the tactical planner's doctrine
 }
 
 export interface Battle {

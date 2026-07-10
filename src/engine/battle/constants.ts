@@ -21,6 +21,8 @@ export const BATTLE_TUNING = {
   volleyBaseLoss: 0.06,
   // Extra melee multiplier when a unit spends the day charging.
   chargeBonus: 1.4,
+  // Extra melee multiplier for a unit that spends the day holding (braced defense).
+  holdBonus: 1.3,
   // Per-cell elevation combat multiplier: attacking downhill helps.
   elevationPerLevel: 0.25,
   // Morale lost per 10% of a unit's troops killed in a day.

@@ -54,6 +54,28 @@ describe('stepBattle — movement + melee', () => {
     expect(events.some((ev) => ev.kind === 'clash')).toBe(true);
   });
 
+  it('gives each side independent melee luck: mirror-image blocks do NOT annihilate identically', () => {
+    // Two perfectly symmetric adjacent blocks (same troops/stats/pos-adjacency).
+    // With a single shared jitter both sides would lose the exact same number
+    // every day and rout together; independent per-side draws must diverge them.
+    // Seed 1's two rint(0,30) draws are 19 then 0 (jitters 1.04 vs 0.85), so the
+    // 'a' loss (0.85) is provably smaller than the 'e' loss (1.04): a survives
+    // with strictly more troops. On the old shared-jitter code both would be equal.
+    const b = {
+      ...battle([
+        unit({ id: 'a', factionId: 'A', pos: { x: 4, y: 4 }, troops: 6000 }),
+        unit({ id: 'e', factionId: 'B', pos: { x: 5, y: 4 }, troops: 6000 }),
+      ]),
+      seed: 1,
+      rngCursor: 1,
+    };
+    const { battle: next } = stepBattle({ battle: b, commands: [] });
+    const a = next.units.find((u) => u.id === 'a')!;
+    const e = next.units.find((u) => u.id === 'e')!;
+    expect(a.troops).not.toBe(e.troops); // the regression: NOT identical
+    expect(a.troops).toBeGreaterThan(e.troops); // seed 1: 'a' rolled the luckier (smaller) loss
+  });
+
   it('a large force beats a tiny one: defender loses more', () => {
     const b = battle([
       unit({ id: 'a', factionId: 'A', pos: { x: 4, y: 4 }, troops: 12000 }),
@@ -77,6 +99,46 @@ describe('stepBattle — movement + melee', () => {
   });
 
   it('is deterministic for identical inputs', () => {
+    const mk = () => battle([
+      unit({ id: 'a', factionId: 'A', pos: { x: 4, y: 4 } }),
+      unit({ id: 'e', factionId: 'B', pos: { x: 5, y: 4 } }),
+    ]);
+    expect(stepBattle({ battle: mk(), commands: [] })).toEqual(stepBattle({ battle: mk(), commands: [] }));
+  });
+
+  it('a holding unit brace-defends: it inflicts more and suffers less than when idle', () => {
+    const mk = () => battle([
+      unit({ id: 'a', factionId: 'A', pos: { x: 4, y: 4 }, troops: 6000 }),
+      unit({ id: 'e', factionId: 'B', pos: { x: 5, y: 4 }, troops: 6000 }),
+    ]);
+    const idle = stepBattle({ battle: mk(), commands: [] });
+    const held = stepBattle({ battle: mk(), commands: [{ kind: 'hold', unitId: 'a' }] });
+    const eIdle = idle.battle.units.find((x) => x.id === 'e')!;
+    const eHeld = held.battle.units.find((x) => x.id === 'e')!;
+    const aIdle = idle.battle.units.find((x) => x.id === 'a')!;
+    const aHeld = held.battle.units.find((x) => x.id === 'a')!;
+    expect(6000 - eHeld.troops).toBeGreaterThan(6000 - eIdle.troops); // held unit inflicts more
+    expect(6000 - aHeld.troops).toBeLessThan(6000 - aIdle.troops); // and suffers less
+  });
+
+  it('honors a meleeAttack order: a unit hits its ordered target, not just the nearest', () => {
+    // 'a' is adjacent to BOTH 'weak' (x=3) and 'strong' (x=5). Default melee picks
+    // the first adjacent found; an explicit order must direct it at 'strong'.
+    const mk = () => battle([
+      unit({ id: 'a', factionId: 'A', pos: { x: 4, y: 4 }, troops: 6000 }),
+      unit({ id: 'weak', factionId: 'B', pos: { x: 3, y: 4 }, troops: 6000 }),
+      unit({ id: 'strong', factionId: 'B', pos: { x: 5, y: 4 }, troops: 6000 }),
+    ]);
+    const { battle: next, events } = stepBattle({ battle: mk(), commands: [{ kind: 'meleeAttack', unitId: 'a', targetUnitId: 'strong' }] });
+    const strong = next.units.find((x) => x.id === 'strong')!;
+    expect(strong.troops).toBeLessThan(6000); // the ordered target took the hit
+    // Both adjacent enemies fight 'a' either way, so troop counts alone can't tell
+    // focus-fire apart from the default; the clash 'a' *initiates* is the real tell.
+    // Without target-honoring 'a' clashes the nearest ('weak'); the order redirects it.
+    expect(events.some((e) => e.kind === 'clash' && e.unitId === 'a' && e.targetUnitId === 'strong')).toBe(true);
+  });
+
+  it('melee is unchanged when no meleeAttack order is given (determinism preserved)', () => {
     const mk = () => battle([
       unit({ id: 'a', factionId: 'A', pos: { x: 4, y: 4 } }),
       unit({ id: 'e', factionId: 'B', pos: { x: 5, y: 4 } }),

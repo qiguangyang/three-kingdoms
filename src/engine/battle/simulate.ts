@@ -66,9 +66,11 @@ function unitLeadership(u: BattleUnit): number {
 function meleePower(battle: Battle, u: BattleUnit, orders: Map<string, TacticalCommand>): number {
   const t = cellTerrain(cellAt(battle, u.pos));
   const mod = COMBAT_MODIFIER[u.troopType]?.[t] ?? 1.0;
-  const charging = orders.get(u.id)?.kind === 'charge' ? BATTLE_TUNING.chargeBonus : 1.0;
+  const order = orders.get(u.id)?.kind;
+  const charging = order === 'charge' ? BATTLE_TUNING.chargeBonus : 1.0;
+  const holding = order === 'hold' ? BATTLE_TUNING.holdBonus : 1.0;
   const elev = 1 + heightAt(battle, u.pos) * BATTLE_TUNING.elevationPerLevel;
-  return u.troops * mod * unitLeadership(u) * charging * elev;
+  return u.troops * mod * unitLeadership(u) * charging * holding * elev;
 }
 
 function nearestEnemy(u: BattleUnit, units: BattleUnit[]): BattleUnit | undefined {
@@ -193,7 +195,15 @@ export function stepBattle(input: StepInput): StepResult {
   const resolvedPairs = new Set<string>();
   for (const u of units) {
     if (!isActive(u)) continue;
-    const enemy = units.find((e) => e.factionId !== u.factionId && isActive(e) && chebyshev(u.pos, e.pos) <= 1);
+    // Prefer an explicitly ordered target when it is adjacent (focus fire);
+    // otherwise fall back to the first adjacent enemy (unchanged default).
+    const order = orders.get(u.id);
+    let enemy: BattleUnit | undefined;
+    if (order && order.kind === 'meleeAttack') {
+      const t = byId(order.targetUnitId);
+      if (t && t.factionId !== u.factionId && isActive(t) && chebyshev(u.pos, t.pos) <= 1) enemy = t;
+    }
+    if (!enemy) enemy = units.find((e) => e.factionId !== u.factionId && isActive(e) && chebyshev(u.pos, e.pos) <= 1);
     if (!enemy) continue;
     const key = [u.id, enemy.id].sort().join('|');
     if (resolvedPairs.has(key)) continue;
@@ -201,9 +211,15 @@ export function stepBattle(input: StepInput): StepResult {
 
     const pa = meleePower(input.battle, u, orders);
     const pb = meleePower(input.battle, enemy, orders);
-    const jitter = 0.85 + rint(0, 30) / 100; // 0.85..1.15
-    const bLoss = Math.min(enemy.troops, Math.floor(BATTLE_TUNING.meleeBaseLoss * (pa / Math.max(pb, 1)) * enemy.troops * jitter));
-    const aLoss = Math.min(u.troops, Math.floor(BATTLE_TUNING.meleeBaseLoss * (pb / Math.max(pa, 1)) * u.troops * jitter));
+    // Independent per-side luck: evenly matched forces should NOT annihilate each
+    // other identically. A single shared jitter makes a mirror-image clash perfectly
+    // symmetric (both sides lose the same each day and rout together), which erases
+    // tactical variance and lets a defender's uncommitted reserve always break the
+    // tie. Two draws give each side its own daily luck.
+    const jitterB = 0.85 + rint(0, 30) / 100; // 0.85..1.15 — enemy's (u's target) casualties
+    const jitterA = 0.85 + rint(0, 30) / 100; // 0.85..1.15 — u's own casualties
+    const bLoss = Math.min(enemy.troops, Math.floor(BATTLE_TUNING.meleeBaseLoss * (pa / Math.max(pb, 1)) * enemy.troops * jitterB));
+    const aLoss = Math.min(u.troops, Math.floor(BATTLE_TUNING.meleeBaseLoss * (pb / Math.max(pa, 1)) * u.troops * jitterA));
     u.troops -= aLoss;
     enemy.troops -= bLoss;
     events.push({ kind: 'clash', unitId: u.id, targetUnitId: enemy.id, casualties: bLoss, defCasualties: aLoss });
