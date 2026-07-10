@@ -15,16 +15,37 @@ export interface Vec3 {
   z: number;
 }
 
+// Render proportions (world units per logical cell), independent of the
+// gameplay grid. The logical grid is 500x200 (2.5:1, historically compressed
+// north-south), which crams the dense central-plain cities together. Real
+// Han-era China is far more square, so we stretch the north-south (Z) axis in
+// RENDER SPACE only — gameplay still uses the logical coords. This spreads the
+// cities apart and gives the map real-China proportions. RENDER_SX also scales
+// the whole map up a little so it fills the viewport.
+export const RENDER_SX = 1.15; // world units per logical x (east-west)
+export const RENDER_SZ = 2.7; // world units per logical y (north-south) — the stretch
+export const WORLD_W = MAP_WIDTH * RENDER_SX; // ~575 world units east-west
+export const WORLD_D = MAP_HEIGHT * RENDER_SZ; // ~540 world units north-south
+
 // Project a logical grid position to 3D world coordinates centered at the
 // origin. The grid's X axis maps to world X and the grid's Y axis maps to
-// world Z (the ground plane); world Y is left at 0 here — terrain height is
-// added later by the scene from its heightmap. Centering keeps the camera and
-// orbit controls symmetric around the landmass.
+// world Z (the ground plane), each scaled by the render proportion; world Y is
+// left at 0 here — terrain height is added later by the scene from its
+// heightmap. Centering keeps the camera and orbit controls symmetric.
 export function gridToWorld(pos: { x: number; y: number }): Vec3 {
   return {
-    x: pos.x - MAP_WIDTH / 2,
+    x: (pos.x - MAP_WIDTH / 2) * RENDER_SX,
     y: 0,
-    z: pos.y - MAP_HEIGHT / 2,
+    z: (pos.y - MAP_HEIGHT / 2) * RENDER_SZ,
+  };
+}
+
+// Inverse of gridToWorld's XZ mapping: recover logical grid coords from a world
+// XZ position (used by the terrain builder to key noise/masks on logical space).
+export function worldToGrid(wx: number, wz: number): { x: number; y: number } {
+  return {
+    x: wx / RENDER_SX + MAP_WIDTH / 2,
+    y: wz / RENDER_SZ + MAP_HEIGHT / 2,
   };
 }
 

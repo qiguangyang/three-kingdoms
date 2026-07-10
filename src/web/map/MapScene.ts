@@ -16,30 +16,31 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { MAP_HEIGHT, MAP_WIDTH } from '../../engine/constants.js';
+import { MAP_HEIGHT } from '../../engine/constants.js';
 import { COASTLINE_PATH } from '../../data/map/geography.js';
 import type { City, GameState } from '../../engine/types.js';
 import { FACTION_GLYPH, factionColor } from '../theme.js';
-import { gridToWorld, markerScale } from './mapGeometry.js';
+import { gridToWorld, worldToGrid, markerScale, WORLD_W, WORLD_D } from './mapGeometry.js';
 
-// ---- render-layer tuning (world units; the map spans MAP_WIDTH x MAP_HEIGHT,
-// i.e. 500 x 200 world units, centered on the origin via gridToWorld) ----
+// ---- render-layer tuning (world units; the map spans WORLD_W x WORLD_D,
+// ~575 x 540 world units, centered on the origin via gridToWorld — the render
+// proportions stretch the logical 500x200 grid to real-China proportions) ----
 const MAP_SEED = 1337; // fixed noise seed — relief is stable across frames
-const SHORE_WIDTH = 16; // world units the coast ramps up from sea level
+const SHORE_WIDTH = 22; // world units the coast ramps up from sea level
 const LOWLAND_H = 3; // baseline elevation of inland lowland
 const UPLAND_H = 26; // extra elevation the fbm relief adds toward the interior
 const SEA_FLOOR = -3; // elevation of sea-floor vertices (below the water plane)
 const WATER_Y = 1.4; // sea level; land emerges above this, coast fringe sits below
 const RELIEF_FREQ = 0.035; // fbm frequency over logical grid coords
-const LAND_SEGMENTS_X = 250; // landmass plane subdivisions (2 world units/cell)
-const LAND_SEGMENTS_Z = 100;
+const LAND_SEGMENTS_X = 280; // landmass plane subdivisions (~2 world units/cell)
+const LAND_SEGMENTS_Z = 240;
 
 // Dusk look, borrowed from BattleScene's `dusk` environment preset so the two
 // scenes read as the same time of day.
 const SKY_TOP = 0x2a3b60;
 const SKY_HORIZON = 0x93a0b4;
 const FOG_COLOR = 0x93a0b4;
-const FOG_DENSITY = 0.0012; // low: the far landmass stays visible, edges haze out
+const FOG_DENSITY = 0.0009; // low: the far landmass stays visible, edges haze out
 
 // ---- city-marker tuning (world units) ----
 // markerScale() returns ~1..2.2 (economic importance); multiply into world units
@@ -176,19 +177,21 @@ export class MapScene {
 
     // Free-orbit camera framed on the whole landmass. near/far span the large
     // world extent plus the sky dome.
-    this.camera = new THREE.PerspectiveCamera(46, 1, 1, 4000);
-    this.camera.position.set(0, 300, 230);
+    this.camera = new THREE.PerspectiveCamera(44, 1, 1, 5000);
+    this.camera.position.set(0, 470, 380);
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
+    this.controls.enableZoom = true; // wheel zooms in/out toward the map
+    this.controls.zoomSpeed = 1.1;
     this.controls.target.set(0, 0, 0);
     // Clamp so the map stays legible and you can't dip under the ground:
     // minPolar keeps a near-top-down cap; maxPolar stops just above the horizon.
-    this.controls.minPolarAngle = 0.15;
+    this.controls.minPolarAngle = 0.12;
     this.controls.maxPolarAngle = 1.45;
-    this.controls.minDistance = 150;
-    this.controls.maxDistance = 620;
+    this.controls.minDistance = 160;
+    this.controls.maxDistance = 1000;
 
     // Dusk lighting, mirroring the battle's `dusk` preset (warm low sun, cool
     // sky fill, faint ambient).
@@ -199,8 +202,8 @@ export class MapScene {
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.camera.near = 1;
-    this.sun.shadow.camera.far = 900;
-    const s = 280; // ortho shadow frustum covering the full landmass
+    this.sun.shadow.camera.far = 1100;
+    const s = 340; // ortho shadow frustum covering the full landmass
     this.sun.shadow.camera.left = -s;
     this.sun.shadow.camera.right = s;
     this.sun.shadow.camera.top = s;
@@ -283,7 +286,7 @@ export class MapScene {
     ];
     const landPolyWorld = landPolyLogical.map((p) => toWorldXZ(p[0], p[1]));
 
-    const geo = new THREE.PlaneGeometry(MAP_WIDTH, MAP_HEIGHT, LAND_SEGMENTS_X, LAND_SEGMENTS_Z);
+    const geo = new THREE.PlaneGeometry(WORLD_W, WORLD_D, LAND_SEGMENTS_X, LAND_SEGMENTS_Z);
     geo.rotateX(-Math.PI / 2); // lay the plane on the XZ ground plane
     const pos = geo.attributes.position as THREE.BufferAttribute;
     const colors: number[] = [];
@@ -296,11 +299,11 @@ export class MapScene {
         // Soft shore falloff: height ramps up from 0 at the coast to full inland.
         const dist = distanceToPolyline(wx, wz, coastWorld);
         const shore = smoothstep(0, SHORE_WIDTH, dist);
-        // Seeded fbm micro-relief keyed on logical grid coords (stable, no
-        // per-frame Math.random).
-        const gx = wx + MAP_WIDTH / 2;
-        const gy = wz + MAP_HEIGHT / 2;
-        const relief = fbm(gx * RELIEF_FREQ, gy * RELIEF_FREQ, MAP_SEED);
+        // Seeded fbm micro-relief keyed on LOGICAL grid coords (stable, no
+        // per-frame Math.random) so the relief pattern isn't stretched by the
+        // render proportions.
+        const g = worldToGrid(wx, wz);
+        const relief = fbm(g.x * RELIEF_FREQ, g.y * RELIEF_FREQ, MAP_SEED);
         h = shore * (LOWLAND_H + relief * UPLAND_H);
       } else {
         h = SEA_FLOOR;
@@ -338,23 +341,27 @@ export class MapScene {
   // to the fogged horizon; land pokes up through it, so no explicit sea mask is
   // needed.
   private buildSea(): void {
-    const wgeo = new THREE.PlaneGeometry(MAP_WIDTH * 2, MAP_HEIGHT * 3.5, 200, 140);
+    const wgeo = new THREE.PlaneGeometry(WORLD_W * 2.4, WORLD_D * 2.2, 220, 180);
     wgeo.rotateX(-Math.PI / 2);
     this.waterMat = new THREE.ShaderMaterial({
       transparent: true,
-      uniforms: { uT: { value: 0 }, uCol: { value: new THREE.Color(0x1d3d55) } },
+      uniforms: { uT: { value: 0 }, uCol: { value: new THREE.Color(0x1a3850) } },
       vertexShader:
         'uniform float uT; varying float vR; varying vec3 vW;' +
         'void main(){ vec3 p = position;' +
-        ' float r = sin(p.x*0.03 + uT*0.8)*0.5 + sin(p.z*0.045 - uT*0.6)*0.4 + sin((p.x+p.z)*0.02 + uT*0.4)*0.3;' +
+        ' float r = sin(p.x*0.018 + uT*0.6)*0.6 + sin(p.z*0.026 - uT*0.5)*0.5 + sin((p.x*0.7+p.z)*0.012 + uT*0.3)*0.35;' +
         ' p.y += r; vR = r; vec4 wp = modelMatrix*vec4(p,1.0); vW = wp.xyz;' +
         ' gl_Position = projectionMatrix * viewMatrix * wp; }',
+      // Gentle broad shading with soft, sparse, drifting glints — no hard grid of
+      // white dots. The glint term uses irregular (non-commensurate) frequencies
+      // and a high threshold so highlights are occasional, not a regular pattern.
       fragmentShader:
         'uniform float uT; uniform vec3 uCol; varying float vR; varying vec3 vW;' +
-        'void main(){ float sh = 0.5 + 0.5*sin(vR*6.0 + uT*3.0);' +
-        ' float spk = smoothstep(0.85, 1.0, sin(vW.x*0.08 + uT*2.0)*sin(vW.z*0.1 - uT*1.7));' +
-        ' vec3 col = uCol + vec3(0.08,0.13,0.18)*sh + vec3(0.4)*spk;' +
-        ' gl_FragColor = vec4(col, 0.9); }',
+        'void main(){ float sh = 0.5 + 0.5*sin(vR*3.0 + uT*1.4);' +
+        ' float g = sin(vW.x*0.021 + uT*0.7) * sin(vW.z*0.017 - uT*0.5) * sin((vW.x-vW.z)*0.013 + uT*0.4);' +
+        ' float spk = smoothstep(0.93, 1.0, g);' +
+        ' vec3 col = uCol + vec3(0.05,0.09,0.13)*sh + vec3(0.18,0.22,0.26)*spk;' +
+        ' gl_FragColor = vec4(col, 0.92); }',
     });
     const water = new THREE.Mesh(wgeo, this.waterMat);
     water.position.y = WATER_Y;
@@ -748,18 +755,20 @@ function disposeObject3D(root: THREE.Object3D): void {
 // of the canvas picking.
 function makeMapLabelEl(): HTMLDivElement {
   const el = document.createElement('div');
+  // Light, atlas-style label: cream text on a strong shadow (no heavy pill), so
+  // dense clusters of cities stay legible without stacking chunky dark boxes.
   el.style.cssText =
-    'padding:2px 7px;border-radius:5px;white-space:nowrap;pointer-events:none;' +
-    "font:600 11px/1.25 'Noto Sans TC',system-ui,sans-serif;color:#e8dcc3;" +
-    'background:rgba(10,13,18,.66);border:1px solid rgba(201,163,92,.28);text-shadow:0 1px 3px #000';
+    'white-space:nowrap;pointer-events:none;letter-spacing:.02em;' +
+    "font:600 10px/1.2 'Noto Sans TC',system-ui,sans-serif;color:#f0e7d2;" +
+    'text-shadow:0 1px 2px #000,0 0 5px rgba(0,0,0,.9),0 0 2px #000';
   return el;
 }
 
-// name (bold) + sub (dimmed), prefixed by a faction-colour dot.
+// name (bold) + sub (small, dimmed), prefixed by a faction-colour dot.
 function cityLabelHtml(name: string, sub: string, color: string): string {
-  const dot = `<span style="color:${color}">●</span>`;
+  const dot = `<span style="color:${color};text-shadow:0 0 3px #000">●</span>`;
   const nm = name ? `<b>${escapeText(name)}</b>` : '';
-  const s = sub ? ` <span style="opacity:.68;font-weight:400">${escapeText(sub)}</span>` : '';
+  const s = sub ? ` <span style="opacity:.72;font-weight:400;font-size:9px">${escapeText(sub)}</span>` : '';
   return `${dot} ${nm}${s}`;
 }
 

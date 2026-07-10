@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gridToWorld, markerScale } from '../../src/web/map/mapGeometry.js';
+import { gridToWorld, worldToGrid, markerScale, RENDER_SX, RENDER_SZ } from '../../src/web/map/mapGeometry.js';
 import { MAP_WIDTH, MAP_HEIGHT } from '../../src/engine/constants.js';
 import { CITIES } from '../../src/data/cities.js';
 import type { City } from '../../src/engine/types.js';
@@ -35,22 +35,29 @@ describe('mapGeometry.gridToWorld', () => {
     });
   });
 
-  it('centers the grid: x = pos.x - MAP_WIDTH/2, z = pos.y - MAP_HEIGHT/2, y = 0', () => {
-    // MAP_WIDTH=500, MAP_HEIGHT=200 → half = 250, 100.
-    expect(gridToWorld({ x: 0, y: 0 })).toEqual({ x: -250, y: 0, z: -100 });
+  it('centers then scales by the render proportions (x*RENDER_SX, z*RENDER_SZ)', () => {
+    // MAP_WIDTH=500, MAP_HEIGHT=200 → half = 250, 100; corners scale by SX/SZ.
+    expect(gridToWorld({ x: 0, y: 0 })).toEqual({ x: -250 * RENDER_SX, y: 0, z: -100 * RENDER_SZ });
     expect(gridToWorld({ x: MAP_WIDTH, y: MAP_HEIGHT })).toEqual({
-      x: 250,
+      x: 250 * RENDER_SX,
       y: 0,
-      z: 100,
+      z: 100 * RENDER_SZ,
     });
   });
 
-  it('projects a known city (Luoyang) to its centered world coords', () => {
+  it('projects a known city (Luoyang) to its centered, proportioned world coords', () => {
     // Luoyang authored at (30, 17), scaled by GRID_SCALE=5 → pos (150, 85).
-    // world: x = 150 - 250 = -100, z = 85 - 100 = -15, y = 0.
     const luoyang = CITIES.luoyang!;
     expect(luoyang.pos).toEqual({ x: 150, y: 85 });
-    expect(gridToWorld(luoyang.pos)).toEqual({ x: -100, y: 0, z: -15 });
+    expect(gridToWorld(luoyang.pos)).toEqual({ x: (150 - 250) * RENDER_SX, y: 0, z: (85 - 100) * RENDER_SZ });
+  });
+
+  it('worldToGrid inverts gridToWorld', () => {
+    const p = { x: 150, y: 85 };
+    const w = gridToWorld(p);
+    const back = worldToGrid(w.x, w.z);
+    expect(back.x).toBeCloseTo(p.x, 9);
+    expect(back.y).toBeCloseTo(p.y, 9);
   });
 });
 
