@@ -64,3 +64,52 @@ describe('battle session driver', () => {
     expect(forUnit[0]!.kind).toBe('march');
   });
 });
+
+import {
+  chooseDecision, pendingPivotalDecision, chargeableUnitIds,
+} from '../../src/state/battleSession.js';
+
+describe('battle session — player decisions', () => {
+  it('startSession computes offeredDecisions for the player side', () => {
+    const { battle, personalities } = setup();
+    const sess = startSession(battle, 'caocao', personalities);
+    expect(Array.isArray(sess.offeredDecisions)).toBe(true);
+    // The setup attacker has multiple blocks vs a weak garrison, so a focus-fire
+    // decision on the weakest enemy is always available.
+    expect(sess.offeredDecisions.some((d) => d.id.startsWith('focusFire'))).toBe(true);
+  });
+
+  it('chooseDecision queues the decision\'s commands (replacing per-unit orders)', () => {
+    const { battle, personalities } = setup();
+    let sess = startSession(battle, 'caocao', personalities);
+    const focus = sess.offeredDecisions.find((d) => d.id.startsWith('focusFire'))!;
+    sess = chooseDecision(sess, focus.id);
+    // Every command in the chosen decision is now queued.
+    for (const c of focus.commands) {
+      expect(sess.queuedPlayerCommands).toContainEqual(c);
+    }
+  });
+
+  it('chooseDecision is a no-op for an unknown id', () => {
+    const { battle, personalities } = setup();
+    const sess = startSession(battle, 'caocao', personalities);
+    expect(chooseDecision(sess, 'nope').queuedPlayerCommands).toEqual(sess.queuedPlayerCommands);
+  });
+
+  it('pendingPivotalDecision returns a salient decision or null', () => {
+    const { battle, personalities } = setup();
+    const sess = startSession(battle, 'caocao', personalities);
+    const pivotal = pendingPivotalDecision(sess);
+    expect(pivotal === null || pivotal.salient === true).toBe(true);
+  });
+
+  it('chargeableUnitIds excludes units that already have a queued order', () => {
+    const { battle, personalities } = setup();
+    let sess = startSession(battle, 'caocao', personalities);
+    const all = chargeableUnitIds(sess);
+    expect(all.length).toBeGreaterThan(0);
+    const held = all[0]!;
+    sess = queuePlayerCommand(sess, { kind: 'hold', unitId: held });
+    expect(chargeableUnitIds(sess)).not.toContain(held);
+  });
+});
