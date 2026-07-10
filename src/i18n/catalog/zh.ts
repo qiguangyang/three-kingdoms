@@ -227,6 +227,7 @@ export const zh: MessageCatalog = {
   'battle.decision.challengeDuel': '单挑',
   'battle.decision.rally': '激励',
   'battle.decision.heroCharge': '陷阵',
+  'battle.decision.feignRetreat': '诈败诱敌',
   'battle.narr.rally': '大将驰阵，动摇的军心为之一振。',
   'battle.gambit.cavalryCharge': '骑兵突击',
   'battle.gambit.fireAttack': '火计',

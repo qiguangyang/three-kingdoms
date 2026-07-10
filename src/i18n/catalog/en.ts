@@ -231,6 +231,7 @@ export const en: MessageCatalog = {
   'battle.decision.challengeDuel': 'Challenge Duel',
   'battle.decision.rally': 'Rally',
   'battle.decision.heroCharge': 'Hero Charge',
+  'battle.decision.feignRetreat': 'Feign Retreat',
   'battle.narr.rally': 'A general rides down the line — the wavering ranks steady.',
   'battle.gambit.cavalryCharge': 'Cavalry Charge',
   'battle.gambit.fireAttack': 'Fire Attack',

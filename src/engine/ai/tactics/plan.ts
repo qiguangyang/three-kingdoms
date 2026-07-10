@@ -7,6 +7,7 @@ import type { Battle, BattleUnit, FactionId, Personality, TacticalCommand } from
 import type { BattleCell, Vec2 } from '../../battle/types.js';
 import { deriveDoctrine } from './doctrine.js';
 import { assessBattle } from './assessment.js';
+import { detectGambits } from '../../battle/gambits.js';
 
 const chebyshev = (a: Vec2, b: Vec2): number => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 const isFielded = (u: BattleUnit): boolean => u.state === 'fielded' && u.troops > 0;
@@ -67,6 +68,18 @@ export function planTactical(battle: Battle, factionId: FactionId, personality: 
   const mustPress = a.advantage > 1.5;
   // Disciplined/cautious doctrines value holding favorable ground.
   const holdInclination = (doc.discipline + doc.caution) / 2;
+
+  // STRATAGEM: a guileful commander springs an available fire/flood/ambush for
+  // one of its own units (at most one per day).
+  if (doc.guile > 0.6) {
+    const mineIds = new Set(battle.units.filter((u) => u.factionId === factionId).map((u) => u.id));
+    const strat = detectGambits(battle).find(
+      (g) => (g.id === 'fireAttack' || g.id === 'floodAttack' || g.id === 'ambush') && g.unitIds.some((id) => mineIds.has(id)),
+    );
+    if (strat) {
+      cmds.push({ kind: 'gambit', gambitId: strat.id, unitIds: strat.unitIds.filter((id) => mineIds.has(id)) });
+    }
+  }
 
   // RALLY: the lead general steadies a badly-wavering fielded ally within reach.
   const myFieldedAll = battle.units.filter((u) => u.factionId === factionId && isFielded(u));

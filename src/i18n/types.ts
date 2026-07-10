@@ -250,6 +250,7 @@ export type MessageKey =
   | 'battle.decision.challengeDuel'
   | 'battle.decision.rally'
   | 'battle.decision.heroCharge'
+  | 'battle.decision.feignRetreat'
   | 'battle.narr.rally'
   | 'battle.gambit.cavalryCharge'
   | 'battle.gambit.fireAttack'
