@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { CITIES, CITY_IDS } from '../../src/data/cities.js';
 import { buildAdjacencyMap, marchCost } from '../../src/engine/map.js';
+import { marchDuration } from '../../src/engine/pendingOp.js';
+import { GRID_SCALE } from '../../src/engine/constants.js';
 import type { GameState } from '../../src/engine/types.js';
 
 // Guard test freezing today's gameplay topology (the pre-rescale, GRID_SCALE=1
@@ -198,5 +200,25 @@ describe('grid rescale is gameplay-invariant', () => {
     EXPECTED_COST_PAIRS.forEach(({ a, b, cost }) => {
       expect(marchCost(CITIES[a]!, CITIES[b]!), `${a}->${b}`).toBeCloseTo(cost, 9);
     });
+  });
+
+  // marchDuration is the other distance-derived gameplay coefficient the rescale
+  // touched: it divides the day coefficient by GRID_SCALE so scaling coords x
+  // GRID_SCALE leaves march timing unchanged. Assert it equals the original
+  // base-grid formula `max(4, ceil(baseManhattan * 0.5))` — this fails if the
+  // `/ GRID_SCALE` divisor is ever dropped (which would make every march ~5x
+  // longer while the rest of the suite stays green).
+  it('marchDuration is scale-invariant (matches the base-grid day formula)', () => {
+    const pairs: [string, string][] = [
+      ['luoyang', 'changan'], ['luoyang', 'chengdu'], ['xiliang', 'yunnan'],
+      ['chengdu', 'mianzhu'], ['beiping', 'xiangping'], ['jianye', 'wujun'],
+    ];
+    for (const [a, b] of pairs) {
+      const ca = CITIES[a]!;
+      const cb = CITIES[b]!;
+      const baseManhattan = (Math.abs(ca.pos.x - cb.pos.x) + Math.abs(ca.pos.y - cb.pos.y)) / GRID_SCALE;
+      const expected = Math.max(4, Math.ceil(baseManhattan * 0.5));
+      expect(marchDuration(ca, cb), `${a}->${b}`).toBe(expected);
+    }
   });
 });

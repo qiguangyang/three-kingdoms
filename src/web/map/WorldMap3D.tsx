@@ -98,7 +98,7 @@ export const WorldMap3D: React.FC<MapViewProps> = (props) => {
   );
 };
 
-// Atlas-style legend, echoing the reference 三國區劃圖 key box: a dark-glass panel
+// Atlas-style legend, echoing the reference Three Kingdoms map's key box: a dark-glass panel
 // with a title and a small key for the territory colours, province boxes, and
 // city markers. Re-renders with the parent (locale changes flow through).
 const MapLegend: React.FC = () => {

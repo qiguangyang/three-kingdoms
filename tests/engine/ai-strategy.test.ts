@@ -105,6 +105,20 @@ describe('threat detection', () => {
     ]);
     expect(isFactionThreatened(state, 'dongzhuo')).toBe(false);
   });
+
+  it('flags garrison-overmatch at a mid-range distance that pins the scaled DIRECT_BORDER_DISTANCE', () => {
+    // Enemy neighbor at scaled manhattan 40 (base 8): inside the correctly-scaled
+    // threat radius DIRECT_BORDER_DISTANCE = 12*GRID_SCALE = 60, so flagged. This
+    // straddles the band (12, 60]: if the GRID_SCALE factor were ever dropped
+    // (threshold 12), 40 > 12 and the threat would go undetected. The other
+    // fixtures sit at scaled distance 10 (<= both 12 and 60) or 80 (> both), so
+    // only this case actually pins the rescale of DIRECT_BORDER_DISTANCE.
+    const state = makeTopology([
+      { id: 'luoyang', factionId: 'dongzhuo', pos: { x: 10 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 2000 },
+      { id: 'chenliu', factionId: 'caocao', pos: { x: 18 * GRID_SCALE, y: 10 * GRID_SCALE }, garrison: 9000 },
+    ]);
+    expect(threatenedCityIds(state, 'dongzhuo')).toContain('luoyang');
+  });
 });
 
 describe('expansion target selection', () => {

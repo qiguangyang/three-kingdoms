@@ -122,7 +122,7 @@ export const COASTLINE_PATH = scalePath(
 // 0..40), traced to real proportions AROUND the fixed city positions. Clockwise
 // from the northwest: the northern steppe frontier, the NE Liaodong peninsula,
 // the Bohai gulf sweeping inland, the Shandong peninsula, the Yangtze delta +
-// Hangzhou bay, the SE/Fujian coast, the southern coast curving out to 交州, and
+// Hangzhou bay, the SE/Fujian coast, the southern coast curving out to Jiaozhou, and
 // the western/interior taper of Liangzhou/Yizhou. The 3D map fills this polygon
 // as land and floods everything outside it as sea, so its whole outline reads as
 // coast. Every city sits inside it.

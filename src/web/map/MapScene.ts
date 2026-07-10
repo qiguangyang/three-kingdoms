@@ -1,4 +1,4 @@
-// Three.js scene manager for the 3D campaign map ("沙盘 · 天下" overworld).
+// Three.js scene manager for the 3D campaign map (the sand-table overworld).
 //
 // Pure projection/sizing math lives in mapGeometry.ts (unit-tested); this file
 // is the rendering glue (verified visually), mirroring the battle renderer's
@@ -141,11 +141,12 @@ export class MapScene {
 
   // ---- city layer (Task 1.3) ----
   private readonly cities = new Map<string, CityVisual>();
-  private land: THREE.Mesh | null = null; // terrain mesh, raycast to seat markers on the surface
+  private land: THREE.Mesh | null = null; // terrain mesh
+  private landPolyWorld: Array<[number, number]> = []; // China outline in world XZ (open loop)
+  private coastClosed: Array<[number, number]> = []; // same, with the closing segment appended
   private territories: THREE.Mesh | null = null; // translucent faction-territory overlay
   private territorySig = ''; // ownership signature; rebuild the overlay only when it changes
-  private readonly provinceLabels: CSS2DObject[] = []; // 州 gazetteer boxes
-  private readonly terrainRay = new THREE.Raycaster(); // samples land height under a city
+  private readonly provinceLabels: CSS2DObject[] = []; // province (zhou) gazetteer boxes
   private readonly pickRay = new THREE.Raycaster(); // resolves the marker under the cursor
   private readonly pointerNdc = new THREE.Vector2();
   private selectedId: string | null = null;
@@ -282,8 +283,12 @@ export class MapScene {
     // whole outline is treated as coast in the render (the landmass is an island
     // continent, the sea plane surrounds it), so the shore falloff + gold coast
     // line trace the entire border.
-    const landPolyWorld = CHINA_LAND.map((p) => toWorldXZ(p[0], p[1]));
-    const coastWorld = landPolyWorld; // closed loop; the border is the coast
+    this.landPolyWorld = CHINA_LAND.map((p) => toWorldXZ(p[0], p[1]));
+    // Closed loop for the shore-distance ramp: append the first point so the
+    // closing (western frontier) coast edge is included in distanceToPolyline —
+    // otherwise that shore would jump to full inland height (a wall, not a beach).
+    this.coastClosed = [...this.landPolyWorld, this.landPolyWorld[0]!];
+    const coastWorld = this.landPolyWorld;
 
     const geo = new THREE.PlaneGeometry(WORLD_W, WORLD_D, LAND_SEGMENTS_X, LAND_SEGMENTS_Z);
     geo.rotateX(-Math.PI / 2); // lay the plane on the XZ ground plane
@@ -292,23 +297,9 @@ export class MapScene {
     for (let i = 0; i < pos.count; i++) {
       const wx = pos.getX(i);
       const wz = pos.getZ(i);
-      const inside = pointInPolygon(wx, wz, landPolyWorld);
-      let h: number;
-      if (inside) {
-        // Soft shore falloff: height ramps up from 0 at the coast to full inland.
-        const dist = distanceToPolyline(wx, wz, coastWorld);
-        const shore = smoothstep(0, SHORE_WIDTH, dist);
-        // Seeded fbm micro-relief keyed on LOGICAL grid coords (stable, no
-        // per-frame Math.random) so the relief pattern isn't stretched by the
-        // render proportions.
-        const g = worldToGrid(wx, wz);
-        const relief = fbm(g.x * RELIEF_FREQ, g.y * RELIEF_FREQ, MAP_SEED);
-        h = shore * (LOWLAND_H + relief * UPLAND_H);
-      } else {
-        h = SEA_FLOOR;
-      }
+      const h = this.landHeightAt(wx, wz);
       pos.setY(i, h);
-      const c = inside ? landRamp(h) : SEABED_COLOR;
+      const c = h > SEA_FLOOR + 0.001 ? landRamp(h) : SEABED_COLOR;
       colors.push(c[0], c[1], c[2]);
     }
     geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -472,8 +463,8 @@ export class MapScene {
     this.territories = mesh;
   }
 
-  // The 13 Han provinces (州) as boxed atlas labels, like the reference map's
-  // 司隸/冀州/荊州 gazetteer boxes. Placed at each province's centroid, seated a
+  // The 13 Han provinces (zhou) as boxed atlas labels, like the reference map's
+  // Sili/Jizhou/Jingzhou gazetteer boxes. Placed at each province's centroid, seated a
   // little above the terrain, dim so they sit behind the city labels. Built once
   // (static geography); resolved to the active locale at construction.
   private buildProvinceLabels(): void {
@@ -535,6 +526,10 @@ export class MapScene {
     }
     this.provinceLabels.length = 0;
     this.controls.dispose();
+    // The scene.traverse sweep below frees mesh geometry/material/textures but a
+    // Light exposes none of those, so free the sun's 2048x2048 shadow-map render
+    // target explicitly (WebGLRenderer.dispose does not).
+    this.sun.dispose();
     // Free every geometry / material / texture in the scene, matching the
     // battle scene's disposal rigor to avoid GPU leaks between mounts.
     this.scene.traverse((o) => {
@@ -739,15 +734,23 @@ export class MapScene {
     v.label.element.innerHTML = cityLabelHtml(ld.name, ld.sub, factionColor(ld.factionId));
   }
 
-  // Sample the terrain surface height under a world XZ by raycasting straight
-  // down onto the land mesh (the exact rendered relief), so a marker sits on the
-  // ground rather than at y=0. Clamped to sea level so a marker never sinks.
+  // Analytic terrain height at a world XZ — the SAME function the landmass mesh
+  // is built from (land/sea mask + shore falloff + seeded fbm relief). Computing
+  // it directly avoids raycasting the 134k-triangle land mesh (there is no BVH,
+  // so each raycast tests every triangle); seating ~528 rivers/labels/markers by
+  // raycast would freeze the main thread on map open. Returns SEA_FLOOR over sea.
+  private landHeightAt(wx: number, wz: number): number {
+    if (!pointInPolygon(wx, wz, this.landPolyWorld)) return SEA_FLOOR;
+    const shore = smoothstep(0, SHORE_WIDTH, distanceToPolyline(wx, wz, this.coastClosed));
+    const g = worldToGrid(wx, wz);
+    const relief = fbm(g.x * RELIEF_FREQ, g.y * RELIEF_FREQ, MAP_SEED);
+    return shore * (LOWLAND_H + relief * UPLAND_H);
+  }
+
+  // Surface height for seating a marker/label/river on the relief, clamped to sea
+  // level so nothing sinks below the water plane.
   private terrainHeightAt(wx: number, wz: number): number {
-    if (!this.land) return LOWLAND_H;
-    this.terrainRay.set(new THREE.Vector3(wx, 240, wz), DOWN);
-    const hits = this.terrainRay.intersectObject(this.land, false);
-    const y = hits.length > 0 ? hits[0]!.point.y : LOWLAND_H;
-    return Math.max(y, WATER_Y);
+    return Math.max(WATER_Y, this.landHeightAt(wx, wz));
   }
 
   // Apply / clear the selected look on a marker.
@@ -835,7 +838,6 @@ export class MapScene {
 // helpers (pure; scene state stays on the class)
 
 // Straight-down ray direction shared by every terrain-height sample.
-const DOWN = new THREE.Vector3(0, -1, 0);
 
 // The set of capital city ids: each alive faction's lord (faction.lordId) resides
 // in exactly one city (General.locationCityId), which the scenario seeds as the
