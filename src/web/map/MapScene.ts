@@ -141,6 +141,8 @@ export class MapScene {
   // ---- city layer (Task 1.3) ----
   private readonly cities = new Map<string, CityVisual>();
   private land: THREE.Mesh | null = null; // terrain mesh, raycast to seat markers on the surface
+  private territories: THREE.Mesh | null = null; // translucent faction-territory overlay
+  private territorySig = ''; // ownership signature; rebuild the overlay only when it changes
   private readonly terrainRay = new THREE.Raycaster(); // samples land height under a city
   private readonly pickRay = new THREE.Raycaster(); // resolves the marker under the cursor
   private readonly pointerNdc = new THREE.Vector2();
@@ -390,6 +392,80 @@ export class MapScene {
     }
   }
 
+  // Translucent faction-territory overlay draped on the land — the "kingdom map"
+  // layer. Each land vertex is claimed by the nearest city; if that city has a
+  // faction, the vertex takes the faction colour, so the map shows each warlord's
+  // realm as a soft coloured region (neutral land stays uncoloured). Rebuilt only
+  // when ownership changes. Reuses the terrain geometry so it drapes exactly.
+  private buildTerritories(game: GameState): void {
+    if (!this.land) return;
+    const cityWorld = Object.values(game.cities).map((c) => ({ f: c.factionId, w: gridToWorld(c.pos) }));
+    const sig = cityWorld
+      .map((c) => `${Math.round(c.w.x)},${Math.round(c.w.z)}:${c.f ?? '_'}`)
+      .sort()
+      .join('|');
+    if (sig === this.territorySig && this.territories) return;
+    this.territorySig = sig;
+    if (this.territories) {
+      this.scene.remove(this.territories);
+      this.territories.geometry.dispose();
+      (this.territories.material as THREE.Material).dispose();
+      this.territories = null;
+    }
+
+    const src = this.land.geometry;
+    const srcPos = src.getAttribute('position') as THREE.BufferAttribute;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', srcPos.clone());
+    if (src.index) geo.setIndex(src.index.clone());
+    const landPolyWorld = CHINA_LAND.map((p) => toWorldXZ(p[0], p[1]));
+    const n = srcPos.count;
+    const cols = new Float32Array(n * 3);
+    const alphas = new Float32Array(n);
+    const col = new THREE.Color();
+    for (let i = 0; i < n; i++) {
+      const wx = srcPos.getX(i);
+      const wz = srcPos.getZ(i);
+      let best = Infinity;
+      let bf: string | null = null;
+      for (const c of cityWorld) {
+        const dx = wx - c.w.x;
+        const dz = wz - c.w.z;
+        const d = dx * dx + dz * dz;
+        if (d < best) {
+          best = d;
+          bf = c.f;
+        }
+      }
+      if (bf && pointInPolygon(wx, wz, landPolyWorld)) {
+        col.set(factionColor(bf));
+        cols[i * 3] = col.r;
+        cols[i * 3 + 1] = col.g;
+        cols[i * 3 + 2] = col.b;
+        alphas[i] = 0.42;
+      } else {
+        alphas[i] = 0;
+      }
+    }
+    geo.setAttribute('aCol', new THREE.BufferAttribute(cols, 3));
+    geo.setAttribute('aA', new THREE.BufferAttribute(alphas, 1));
+    const mat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      vertexShader:
+        'attribute vec3 aCol; attribute float aA; varying vec3 vC; varying float vA;' +
+        'void main(){ vC = aCol; vA = aA; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader:
+        'varying vec3 vC; varying float vA;' +
+        'void main(){ if (vA < 0.01) discard; gl_FragColor = vec4(vC, vA); }',
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.y = 0.7; // float just above the terrain surface
+    mesh.renderOrder = 2;
+    this.scene.add(mesh);
+    this.territories = mesh;
+  }
+
   resize(): void {
     const w = this.canvas.clientWidth || 800;
     const h = this.canvas.clientHeight || 500;
@@ -456,6 +532,7 @@ export class MapScene {
   // capital status changed is rebuilt; every marker's floating label is refreshed
   // from the matching MapLabelData.
   syncCities(game: GameState, labels: MapLabelData[]): void {
+    this.buildTerritories(game);
     const labelById = new Map(labels.map((l) => [l.cityId, l]));
     const capitals = capitalCityIds(game);
     const alive = new Set<string>();
