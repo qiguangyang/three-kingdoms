@@ -50,4 +50,11 @@ describe('doctrine changes how an army fights', () => {
     const cautious = simulateHeadless({ ...base, attacker: { troops: 8000, wu: 62, zhi: 92, command: 88, personality: 'turtle' as const } });
     expect(aggressive.leverCounts.challengeDuel ?? 0).toBeGreaterThan(cautious.leverCounts.challengeDuel ?? 0);
   });
+
+  it('a guileful commander springs more stratagems than a brute', () => {
+    const base = { seed: 4, defender: { troops: 8000, wu: 70, zhi: 60, command: 80, personality: 'balanced' as const } };
+    const guileful = simulateHeadless({ ...base, attacker: { troops: 8000, wu: 55, zhi: 98, command: 85, personality: 'balanced' as const } });
+    const brute = simulateHeadless({ ...base, attacker: { troops: 8000, wu: 98, zhi: 20, command: 70, personality: 'active' as const } });
+    expect(guileful.leverCounts.gambit ?? 0).toBeGreaterThan(brute.leverCounts.gambit ?? 0);
+  });
 });
