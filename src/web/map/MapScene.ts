@@ -16,8 +16,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { MAP_HEIGHT } from '../../engine/constants.js';
-import { COASTLINE_PATH } from '../../data/map/geography.js';
+import { CHINA_LAND } from '../../data/map/geography.js';
 import type { City, GameState } from '../../engine/types.js';
 import { FACTION_GLYPH, factionColor } from '../theme.js';
 import { gridToWorld, worldToGrid, markerScale, WORLD_W, WORLD_D } from './mapGeometry.js';
@@ -269,22 +268,13 @@ export class MapScene {
   // a height ramp (coast sand -> lowland green -> upland brown). A glowing gold
   // line traces the coast where land meets sea.
   private buildLandmass(): void {
-    // Derive the land/sea mask from COASTLINE_PATH. The authored path is an OPEN
-    // curve hugging the eastern coast (running from the NE corner down to the SE
-    // corner); land lies to its west. We sample it into a polyline, then close it
-    // around the map's western / northern / southern boundary to get a filled
-    // land polygon we can point-in-polygon test. (Accurate re-authoring of the
-    // coastline is a later task — the existing scaled coastline is fine here.)
-    const coastLogical = samplePath(COASTLINE_PATH);
-    const coastWorld = coastLogical.map((p) => toWorldXZ(p[0], p[1]));
-    const first = coastLogical[0]!;
-    const landPolyLogical: Array<[number, number]> = [
-      ...coastLogical,
-      [0, MAP_HEIGHT], // SW corner
-      [0, 0], // NW corner
-      [first[0], 0], // back up under the coastline's start x, closing the loop
-    ];
-    const landPolyWorld = landPolyLogical.map((p) => toWorldXZ(p[0], p[1]));
+    // Land/sea mask from the CLOSED China outline (CHINA_LAND, logical coords):
+    // points inside the polygon are land, everything outside floods to sea. The
+    // whole outline is treated as coast in the render (the landmass is an island
+    // continent, the sea plane surrounds it), so the shore falloff + gold coast
+    // line trace the entire border.
+    const landPolyWorld = CHINA_LAND.map((p) => toWorldXZ(p[0], p[1]));
+    const coastWorld = landPolyWorld; // closed loop; the border is the coast
 
     const geo = new THREE.PlaneGeometry(WORLD_W, WORLD_D, LAND_SEGMENTS_X, LAND_SEGMENTS_Z);
     geo.rotateX(-Math.PI / 2); // lay the plane on the XZ ground plane
@@ -327,7 +317,7 @@ export class MapScene {
     // so it reads as a shoreline; kept bright so the bloom pass makes it glow.
     const linePts = coastWorld.map(([x, z]) => new THREE.Vector3(x, WATER_Y + 0.2, z));
     const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
-    const coast = new THREE.Line(
+    const coast = new THREE.LineLoop(
       lineGeo,
       new THREE.LineBasicMaterial({ color: 0xffcf7a, transparent: true, opacity: 0.9 }),
     );

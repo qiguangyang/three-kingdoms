@@ -118,6 +118,57 @@ export const COASTLINE_PATH = scalePath(
   GRID_SCALE,
 );
 
+// Closed outline of Han China in logical base coords (x east 0..100, y south
+// 0..40), traced to real proportions AROUND the fixed city positions. Clockwise
+// from the northwest: the northern steppe frontier, the NE Liaodong peninsula,
+// the Bohai gulf sweeping inland, the Shandong peninsula, the Yangtze delta +
+// Hangzhou bay, the SE/Fujian coast, the southern coast curving out to 交州, and
+// the western/interior taper of Liangzhou/Yizhou. The 3D map fills this polygon
+// as land and floods everything outside it as sea, so its whole outline reads as
+// coast. Every city sits inside it.
+const CHINA_LAND_RAW: Array<[number, number]> = [
+  [2, 12],   // NW, west of Xiliang (5,13)
+  [3, 6],    // north-west frontier
+  [9, 3],
+  [18, 2],
+  [28, 2],   // north of Jinyang
+  [40, 1],
+  [52, 1],   // north of Yecheng/Beiping
+  [61, 2],   // north of Beiping (60,5)
+  [70, 2],   // toward Liaodong
+  [78, 2],   // Liaodong base, Xiangping (75,3)
+  [85, 3],   // Liaodong / far NE
+  [90, 4],   // NE tip
+  [85, 7],   // sea coast: Liaodong east side descends
+  [79, 8],
+  [73, 8],   // into the Bohai approach
+  [67, 10],  // Bohai gulf mouth
+  [61, 13],  // Bohai gulf bottom (Nanpi 58,10 / Pingyuan 55,15 sit west of here)
+  [63, 16],  // Shandong base
+  [70, 17],  // Shandong peninsula tip (Beihai 63,18 inside)
+  [73, 19],  // Shandong SE
+  [67, 20],  // Laizhou bay indent
+  [66, 23],  // east coast (Pengcheng 58,20 / Xiapi 55,22 inside)
+  [70, 26],
+  [75, 29],  // Yangtze delta bulge (Wujun 68,28 inside)
+  [77, 32],  // near Kuaiji (73,32)
+  [73, 33],  // Hangzhou bay indent
+  [72, 35],  // Fujian coast
+  [69, 38],
+  [64, 40],  // SE corner
+  [56, 41],  // south coast toward Jiaozhou
+  [48, 42],  // far-south bulge (Panyu / Guangzhou)
+  [40, 41],
+  [30, 40],  // south of Guiyang (40,35)
+  [22, 40],  // south of Jianning (20,35)
+  [15, 39],  // Yunnan (15,37) inside
+  [9, 37],   // southwest
+  [5, 32],   // west of Chengdu (15,30)
+  [3, 25],
+  [2, 18],   // west of Tianshui (10,18)
+];
+export const CHINA_LAND: Array<[number, number]> = scalePoints(CHINA_LAND_RAW, GRID_SCALE);
+
 // ---------------------------------------------------------------- rivers
 
 const RIVERS_RAW: NamedFeature[] = [
