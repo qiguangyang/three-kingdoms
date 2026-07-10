@@ -1,6 +1,6 @@
 // Deterministic one-day battle step. Phases run in a fixed order so results
-// are reproducible: default-orders -> move -> ranged -> melee -> duel -> fire
-// -> morale/rout -> end-check.
+// are reproducible: default-orders -> move -> ranged -> melee -> charge-shock
+// -> duel -> fire -> flood -> ambush -> rally -> morale/rout -> end-check.
 import { BATTLE_DAY_LIMIT, COMBAT_MODIFIER } from '../constants.js';
 import { rollInt } from '../rng.js';
 import type {

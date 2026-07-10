@@ -52,7 +52,7 @@ export function createBattle(state: GameState, input: BattleSetupInput): Battle 
     { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
     { x: 1, y: 1 }, { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 },
   ];
-  const windSeed = (field.seed * 2654435761) >>> 0;
+  const windSeed = Math.imul(field.seed, 2654435761) >>> 0;
   const wind = { dir: windDirs[windSeed % 8]!, strength: 0.3 + (windSeed % 61) / 100 }; // 0.3..0.9
 
   const attackerGenerals = input.attackingGeneralIds

@@ -91,4 +91,21 @@ describe('createBattle', () => {
     expect(Math.abs(w.dir.x) + Math.abs(w.dir.y)).toBeGreaterThan(0); // a real direction
     expect(mk().wind).toEqual(w); // deterministic
   });
+
+  it('wind direction varies across battles (not collapsed to one direction)', () => {
+    // Real battles derive wind from field.seed, a full-range uint32 (the evolved
+    // rngState). A plain `field.seed * 2654435761` float64 multiply overflows 2^53
+    // and rounds away the low bits that `% 8` reads, collapsing ~99.8% of battles
+    // to one direction. Use large uint32 seeds to exercise that real condition;
+    // Math.imul keeps the low bits, so directions must actually vary.
+    const dirs = new Set<string>();
+    for (let i = 0; i < 16; i++) {
+      const seed = ((i + 1) * 268435459) >>> 0; // spread across the uint32 range
+      const s = buildInitialState({ scenario: SCENARIO_DONGZHUO, playerFactionId: 'caocao', refData: REF_DATA, seed });
+      const target = Object.values(s.cities).find((c) => c.factionId && c.factionId !== 'caocao')!;
+      const b = createBattle(s, { cityId: target.id, attackerFactionId: 'caocao', defenderFactionId: target.factionId!, attackingGeneralIds: ['caocao'], attackingTroops: 6000 });
+      dirs.add(`${b.wind!.dir.x},${b.wind!.dir.y}`);
+    }
+    expect(dirs.size).toBeGreaterThan(1); // not all the same wind
+  });
 });
