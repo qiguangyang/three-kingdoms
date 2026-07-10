@@ -68,6 +68,7 @@ export type BattleEvent =
   | { kind: 'ambushSprung'; at: Vec2; unitId: string }
   | { kind: 'moraleBreak'; unitId: string }
   | { kind: 'rout'; unitId: string }
+  | { kind: 'feint'; unitId: string }
   | { kind: 'reserveCommitted'; factionId: FactionId; unitIds: string[] }
   | { kind: 'dayAdvanced'; day: number }
   | { kind: 'log'; entry: LogEntry }

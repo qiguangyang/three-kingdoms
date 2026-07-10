@@ -223,6 +223,18 @@ describe('stepBattle — movement + melee', () => {
     expect(e.morale).toBeLessThan(100 - 20); // heavy surprise morale hit (>= the 30 shock, minus clamps)
     expect(events.some((ev) => ev.kind === 'ambushSprung' && ev.unitId === 'a')).toBe(true);
   });
+
+  it('a retreat command withdraws a unit toward its home edge, staying fielded (feint)', () => {
+    const b = battle([
+      unit({ id: 'a', factionId: 'A', pos: { x: 4, y: 3 } }), // attacker: home edge is high y (h-1)
+      unit({ id: 'e', factionId: 'B', pos: { x: 4, y: 1 } }),
+    ]);
+    const { battle: next, events } = stepBattle({ battle: b, commands: [{ kind: 'retreat', unitId: 'a' }] });
+    const a = next.units.find((x) => x.id === 'a')!;
+    expect(a.pos.y).toBeGreaterThan(3);          // moved toward home (away from the enemy at y=1)
+    expect(a.state).toBe('fielded');             // deliberate, not routed
+    expect(events.some((ev) => ev.kind === 'feint' && ev.unitId === 'a')).toBe(true);
+  });
 });
 
 describe('stepBattle — ranged, duel, morale, end', () => {

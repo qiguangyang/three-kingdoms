@@ -156,10 +156,15 @@ export function stepBattle(input: StepInput): StepResult {
       continue; // holding or attacking in place: no move
     }
     let target: Vec2 | undefined;
+    let feinting = false;
     if (order && order.kind === 'march') target = order.target;
-    else if (order && (order.kind === 'charge')) {
+    else if (order && order.kind === 'charge') {
       const t = byId(order.targetUnitId);
       target = t?.pos;
+    } else if (order && order.kind === 'retreat') {
+      const homeY = u.factionId === input.battle.attackerFactionId ? input.battle.field.height - 1 : 0;
+      target = { x: u.pos.x, y: homeY };
+      feinting = true;
     } else {
       const enemy = nearestEnemy(u, units);
       target = enemy?.pos;
@@ -171,6 +176,7 @@ export function stepBattle(input: StepInput): StepResult {
       u.pos = to;
       events.push({ kind: 'move', unitId: u.id, from, to });
     }
+    if (feinting) events.push({ kind: 'feint', unitId: u.id });
   }
 
   // ---------------- RANGED PHASE ----------------
