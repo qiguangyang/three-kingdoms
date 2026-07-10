@@ -16,9 +16,10 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { CHINA_LAND, RIVERS } from '../../data/map/geography.js';
+import { CHINA_LAND, RIVERS, PROVINCE_LABELS } from '../../data/map/geography.js';
 import type { City, GameState } from '../../engine/types.js';
 import { FACTION_GLYPH, factionColor } from '../theme.js';
+import { pickName } from '../../i18n/locale.js';
 import { gridToWorld, worldToGrid, markerScale, WORLD_W, WORLD_D } from './mapGeometry.js';
 
 // ---- render-layer tuning (world units; the map spans WORLD_W x WORLD_D,
@@ -143,6 +144,7 @@ export class MapScene {
   private land: THREE.Mesh | null = null; // terrain mesh, raycast to seat markers on the surface
   private territories: THREE.Mesh | null = null; // translucent faction-territory overlay
   private territorySig = ''; // ownership signature; rebuild the overlay only when it changes
+  private readonly provinceLabels: CSS2DObject[] = []; // 州 gazetteer boxes
   private readonly terrainRay = new THREE.Raycaster(); // samples land height under a city
   private readonly pickRay = new THREE.Raycaster(); // resolves the marker under the cursor
   private readonly pointerNdc = new THREE.Vector2();
@@ -220,6 +222,7 @@ export class MapScene {
     this.buildLandmass();
     this.buildSea();
     this.buildRivers();
+    this.buildProvinceLabels();
 
     // Post-processing: a gentle bloom so the gold coastline, water sparkle, and
     // bright sky glow filmically. RenderPass renders linear HDR; OutputPass
@@ -466,6 +469,26 @@ export class MapScene {
     this.territories = mesh;
   }
 
+  // The 13 Han provinces (州) as boxed atlas labels, like the reference map's
+  // 司隸/冀州/荊州 gazetteer boxes. Placed at each province's centroid, seated a
+  // little above the terrain, dim so they sit behind the city labels. Built once
+  // (static geography); resolved to the active locale at construction.
+  private buildProvinceLabels(): void {
+    for (const p of PROVINCE_LABELS) {
+      const [wx, wz] = toWorldXZ(p.x, p.y);
+      const el = document.createElement('div');
+      el.textContent = pickName(p.text);
+      el.style.cssText =
+        'pointer-events:none;white-space:nowrap;padding:1px 8px;border-radius:3px;letter-spacing:.22em;' +
+        "font:600 13px/1.3 'Noto Serif TC','Noto Serif SC',serif;color:rgba(240,231,210,.62);" +
+        'background:rgba(20,16,10,.34);border:1px solid rgba(201,163,92,.4);text-shadow:0 1px 3px #000';
+      const label = new CSS2DObject(el);
+      label.position.set(wx, this.terrainHeightAt(wx, wz) + 6, wz);
+      this.scene.add(label);
+      this.provinceLabels.push(label);
+    }
+  }
+
   resize(): void {
     const w = this.canvas.clientWidth || 800;
     const h = this.canvas.clientHeight || 500;
@@ -503,6 +526,11 @@ export class MapScene {
       }
     }
     this.cities.clear();
+    for (const p of this.provinceLabels) {
+      p.removeFromParent();
+      p.element.remove();
+    }
+    this.provinceLabels.length = 0;
     this.controls.dispose();
     // Free every geometry / material / texture in the scene, matching the
     // battle scene's disposal rigor to avoid GPU leaks between mounts.
