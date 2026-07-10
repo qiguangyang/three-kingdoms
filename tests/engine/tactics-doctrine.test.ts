@@ -59,4 +59,16 @@ describe('deriveDoctrine', () => {
     expect(d1).toEqual(d2);
     for (const v of Object.values(d1)) { expect(v).toBeGreaterThanOrEqual(0); expect(v).toBeLessThanOrEqual(1); }
   });
+
+  it('doctrine shifts to the surviving general when the lead commander is gone', () => {
+    const b = battle([
+      unit({ id: 'lead', factionId: 'A', wu: 100, zhi: 25, command: 95 }), // aggressive lead (highest command)
+      unit({ id: 'second', factionId: 'A', wu: 55, zhi: 96, command: 80 }), // guileful backup
+    ]);
+    const before = deriveDoctrine(b, 'A', 'balanced');
+    b.units[0]!.state = 'gone'; // the lead is slain / has left the field
+    const after = deriveDoctrine(b, 'A', 'balanced');
+    expect(after.aggression).toBeLessThan(before.aggression); // no longer the wu-100 lead
+    expect(after.guile).toBeGreaterThan(before.guile);        // the guileful backup now sets the tone
+  });
 });

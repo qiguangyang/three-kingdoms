@@ -95,4 +95,21 @@ describe('detectGambits', () => {
     ], f);
     expect(detectGambits(b).some((g) => g.id === 'ambush')).toBe(true);
   });
+
+  it('surfaces a fireAttack per-side when BOTH factions have a forest unit with wind up', () => {
+    const cells = new Array(24).fill('plain');
+    cells[1 * 6 + 2] = 'forest'; // (x=2,y=1) — enemy sits here
+    cells[2 * 6 + 4] = 'forest'; // (x=4,y=2) — my unit sits here
+    const f = field(cells);
+    const windy: Battle = {
+      ...mk([
+        u({ id: 'e', factionId: 'B', pos: { x: 2, y: 1 } }), // enemy on forest, listed FIRST
+        u({ id: 'a', factionId: 'A', pos: { x: 4, y: 2 } }), // my unit on forest
+      ], f),
+      wind: { dir: { x: 0, y: -1 }, strength: 1 },
+    };
+    const fires = detectGambits(windy).filter((g) => g.id === 'fireAttack');
+    expect(fires.length).toBeGreaterThanOrEqual(2); // one per side, not just the first global one
+    expect(fires.flatMap((g) => g.unitIds)).toEqual(expect.arrayContaining(['e', 'a']));
+  });
 });

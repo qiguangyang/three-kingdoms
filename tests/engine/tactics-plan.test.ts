@@ -184,4 +184,19 @@ describe('planTactical', () => {
     b.wind = { dir: { x: 0, y: -1 }, strength: 0.8 };
     expect(planTactical(b, 'A', 'active').some((c) => c.kind === 'gambit')).toBe(false);
   });
+
+  it('a guileful commander springs its OWN fire even when the enemy also has a forest unit', () => {
+    const field = flatField();
+    field.cells[3 * 12 + 5] = 'forest'; // enemy-side forest (listed-first unit will sit by it)
+    field.cells[7 * 12 + 5] = 'forest'; // my-side forest
+    const b = mkBattle([
+      u({ id: 'efoe', factionId: 'B', pos: { x: 5, y: 3 }, troops: 5000 }), // enemy by forest, listed FIRST
+      u({ id: 'z', factionId: 'A', pos: { x: 5, y: 7 }, wu: 55, zhi: 98, command: 85, troops: 5000 }), // my guileful unit by forest
+    ], field);
+    b.wind = { dir: { x: 0, y: -1 }, strength: 0.8 };
+    const cmds = planTactical(b, 'A', 'balanced');
+    const fire = cmds.find((c) => c.kind === 'gambit' && (c as { gambitId: string }).gambitId === 'fireAttack');
+    expect(fire).toBeDefined();
+    expect((fire as { unitIds: string[] }).unitIds).toContain('z'); // MY unit, not the enemy's
+  });
 });

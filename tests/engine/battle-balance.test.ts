@@ -66,4 +66,21 @@ describe('battle balance harness', () => {
     const sweep = runBalanceSweep(matchups);
     expect(sweep.leverTotals.gambit ?? 0).toBeGreaterThan(0);
   });
+
+  it('a 1.5x quality advantage wins a clear majority', () => {
+    const seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const sweep = runBalanceSweep(seeds.map((seed) => ({ seed,
+      attacker: { troops: 9000, wu: 88, zhi: 70, command: 82, personality: 'active' as const },
+      defender: { troops: 6000, wu: 68, zhi: 60, command: 70, personality: 'balanced' as const } })));
+    expect(sweep.attackerWinRate).toBeGreaterThanOrEqual(0.6);
+  });
+
+  it('battles resolve in a sane length band (not instant, not always the day cap)', () => {
+    const seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const sweep = runBalanceSweep(seeds.map((seed) => ({ seed,
+      attacker: { troops: 7000, wu: 80, zhi: 65, command: 78, personality: 'balanced' as const },
+      defender: { troops: 7000, wu: 78, zhi: 65, command: 76, personality: 'balanced' as const } })));
+    expect(sweep.avgDays).toBeGreaterThan(2);
+    expect(sweep.avgDays).toBeLessThan(28);
+  });
 });

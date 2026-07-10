@@ -3,7 +3,7 @@ import { buildInitialState } from '../../src/engine/scenario.js';
 import { SCENARIO_DONGZHUO } from '../../src/data/scenarios/s1-dongzhuo.js';
 import { REF_DATA } from '../../src/data/index.js';
 import { createBattle } from '../../src/engine/battle/setup.js';
-import { gameStore, loadGame, finishBattle, quickResolveBattle, chooseBattleDecision } from '../../src/state/store.js';
+import { gameStore, loadGame, finishBattle, quickResolveBattle, resolveBattleDay, chooseBattleDecision } from '../../src/state/store.js';
 
 function seedWithPendingBattle() {
   const s = buildInitialState({ scenario: SCENARIO_DONGZHUO, playerFactionId: 'caocao', refData: REF_DATA, seed: 100 });
@@ -47,5 +47,20 @@ describe('battle store integration', () => {
     chooseBattleDecision(decision.id);
     const after = gameStore.getState().battle!;
     expect(after.queuedPlayerCommands.length).toBeGreaterThan(before.queuedPlayerCommands.length);
+  });
+
+  it('mid-battle save keeps game.pendingBattle in sync so a reload resumes at the current day', () => {
+    const { game } = seedWithPendingBattle();
+    loadGame({ game, locale: 'zh' }); // enters a battle (day 0)
+    resolveBattleDay();
+    resolveBattleDay();
+    const st = gameStore.getState();
+    const sessionDay = st.battle!.battle.daysElapsed;
+    expect(sessionDay).toBeGreaterThan(0);
+    expect(st.game!.pendingBattle!.daysElapsed).toBe(sessionDay); // pendingBattle tracks the live battle
+
+    // Simulate a reload from the autosaved game: the resumed session is at the same day.
+    loadGame({ game: st.game!, locale: 'zh' });
+    expect(gameStore.getState().battle!.battle.daysElapsed).toBe(sessionDay);
   });
 });

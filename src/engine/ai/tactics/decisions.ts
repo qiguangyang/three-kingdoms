@@ -75,36 +75,48 @@ export function offerPlayerDecisions(battle: Battle, factionId: FactionId): Offe
     }
   }
 
-  // HERO — Challenge Duel: a high-wu player general beside a high-wu enemy general.
-  const myGeneral = mine.find((u) => u.wu !== undefined && u.wu >= BATTLE_TUNING.duelWuMin);
-  if (myGeneral) {
-    const foeGeneral = enemies.find((e) => e.wu !== undefined && e.wu >= BATTLE_TUNING.duelWuMin && chebyshev(myGeneral.pos, e.pos) <= 1);
-    if (foeGeneral) {
-      out.push({ id: `challengeDuel:${foeGeneral.id}`, family: 'hero', labelKey: 'battle.decision.challengeDuel', salient: true,
-        commands: [{ kind: 'challengeDuel', unitId: myGeneral.id, targetUnitId: foeGeneral.id }] });
-    }
+  // HERO — Challenge Duel: the first of my high-wu generals that stands beside an
+  // enemy general (best-match across all my generals, not just the first one).
+  let duelMine: BattleUnit | undefined;
+  let duelFoe: BattleUnit | undefined;
+  for (const g of mine) {
+    if (g.wu === undefined || g.wu < BATTLE_TUNING.duelWuMin) continue;
+    const foe = enemies.find((e) => e.wu !== undefined && e.wu >= BATTLE_TUNING.duelWuMin && chebyshev(g.pos, e.pos) <= 1);
+    if (foe) { duelMine = g; duelFoe = foe; break; }
+  }
+  if (duelMine && duelFoe) {
+    out.push({ id: `challengeDuel:${duelFoe.id}`, family: 'hero', labelKey: 'battle.decision.challengeDuel', salient: true,
+      commands: [{ kind: 'challengeDuel', unitId: duelMine.id, targetUnitId: duelFoe.id }] });
   }
 
-  // HERO — Rally: a wavering ally with a friendly general within reach.
-  const wavering = mine.find((u) => u.morale <= BATTLE_TUNING.routMoraleThreshold + 10);
-  if (wavering) {
-    const gen = mine.find((u) => u.command !== undefined && u.id !== wavering.id && chebyshev(u.pos, wavering.pos) <= 3);
-    if (gen) {
-      out.push({ id: `rally:${wavering.id}`, family: 'hero', labelKey: 'battle.decision.rally', salient: true,
-        commands: [{ kind: 'rally', unitId: gen.id, targetUnitId: wavering.id }] });
-    }
+  // HERO — Rally: the first wavering ally that has a friendly general within reach
+  // (best-match across all wavering units).
+  let rallyWaver: BattleUnit | undefined;
+  let rallyGen: BattleUnit | undefined;
+  for (const w of mine) {
+    if (w.morale > BATTLE_TUNING.routMoraleThreshold + 10) continue;
+    const gen = mine.find((u2) => u2.command !== undefined && u2.id !== w.id && chebyshev(u2.pos, w.pos) <= 3);
+    if (gen) { rallyWaver = w; rallyGen = gen; break; }
+  }
+  if (rallyWaver && rallyGen) {
+    out.push({ id: `rally:${rallyWaver.id}`, family: 'hero', labelKey: 'battle.decision.rally', salient: true,
+      commands: [{ kind: 'rally', unitId: rallyGen.id, targetUnitId: rallyWaver.id }] });
   }
 
-  // HERO — Hero Charge: a cavalry unit that can reach an enemy this turn.
-  const cav = mine.find((u) => (u.troopType === 'cavalry' || u.troopType === 'heavyCav'));
-  if (cav) {
-    let target: typeof enemies[number] | undefined;
+  // HERO — Hero Charge: the first of my cavalry that can reach an enemy this
+  // turn (nearest enemy within its move range; best-match across all cavalry).
+  let chargeCav: BattleUnit | undefined;
+  let chargeFoe: BattleUnit | undefined;
+  for (const cav of mine) {
+    if (cav.troopType !== 'cavalry' && cav.troopType !== 'heavyCav') continue;
+    let target: BattleUnit | undefined;
     let best = Infinity;
     for (const e of enemies) { const d = chebyshev(cav.pos, e.pos); if (d < best) { best = d; target = e; } }
-    if (target && best <= (BATTLE_TUNING.moveRange[cav.troopType] ?? 4)) {
-      out.push({ id: `heroCharge:${target.id}`, family: 'hero', labelKey: 'battle.decision.heroCharge', salient: false,
-        commands: [{ kind: 'charge', unitId: cav.id, targetUnitId: target.id }] });
-    }
+    if (target && best <= (BATTLE_TUNING.moveRange[cav.troopType] ?? 4)) { chargeCav = cav; chargeFoe = target; break; }
+  }
+  if (chargeCav && chargeFoe) {
+    out.push({ id: `heroCharge:${chargeFoe.id}`, family: 'hero', labelKey: 'battle.decision.heroCharge', salient: false,
+      commands: [{ kind: 'charge', unitId: chargeCav.id, targetUnitId: chargeFoe.id }] });
   }
 
   // STRATAGEM — Feign Retreat: pull a pressed unit back to bait the enemy on.

@@ -324,4 +324,21 @@ describe('stepBattle — ranged, duel, morale, end', () => {
     if (end && end.kind === 'end') expect(typeof end.attackerWon).toBe('boolean');
     expect(true).toBe(true);
   });
+
+  it('a battle that reaches the day limit ends as an attacker timeout', () => {
+    // Two evenly-spaced units that never close (both hold) run to the 30-day cap.
+    let b = battle([
+      unit({ id: 'a', factionId: 'A', pos: { x: 1, y: 4 } }),
+      unit({ id: 'e', factionId: 'B', pos: { x: 8, y: 4 } }),
+    ]);
+    let end;
+    for (let day = 0; day < 31 && !end; day++) {
+      const r = stepBattle({ battle: b, commands: [{ kind: 'hold', unitId: 'a' }, { kind: 'hold', unitId: 'e' }] });
+      b = r.battle;
+      end = r.events.find((ev) => ev.kind === 'end');
+    }
+    expect(end).toBeDefined();
+    expect(end!.kind === 'end' && end!.reason).toBe('timeout');
+    expect(end!.kind === 'end' && end!.attackerWon).toBe(false);
+  });
 });

@@ -107,6 +107,29 @@ describe('offerPlayerDecisions — hero levers', () => {
     expect(d.commands).toEqual([{ kind: 'rally', unitId: 'gen', targetUnitId: 'weak' }]);
   });
 
+  it('offers Challenge Duel even when the FIRST general has no adjacent enemy general (best-match)', () => {
+    const b = mk([
+      u({ id: 'g1', factionId: 'A', pos: { x: 1, y: 8 }, wu: 96 }),   // high-wu, but far from any enemy general
+      u({ id: 'g2', factionId: 'A', pos: { x: 5, y: 4 }, wu: 95 }),   // high-wu, adjacent to the enemy general
+      u({ id: 'foe', factionId: 'B', pos: { x: 6, y: 4 }, wu: 94 }),
+    ]);
+    const d = find(offerPlayerDecisions(b, 'A'), 'challengeDuel')!;
+    expect(d).toBeDefined();
+    expect(d.commands).toEqual([{ kind: 'challengeDuel', unitId: 'g2', targetUnitId: 'foe' }]);
+  });
+
+  it('offers Rally even when the FIRST wavering unit has no general in range (best-match)', () => {
+    const b = mk([
+      u({ id: 'w1', factionId: 'A', pos: { x: 1, y: 8 }, morale: 15 }),       // wavering, no general near
+      u({ id: 'w2', factionId: 'A', pos: { x: 5, y: 4 }, morale: 15 }),       // wavering, general adjacent
+      u({ id: 'gen', factionId: 'A', pos: { x: 5, y: 5 }, command: 90 }),
+      u({ id: 'e', factionId: 'B', pos: { x: 8, y: 0 } }),
+    ]);
+    const d = find(offerPlayerDecisions(b, 'A'), 'rally')!;
+    expect(d).toBeDefined();
+    expect(d.commands).toEqual([{ kind: 'rally', unitId: 'gen', targetUnitId: 'w2' }]);
+  });
+
   it('offers Hero Charge (non-salient) for a cavalry unit that can reach a target', () => {
     const b = mk([
       u({ id: 'cav', factionId: 'A', pos: { x: 4, y: 6 }, troopType: 'cavalry', wu: 88 }),
@@ -117,6 +140,17 @@ describe('offerPlayerDecisions — hero levers', () => {
     expect(d.family).toBe('hero');
     expect(d.salient).toBe(false);
     expect(d.commands[0]).toEqual({ kind: 'charge', unitId: 'cav', targetUnitId: 'e' });
+  });
+
+  it('offers Hero Charge even when the FIRST cavalry is out of range but a SECOND can reach (best-match)', () => {
+    const b = mk([
+      u({ id: 'c1', factionId: 'A', pos: { x: 1, y: 9 }, troopType: 'cavalry' }),   // cavalry, but 7 cells from any enemy (> moveRange 4)
+      u({ id: 'c2', factionId: 'A', pos: { x: 6, y: 3 }, troopType: 'cavalry' }),   // cavalry, within charge range of the enemy
+      u({ id: 'e', factionId: 'B', pos: { x: 8, y: 2 }, troops: 3000 }),
+    ]);
+    const d = find(offerPlayerDecisions(b, 'A'), 'heroCharge')!;
+    expect(d).toBeDefined();
+    expect(d.commands[0]).toEqual({ kind: 'charge', unitId: 'c2', targetUnitId: 'e' });
   });
 });
 
