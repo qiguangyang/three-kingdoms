@@ -172,6 +172,12 @@ export class MapScene {
     lr.style.inset = '0';
     lr.style.pointerEvents = 'none';
     lr.style.overflow = 'hidden';
+    // CSS2DRenderer assigns each label its own z-index (depth-sorting among
+    // labels); left uncontained those values leak into the page and can paint
+    // OVER the HUD panels and modals. Giving the overlay its own z-index makes it
+    // a stacking context, so the labels stay contained below the floating HUD
+    // (z-20) and the command modals (z-30/40).
+    lr.style.zIndex = '1';
     canvas.parentElement?.appendChild(lr);
 
     this.scene = new THREE.Scene();
