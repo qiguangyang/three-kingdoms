@@ -30,7 +30,7 @@ export function detectGambits(battle: Battle): Gambit[] {
       if (!active(u)) continue;
       const inForest = cellAt(battle, u.pos) === 'forest' ||
         [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }].some((d) => cellAt(battle, { x: u.pos.x + d.x, y: u.pos.y + d.y }) === 'forest');
-      if (inForest) { out.push({ id: 'fireAttack', unitIds: [u.id], labelKey: 'battle.gambit.fireAttack' }); break; }
+      if (inForest) out.push({ id: 'fireAttack', unitIds: [u.id], labelKey: 'battle.gambit.fireAttack' });
     }
   }
 
@@ -42,14 +42,14 @@ export function detectGambits(battle: Battle): Gambit[] {
       .some((d) => cellAt(battle, { x: u.pos.x + d.x, y: u.pos.y + d.y }) === 'river');
     if (!nextToRiver) continue;
     const foe = units.find((e) => e.factionId !== u.factionId && active(e) && chebyshev(u.pos, e.pos) <= 4);
-    if (foe) { out.push({ id: 'floodAttack', unitIds: [u.id], labelKey: 'battle.gambit.floodAttack' }); break; }
+    if (foe) out.push({ id: 'floodAttack', unitIds: [u.id], labelKey: 'battle.gambit.floodAttack' });
   }
 
   // duelChallenge: two adjacent generals both above the wu threshold.
   for (const u of units) {
     if (!active(u) || u.wu === undefined || u.wu < BATTLE_TUNING.duelWuMin) continue;
     const foe = units.find((e) => e.factionId !== u.factionId && active(e) && e.wu !== undefined && e.wu >= BATTLE_TUNING.duelWuMin && chebyshev(u.pos, e.pos) <= 1);
-    if (foe) { out.push({ id: 'duelChallenge', unitIds: [u.id, foe.id], labelKey: 'battle.gambit.duelChallenge' }); break; }
+    if (foe) out.push({ id: 'duelChallenge', unitIds: [u.id, foe.id], labelKey: 'battle.gambit.duelChallenge' });
   }
 
   // fordCrossing: a land unit adjacent to a ford cell.
@@ -57,7 +57,7 @@ export function detectGambits(battle: Battle): Gambit[] {
     if (!active(u) || u.troopType === 'navy') continue;
     const nextToFord = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 0, y: 0 }]
       .some((d) => cellAt(battle, { x: u.pos.x + d.x, y: u.pos.y + d.y }) === 'ford');
-    if (nextToFord) { out.push({ id: 'fordCrossing', unitIds: [u.id], labelKey: 'battle.gambit.fordCrossing' }); break; }
+    if (nextToFord) out.push({ id: 'fordCrossing', unitIds: [u.id], labelKey: 'battle.gambit.fordCrossing' });
   }
 
   // ambush: a unit standing in forest with an enemy at striking distance.
@@ -65,7 +65,7 @@ export function detectGambits(battle: Battle): Gambit[] {
     if (!active(u)) continue;
     if (cellAt(battle, u.pos) !== 'forest') continue;
     const foe = units.find((e) => e.factionId !== u.factionId && active(e) && chebyshev(u.pos, e.pos) <= 2 && chebyshev(u.pos, e.pos) >= 1);
-    if (foe) { out.push({ id: 'ambush', unitIds: [u.id], labelKey: 'battle.gambit.ambush' }); break; }
+    if (foe) out.push({ id: 'ambush', unitIds: [u.id], labelKey: 'battle.gambit.ambush' });
   }
 
   return out;
