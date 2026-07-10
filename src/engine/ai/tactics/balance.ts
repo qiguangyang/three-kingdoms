@@ -43,6 +43,14 @@ function openField(seed: number): BattleField {
   // A defensible hill in front of the defender, so the hold lever is reachable.
   cells[3 * w + 6] = 'hill';
   heights[3 * w + 6] = 0.8;
+  // A forest stand + a river cell beside the attacker's staging corner so a
+  // guileful commander can spring a fire/flood/ambush stratagem. Kept off the
+  // center advance lane (x=6) so neither blocks the head-on approach: a river
+  // on the lane would halt land units short of contact (see stepToward) and
+  // deadlock the battle.
+  cells[10 * w + 5] = 'forest'; // (5,10): adjacent to the attacker at (6,10)
+  cells[9 * w + 5] = 'forest'; // (5,9)
+  cells[10 * w + 4] = 'river'; // (4,10)
   return { width: w, height: h, heights, cells, seed };
 }
 
@@ -64,7 +72,8 @@ function buildBattle(m: Matchup): Battle {
       state: 'reserve', formationRole: 'rear' },
   ];
   return { cityId: 'c', attackerFactionId: A, defenderFactionId: B, daysElapsed: 0,
-    units, field: openField(m.seed), seed: m.seed, rngCursor: m.seed >>> 0, log: [] };
+    units, field: openField(m.seed), seed: m.seed, rngCursor: m.seed >>> 0, log: [],
+    wind: { dir: { x: 0, y: -1 }, strength: 0.8 } };
 }
 
 export function simulateHeadless(m: Matchup): BattleReport {

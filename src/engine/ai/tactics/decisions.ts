@@ -8,7 +8,7 @@ import { assessBattle } from './assessment.js';
 
 export interface OfferedDecision {
   id: string; // 'commitReserves' | 'holdLine' | `focusFire:${targetUnitId}`
-  family: 'maneuver' | 'hero';
+  family: 'maneuver' | 'hero' | 'stratagem';
   labelKey: string; // i18n MessageKey
   salient: boolean; // pause auto-play for this decision
   commands: TacticalCommand[];
@@ -105,6 +105,13 @@ export function offerPlayerDecisions(battle: Battle, factionId: FactionId): Offe
       out.push({ id: `heroCharge:${target.id}`, family: 'hero', labelKey: 'battle.decision.heroCharge', salient: false,
         commands: [{ kind: 'charge', unitId: cav.id, targetUnitId: target.id }] });
     }
+  }
+
+  // STRATAGEM — Feign Retreat: pull a pressed unit back to bait the enemy on.
+  const pressed = mine.find((u) => enemies.some((e) => chebyshev(u.pos, e.pos) <= 1));
+  if (pressed) {
+    out.push({ id: `feignRetreat:${pressed.id}`, family: 'stratagem', labelKey: 'battle.decision.feignRetreat', salient: false,
+      commands: [{ kind: 'retreat', unitId: pressed.id }] });
   }
 
   return out;

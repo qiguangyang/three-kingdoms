@@ -1,6 +1,6 @@
 // Deterministic one-day battle step. Phases run in a fixed order so results
-// are reproducible: default-orders -> move -> ranged -> melee -> duel -> fire
-// -> morale/rout -> end-check.
+// are reproducible: default-orders -> move -> ranged -> melee -> charge-shock
+// -> duel -> fire -> flood -> ambush -> rally -> morale/rout -> end-check.
 import { BATTLE_DAY_LIMIT, COMBAT_MODIFIER } from '../constants.js';
 import { rollInt } from '../rng.js';
 import type {
@@ -156,10 +156,15 @@ export function stepBattle(input: StepInput): StepResult {
       continue; // holding or attacking in place: no move
     }
     let target: Vec2 | undefined;
+    let feinting = false;
     if (order && order.kind === 'march') target = order.target;
-    else if (order && (order.kind === 'charge')) {
+    else if (order && order.kind === 'charge') {
       const t = byId(order.targetUnitId);
       target = t?.pos;
+    } else if (order && order.kind === 'retreat') {
+      const homeY = u.factionId === input.battle.attackerFactionId ? input.battle.field.height - 1 : 0;
+      target = { x: u.pos.x, y: homeY };
+      feinting = true;
     } else {
       const enemy = nearestEnemy(u, units);
       target = enemy?.pos;
@@ -171,6 +176,7 @@ export function stepBattle(input: StepInput): StepResult {
       u.pos = to;
       events.push({ kind: 'move', unitId: u.id, from, to });
     }
+    if (feinting) events.push({ kind: 'feint', unitId: u.id });
   }
 
   // ---------------- RANGED PHASE ----------------
@@ -278,10 +284,17 @@ export function stepBattle(input: StepInput): StepResult {
       const src = byId(uid);
       if (!src || !isActive(src)) continue;
       const at = { ...src.pos };
-      events.push({ kind: 'fire', at, spread: 2 });
+      const wind = input.battle.wind;
+      const reach = wind ? 2 + Math.round(wind.strength * 3) : 2;
+      events.push({ kind: 'fire', at, spread: reach });
       for (const e of units) {
         if (e.factionId === src.factionId || !isActive(e)) continue;
-        if (chebyshev(e.pos, at) <= 2) {
+        const dx = e.pos.x - at.x;
+        const dy = e.pos.y - at.y;
+        const cheb = Math.max(Math.abs(dx), Math.abs(dy));
+        // Base blaze, or caught downwind within the extended reach.
+        const downwind = wind ? dx * wind.dir.x + dy * wind.dir.y > 0 : false;
+        if (cheb <= 2 || (downwind && cheb <= reach)) {
           const loss = Math.min(e.troops, Math.floor(e.troops * 0.2));
           e.troops -= loss;
           e.morale = Math.max(0, e.morale - 20);
@@ -341,6 +354,26 @@ export function stepBattle(input: StepInput): StepResult {
             e.troops -= loss;
             e.morale = Math.max(0, e.morale - 35);
           }
+        }
+      }
+    }
+  }
+
+  // ---------------- AMBUSH PHASE ----------------
+  // A concealed forest unit springs a surprise strike: modest casualties but a
+  // heavy morale shock to nearby enemies (gate-checking is the caller's job).
+  for (const c of input.commands) {
+    if (c.kind !== 'gambit' || c.gambitId !== 'ambush') continue;
+    for (const uid of c.unitIds) {
+      const src = byId(uid);
+      if (!src || !isActive(src)) continue;
+      const at = { ...src.pos };
+      events.push({ kind: 'ambushSprung', at, unitId: src.id });
+      for (const e of units) {
+        if (e.factionId === src.factionId || !isActive(e)) continue;
+        if (chebyshev(e.pos, at) <= 2) {
+          e.troops -= Math.min(e.troops, Math.floor(e.troops * 0.15));
+          e.morale = Math.max(0, e.morale - 30);
         }
       }
     }

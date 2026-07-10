@@ -119,3 +119,16 @@ describe('offerPlayerDecisions — hero levers', () => {
     expect(d.commands[0]).toEqual({ kind: 'charge', unitId: 'cav', targetUnitId: 'e' });
   });
 });
+
+describe('offerPlayerDecisions — stratagem levers', () => {
+  it('offers Feign Retreat for a player unit with an adjacent enemy', () => {
+    const b = mk([
+      u({ id: 'a', factionId: 'A', pos: { x: 4, y: 6 } }),
+      u({ id: 'e', factionId: 'B', pos: { x: 4, y: 5 } }),
+    ]);
+    const d = find(offerPlayerDecisions(b, 'A'), 'feignRetreat')!;
+    expect(d).toBeDefined();
+    expect(d.family).toBe('stratagem');
+    expect(d.commands).toEqual([{ kind: 'retreat', unitId: 'a' }]);
+  });
+});

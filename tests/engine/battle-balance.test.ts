@@ -57,4 +57,13 @@ describe('battle balance harness', () => {
     const sweep = runBalanceSweep(matchups);
     expect(sweep.leverTotals.challengeDuel ?? 0).toBeGreaterThan(0);
   });
+
+  it('stratagems are reachable: a guileful commander springs a fire/flood/ambush gambit in a sweep', () => {
+    const seeds = [1, 2, 3, 4, 5, 6, 7, 8];
+    const matchups = seeds.map((seed) => ({ seed,
+      attacker: { troops: 8000, wu: 55, zhi: 98, command: 85, personality: 'balanced' as const },
+      defender: { troops: 8000, wu: 70, zhi: 60, command: 80, personality: 'balanced' as const } }));
+    const sweep = runBalanceSweep(matchups);
+    expect(sweep.leverTotals.gambit ?? 0).toBeGreaterThan(0);
+  });
 });

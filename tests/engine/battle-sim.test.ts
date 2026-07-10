@@ -211,6 +211,30 @@ describe('stepBattle — movement + melee', () => {
     const cmds = [{ kind: 'rally', unitId: 'gen', targetUnitId: 'weak' }, { kind: 'charge', unitId: 'e', targetUnitId: 'weak' }] as const;
     expect(stepBattle({ battle: mk(), commands: [...cmds] })).toEqual(stepBattle({ battle: mk(), commands: [...cmds] }));
   });
+
+  it('an ambush gambit deals a heavy morale shock to nearby enemies and emits ambushSprung', () => {
+    const b = battle([
+      unit({ id: 'a', factionId: 'A', pos: { x: 4, y: 4 } }),
+      unit({ id: 'e', factionId: 'B', pos: { x: 5, y: 4 }, troops: 8000, morale: 100 }),
+    ]);
+    const { battle: next, events } = stepBattle({ battle: b, commands: [{ kind: 'gambit', gambitId: 'ambush', unitIds: ['a'] }] });
+    const e = next.units.find((x) => x.id === 'e')!;
+    expect(e.troops).toBeLessThan(8000);
+    expect(e.morale).toBeLessThan(100 - 20); // heavy surprise morale hit (>= the 30 shock, minus clamps)
+    expect(events.some((ev) => ev.kind === 'ambushSprung' && ev.unitId === 'a')).toBe(true);
+  });
+
+  it('a retreat command withdraws a unit toward its home edge, staying fielded (feint)', () => {
+    const b = battle([
+      unit({ id: 'a', factionId: 'A', pos: { x: 4, y: 3 } }), // attacker: home edge is high y (h-1)
+      unit({ id: 'e', factionId: 'B', pos: { x: 4, y: 1 } }),
+    ]);
+    const { battle: next, events } = stepBattle({ battle: b, commands: [{ kind: 'retreat', unitId: 'a' }] });
+    const a = next.units.find((x) => x.id === 'a')!;
+    expect(a.pos.y).toBeGreaterThan(3);          // moved toward home (away from the enemy at y=1)
+    expect(a.state).toBe('fielded');             // deliberate, not routed
+    expect(events.some((ev) => ev.kind === 'feint' && ev.unitId === 'a')).toBe(true);
+  });
 });
 
 describe('stepBattle — ranged, duel, morale, end', () => {
@@ -234,6 +258,25 @@ describe('stepBattle — ranged, duel, morale, end', () => {
     const e = next.units.find((u) => u.id === 'e')!;
     expect(e.troops).toBeLessThan(8000);
     expect(events.some((ev) => ev.kind === 'fire')).toBe(true);
+  });
+
+  it('fire spreads downwind: it burns an enemy beyond the base radius when the wind blows toward it', () => {
+    // All three hold so nobody advances before the fire phase — this isolates the
+    // downwind spread (units otherwise close distance in the movement phase first).
+    const b = battle([
+      unit({ id: 'a', factionId: 'A', pos: { x: 3, y: 4 } }),
+      unit({ id: 'down', factionId: 'B', pos: { x: 7, y: 4 }, troops: 8000 }), // 4 cells east (downwind)
+      unit({ id: 'up', factionId: 'B', pos: { x: 3, y: 0 }, troops: 8000 }),   // 4 cells north (crosswind/upwind)
+    ]);
+    b.wind = { dir: { x: 1, y: 0 }, strength: 0.9 }; // strong east wind -> reach 2 + round(2.7)=5
+    const { battle: next } = stepBattle({ battle: b, commands: [
+      { kind: 'gambit', gambitId: 'fireAttack', unitIds: ['a'] },
+      { kind: 'hold', unitId: 'a' }, { kind: 'hold', unitId: 'down' }, { kind: 'hold', unitId: 'up' },
+    ] });
+    const down = next.units.find((x) => x.id === 'down')!;
+    const up = next.units.find((x) => x.id === 'up')!;
+    expect(down.troops).toBeLessThan(8000); // caught by the downwind spread (dist 4 > base 2)
+    expect(up.troops).toBe(8000);           // upwind, beyond the base radius -> untouched
   });
 
   it('a floodAttack gambit drowns enemies in the flooded cells and emits a flood event', () => {

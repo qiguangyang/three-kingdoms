@@ -105,6 +105,26 @@ describe('BattleScreen', () => {
     expect(getByText(t('battle.narr.rally'))).toBeInTheDocument();
   });
 
+  it('captions an ambush on a day whose events include an ambushSprung', () => {
+    enterBattle();
+    // Stage a resolved day whose events include a sprung ambush. The per-day
+    // effect must flash the ambush caption (battle.caption.ambush) — zh 伏兵！.
+    const session = gameStore.getState().battle!;
+    const unitId = session.battle.units[0]?.id ?? 'u0';
+    gameStore.setState((s) => ({
+      ...s,
+      battle: {
+        ...session,
+        phase: 'awaitingOrders',
+        lastEvents: [{ kind: 'ambushSprung', at: { x: 0, y: 0 }, unitId }],
+      },
+    }));
+    const { getByText } = render(<BattleScreen />);
+    // Close the intro card so the cinematic caption is unobscured on screen.
+    fireEvent.click(getByText(t('battle.intro.begin')));
+    expect(getByText(t('battle.caption.ambush'))).toBeInTheDocument();
+  });
+
   it('shows the pivotal prompt (Continue watching) while auto-playing on a salient decision', async () => {
     enterSalientBattle();
     const session = gameStore.getState().battle!;

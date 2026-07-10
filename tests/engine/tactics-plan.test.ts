@@ -161,4 +161,27 @@ describe('planTactical', () => {
     const cmds = planTactical(b, 'A', 'balanced');
     expect(cmds.some((c) => c.kind === 'rally' && c.targetUnitId === 'weak')).toBe(true);
   });
+
+  it('a guileful commander springs an available stratagem (fire) when wind + forest allow', () => {
+    const field = flatField();
+    field.cells[4 * 12 + 5] = 'forest'; // forest next to the acting unit
+    const b = mkBattle([
+      u({ id: 'z', factionId: 'A', pos: { x: 5, y: 5 }, wu: 60, zhi: 98, command: 85, troops: 5000 }),
+      u({ id: 'e', factionId: 'B', pos: { x: 6, y: 5 }, troops: 5000 }),
+    ], field);
+    b.wind = { dir: { x: 0, y: -1 }, strength: 0.8 };
+    const cmds = planTactical(b, 'A', 'balanced');
+    expect(cmds.some((c) => c.kind === 'gambit' && (c as { gambitId: string }).gambitId === 'fireAttack')).toBe(true);
+  });
+
+  it('a non-guileful commander does not spring stratagems', () => {
+    const field = flatField();
+    field.cells[4 * 12 + 5] = 'forest';
+    const b = mkBattle([
+      u({ id: 'brute', factionId: 'A', pos: { x: 5, y: 5 }, wu: 98, zhi: 20, command: 70, troops: 5000 }),
+      u({ id: 'e', factionId: 'B', pos: { x: 6, y: 5 }, troops: 5000 }),
+    ], field);
+    b.wind = { dir: { x: 0, y: -1 }, strength: 0.8 };
+    expect(planTactical(b, 'A', 'active').some((c) => c.kind === 'gambit')).toBe(false);
+  });
 });
