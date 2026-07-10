@@ -141,6 +141,17 @@ describe('offerPlayerDecisions — hero levers', () => {
     expect(d.salient).toBe(false);
     expect(d.commands[0]).toEqual({ kind: 'charge', unitId: 'cav', targetUnitId: 'e' });
   });
+
+  it('offers Hero Charge even when the FIRST cavalry is out of range but a SECOND can reach (best-match)', () => {
+    const b = mk([
+      u({ id: 'c1', factionId: 'A', pos: { x: 1, y: 9 }, troopType: 'cavalry' }),   // cavalry, but 7 cells from any enemy (> moveRange 4)
+      u({ id: 'c2', factionId: 'A', pos: { x: 6, y: 3 }, troopType: 'cavalry' }),   // cavalry, within charge range of the enemy
+      u({ id: 'e', factionId: 'B', pos: { x: 8, y: 2 }, troops: 3000 }),
+    ]);
+    const d = find(offerPlayerDecisions(b, 'A'), 'heroCharge')!;
+    expect(d).toBeDefined();
+    expect(d.commands[0]).toEqual({ kind: 'charge', unitId: 'c2', targetUnitId: 'e' });
+  });
 });
 
 describe('offerPlayerDecisions — stratagem levers', () => {

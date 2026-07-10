@@ -103,16 +103,20 @@ export function offerPlayerDecisions(battle: Battle, factionId: FactionId): Offe
       commands: [{ kind: 'rally', unitId: rallyGen.id, targetUnitId: rallyWaver.id }] });
   }
 
-  // HERO — Hero Charge: a cavalry unit that can reach an enemy this turn.
-  const cav = mine.find((u) => (u.troopType === 'cavalry' || u.troopType === 'heavyCav'));
-  if (cav) {
-    let target: typeof enemies[number] | undefined;
+  // HERO — Hero Charge: the first of my cavalry that can reach an enemy this
+  // turn (nearest enemy within its move range; best-match across all cavalry).
+  let chargeCav: BattleUnit | undefined;
+  let chargeFoe: BattleUnit | undefined;
+  for (const cav of mine) {
+    if (cav.troopType !== 'cavalry' && cav.troopType !== 'heavyCav') continue;
+    let target: BattleUnit | undefined;
     let best = Infinity;
     for (const e of enemies) { const d = chebyshev(cav.pos, e.pos); if (d < best) { best = d; target = e; } }
-    if (target && best <= (BATTLE_TUNING.moveRange[cav.troopType] ?? 4)) {
-      out.push({ id: `heroCharge:${target.id}`, family: 'hero', labelKey: 'battle.decision.heroCharge', salient: false,
-        commands: [{ kind: 'charge', unitId: cav.id, targetUnitId: target.id }] });
-    }
+    if (target && best <= (BATTLE_TUNING.moveRange[cav.troopType] ?? 4)) { chargeCav = cav; chargeFoe = target; break; }
+  }
+  if (chargeCav && chargeFoe) {
+    out.push({ id: `heroCharge:${chargeFoe.id}`, family: 'hero', labelKey: 'battle.decision.heroCharge', salient: false,
+      commands: [{ kind: 'charge', unitId: chargeCav.id, targetUnitId: chargeFoe.id }] });
   }
 
   // STRATAGEM — Feign Retreat: pull a pressed unit back to bait the enemy on.

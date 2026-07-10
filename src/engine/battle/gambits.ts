@@ -45,7 +45,10 @@ export function detectGambits(battle: Battle): Gambit[] {
     if (foe) out.push({ id: 'floodAttack', unitIds: [u.id], labelKey: 'battle.gambit.floodAttack' });
   }
 
-  // duelChallenge: two adjacent generals both above the wu threshold.
+  // duelChallenge: two adjacent generals both above the wu threshold. Each
+  // adjacent high-wu pair is reported from BOTH sides' perspective (reciprocal
+  // [a,b] and [b,a] entries); downstream dedups by id and compileGambit
+  // resolves order-independently.
   for (const u of units) {
     if (!active(u) || u.wu === undefined || u.wu < BATTLE_TUNING.duelWuMin) continue;
     const foe = units.find((e) => e.factionId !== u.factionId && active(e) && e.wu !== undefined && e.wu >= BATTLE_TUNING.duelWuMin && chebyshev(u.pos, e.pos) <= 1);

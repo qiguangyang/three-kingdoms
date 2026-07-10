@@ -114,7 +114,7 @@ describe('battle session — player decisions', () => {
   });
 
   it('a defending player is offered maneuver levers too (symmetry)', () => {
-    const { state, battle, personalities } = setup();
+    const { battle, personalities } = setup();
     // Flip: the player defends. (setup builds caocao as attacker; recompute a session
     //  with the DEFENDER faction as the player to prove the levers are side-agnostic.)
     const defender = battle.defenderFactionId;
@@ -123,6 +123,5 @@ describe('battle session — player decisions', () => {
     expect(Array.isArray(sess.offeredDecisions)).toBe(true);
     // A focus-fire decision is offered to whichever side has units + an enemy.
     expect(sess.offeredDecisions.some((d) => d.id.startsWith('focusFire'))).toBe(true);
-    void state;
   });
 });
