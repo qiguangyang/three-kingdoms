@@ -426,6 +426,7 @@ export class MapScene {
     const cols = new Float32Array(n * 3);
     const alphas = new Float32Array(n);
     const col = new THREE.Color();
+    const PASTEL = new THREE.Color(0xf5efe0); // warm off-white the realm colours lean toward
     for (let i = 0; i < n; i++) {
       const wx = srcPos.getX(i);
       const wz = srcPos.getZ(i);
@@ -441,11 +442,13 @@ export class MapScene {
         }
       }
       if (bf && pointInPolygon(wx, wz, landPolyWorld)) {
-        col.set(factionColor(bf));
+        // Lighten toward a soft pastel so the realms read like the reference
+        // atlas's flat fills rather than a dark wash over the terrain.
+        col.set(factionColor(bf)).lerp(PASTEL, 0.28);
         cols[i * 3] = col.r;
         cols[i * 3 + 1] = col.g;
         cols[i * 3 + 2] = col.b;
-        alphas[i] = 0.42;
+        alphas[i] = 0.5;
       } else {
         alphas[i] = 0;
       }
