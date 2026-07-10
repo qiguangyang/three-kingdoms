@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useSession } from '../hooks/useSession.js';
 import { selectBattle, selectLocale } from '../../state/selectors.js';
 import {
-  chooseBattleGambit, finishBattle, quickResolveBattle, resolveBattleDay,
+  chooseBattleDecision, chooseBattleGambit, finishBattle, quickResolveBattle, resolveBattleDay,
   setBattleSpeed, submitBattleOrders,
 } from '../../state/store.js';
 import { selectGame } from '../../state/selectors.js';
@@ -257,6 +257,18 @@ export const BattleScreen: React.FC = () => {
                   resolveBattleDay();
                 }}>
                   {t(g.labelKey as MessageKey)}
+                </CinBtn>
+              ))}
+            </div>
+          )}
+
+          {/* Maneuver levers — the commander's contextual moves. */}
+          {session.offeredDecisions.length > 0 && (
+            <div className="flex flex-wrap items-center justify-center gap-2 px-3 py-2" style={PANEL}>
+              <span className="font-display text-xs" style={{ letterSpacing: '0.28em', color: GOLD }}>{t('battle.decision.tray')}</span>
+              {session.offeredDecisions.map((d) => (
+                <CinBtn key={d.id} onClick={() => { chooseBattleDecision(d.id); resolveBattleDay(); }}>
+                  {t(d.labelKey as MessageKey)}
                 </CinBtn>
               ))}
             </div>

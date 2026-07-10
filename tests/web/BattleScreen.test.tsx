@@ -36,4 +36,12 @@ describe('BattleScreen', () => {
     expect(gameStore.getState().battle!.phase).toBe('resolved');
     expect(getAllByText(t('battle.finish')).length).toBeGreaterThan(0);
   });
+
+  it('renders the maneuver lever tray for the offered decisions', () => {
+    enterBattle();
+    const { getAllByText } = render(<BattleScreen />);
+    // Focus Fire is always offered when the player has units and an enemy exists
+    // (default test locale is zh -> '集火猛攻').
+    expect(getAllByText(t('battle.decision.focusFire')).length).toBeGreaterThan(0);
+  });
 });
