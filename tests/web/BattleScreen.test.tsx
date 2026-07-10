@@ -65,6 +65,46 @@ describe('BattleScreen', () => {
     expect(getAllByText(t('battle.decision.focusFire')).length).toBeGreaterThan(0);
   });
 
+  it('renders a hero lever (Challenge Duel) when a hero decision is offered', () => {
+    enterBattle();
+    // The maneuver tray renders ANY OfferedDecision. Inject a hero (Challenge
+    // Duel) lever the way the tactics detector surfaces one and assert its label
+    // shows (zh 'Challenge Duel' == 单挑).
+    const session = gameStore.getState().battle!;
+    gameStore.setState((s) => ({
+      ...s,
+      battle: {
+        ...session,
+        offeredDecisions: [
+          { id: 'challengeDuel:foe', family: 'hero', labelKey: 'battle.decision.challengeDuel', salient: true, commands: [] },
+        ],
+      },
+    }));
+    const { getAllByText } = render(<BattleScreen />);
+    expect(getAllByText(t('battle.decision.challengeDuel')).length).toBeGreaterThan(0);
+  });
+
+  it('narrates a rally on a day whose events include a rally', () => {
+    enterBattle();
+    // Stage a resolved day whose events include a rally (a general steadying a
+    // wavering block). The per-day effect must surface the rally narration line
+    // (battle.narr.rally) rather than falling back to the generic deploy line.
+    const session = gameStore.getState().battle!;
+    const unitId = session.battle.units[0]?.id ?? 'u0';
+    gameStore.setState((s) => ({
+      ...s,
+      battle: {
+        ...session,
+        phase: 'awaitingOrders',
+        lastEvents: [{ kind: 'rally', unitId, targetUnitId: unitId, morale: 5 }],
+      },
+    }));
+    const { getByText } = render(<BattleScreen />);
+    // Close the intro card so the documentary narration subtitle is on screen.
+    fireEvent.click(getByText(t('battle.intro.begin')));
+    expect(getByText(t('battle.narr.rally'))).toBeInTheDocument();
+  });
+
   it('shows the pivotal prompt (Continue watching) while auto-playing on a salient decision', async () => {
     enterSalientBattle();
     const session = gameStore.getState().battle!;
