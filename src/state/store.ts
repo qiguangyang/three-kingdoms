@@ -232,6 +232,12 @@ function sessionFromGame(game: GameState): BattleSession {
   return startSession(game.pendingBattle!, game.playerFactionId, personalities);
 }
 
+// Keep game.pendingBattle in sync with the live session's battle, so an autosave
+// taken mid-battle reloads at the current day (not day 0).
+function withPendingBattle(s: SessionState, session: BattleSession): SessionState {
+  return { ...s, battle: session, game: s.game ? { ...s.game, pendingBattle: session.battle } : s.game };
+}
+
 // Route to the battle screen for the game's current pendingBattle (used on
 // load/restore and by advanceDays when a siege defers).
 export function enterPendingBattle(): void {
@@ -259,7 +265,7 @@ export function chooseBattleDecision(id: string): void {
 }
 
 export function resolveBattleDay(): void {
-  gameStore.setState((s) => (s.battle ? { ...s, battle: resolveDay(s.battle) } : s));
+  gameStore.setState((s) => (s.battle ? withPendingBattle(s, resolveDay(s.battle)) : s));
 }
 
 export function setBattleSpeed(speed: 1 | 2 | 4): void {
@@ -267,7 +273,7 @@ export function setBattleSpeed(speed: 1 | 2 | 4): void {
 }
 
 export function quickResolveBattle(): void {
-  gameStore.setState((s) => (s.battle ? { ...s, battle: autoResolveSession(s.battle) } : s));
+  gameStore.setState((s) => (s.battle ? withPendingBattle(s, autoResolveSession(s.battle)) : s));
 }
 
 // Fold the resolved battle's outcome back into GameState (casualties,
