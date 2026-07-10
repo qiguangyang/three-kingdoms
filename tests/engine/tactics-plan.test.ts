@@ -134,4 +134,31 @@ describe('planTactical', () => {
     ]);
     expect(planTactical(mk(), 'A', 'active')).toEqual(planTactical(mk(), 'A', 'active'));
   });
+
+  it('an aggressive commander adjacent to an enemy general challenges a duel', () => {
+    const b = mkBattle([
+      u({ id: 'lu', factionId: 'A', pos: { x: 4, y: 4 }, wu: 98, command: 70, troops: 5000 }),
+      u({ id: 'guan', factionId: 'B', pos: { x: 5, y: 4 }, wu: 96, command: 90, troops: 5000 }),
+    ]);
+    const cmds = planTactical(b, 'A', 'active');
+    expect(cmds.some((c) => c.kind === 'challengeDuel' && c.unitId === 'lu' && c.targetUnitId === 'guan')).toBe(true);
+  });
+
+  it('a cautious commander does NOT go duel-hunting', () => {
+    const b = mkBattle([
+      u({ id: 'sima', factionId: 'A', pos: { x: 4, y: 4 }, wu: 60, command: 95, zhi: 98, troops: 5000 }),
+      u({ id: 'guan', factionId: 'B', pos: { x: 5, y: 4 }, wu: 96, command: 90, troops: 5000 }),
+    ]);
+    expect(planTactical(b, 'A', 'turtle').some((c) => c.kind === 'challengeDuel')).toBe(false);
+  });
+
+  it('a general near a wavering ally rallies it', () => {
+    const b = mkBattle([
+      u({ id: 'gen', factionId: 'A', pos: { x: 4, y: 4 }, wu: 80, command: 92, troops: 5000 }),
+      u({ id: 'weak', factionId: 'A', pos: { x: 5, y: 4 }, morale: 18, troops: 2000 }),
+      u({ id: 'e', factionId: 'B', pos: { x: 6, y: 4 }, troops: 5000 }),
+    ]);
+    const cmds = planTactical(b, 'A', 'balanced');
+    expect(cmds.some((c) => c.kind === 'rally' && c.targetUnitId === 'weak')).toBe(true);
+  });
 });

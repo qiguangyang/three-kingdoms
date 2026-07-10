@@ -225,6 +225,20 @@ export function stepBattle(input: StepInput): StepResult {
     events.push({ kind: 'clash', unitId: u.id, targetUnitId: enemy.id, casualties: bLoss, defCasualties: aLoss });
   }
 
+  // ---------------- CHARGE SHOCK ----------------
+  // A charging unit that reached its target shakes the target's morale (beyond
+  // casualties). Command-driven + order-independent, so a defender's charge is
+  // not silently dropped by the melee loop's pair-dedup ordering.
+  for (const c of input.commands) {
+    if (c.kind !== 'charge') continue;
+    const src = byId(c.unitId);
+    const tgt = byId(c.targetUnitId);
+    if (!src || !tgt || !isActive(src) || src.factionId === tgt.factionId) continue;
+    if (chebyshev(src.pos, tgt.pos) > 1) continue; // never reached contact
+    tgt.morale = Math.max(0, tgt.morale - BATTLE_TUNING.chargeMoraleShock);
+    events.push({ kind: 'charge', unitId: src.id, targetUnitId: tgt.id });
+  }
+
   // ---------------- DUEL PHASE ----------------
   // Explicit challengeDuel, or auto-trigger between two adjacent high-wu
   // generals. Loser's unit loses half its troops + a big morale hit.
@@ -330,6 +344,24 @@ export function stepBattle(input: StepInput): StepResult {
         }
       }
     }
+  }
+
+  // ---------------- RALLY PHASE ----------------
+  // A led unit steadies a wavering same-faction ally within range, restoring
+  // morale scaled by the rallying general's leadership. Runs before morale/rout
+  // so a rallied block can survive the day's casualties instead of breaking.
+  for (const c of input.commands) {
+    if (c.kind !== 'rally') continue;
+    const src = byId(c.unitId);
+    const tgt = byId(c.targetUnitId);
+    if (!src || !tgt || !isActive(src) || !isActive(tgt)) continue;
+    if (src.factionId !== tgt.factionId) continue;
+    if (chebyshev(src.pos, tgt.pos) > 3) continue;
+    const gain = Math.round(BATTLE_TUNING.rallyBaseMorale * unitLeadership(src));
+    if (gain <= 0) continue;
+    const before = tgt.morale;
+    tgt.morale = Math.min(100, tgt.morale + gain);
+    if (tgt.morale !== before) events.push({ kind: 'rally', unitId: src.id, targetUnitId: tgt.id, morale: tgt.morale - before });
   }
 
   // ---------------- MORALE / ROUT PHASE ----------------

@@ -36,6 +36,15 @@ function nearestEnemy(u: BattleUnit, enemies: BattleUnit[]): BattleUnit | undefi
   }
   return best;
 }
+// The side's lead general block: the highest-command fielded led unit.
+function leadGeneralUnit(units: BattleUnit[], factionId: FactionId): BattleUnit | undefined {
+  let best: BattleUnit | undefined;
+  for (const u of units) {
+    if (u.factionId !== factionId || !isFielded(u) || u.command === undefined) continue;
+    if (!best || (u.command ?? 0) > (best.command ?? 0)) best = u;
+  }
+  return best;
+}
 
 export function planTactical(battle: Battle, factionId: FactionId, personality: Personality): TacticalCommand[] {
   const enemies = battle.units.filter((e) => e.factionId !== factionId && isFielded(e));
@@ -59,11 +68,28 @@ export function planTactical(battle: Battle, factionId: FactionId, personality: 
   // Disciplined/cautious doctrines value holding favorable ground.
   const holdInclination = (doc.discipline + doc.caution) / 2;
 
+  // RALLY: the lead general steadies a badly-wavering fielded ally within reach.
+  const myFieldedAll = battle.units.filter((u) => u.factionId === factionId && isFielded(u));
+  const wavering = myFieldedAll.find((u) => u.morale <= BATTLE_TUNING.routMoraleThreshold + 10);
+  const rallier = leadGeneralUnit(battle.units, factionId);
+  const rallied = new Set<string>();
+  if (wavering && rallier && rallier.id !== wavering.id && chebyshev(rallier.pos, wavering.pos) <= 3) {
+    cmds.push({ kind: 'rally', unitId: rallier.id, targetUnitId: wavering.id });
+    rallied.add(rallier.id);
+  }
+
   const myUnits = battle.units.filter((u) => u.factionId === factionId && isFielded(u));
   for (const u of myUnits) {
     const near = nearestEnemy(u, enemies);
     if (!near) continue;
     const dist = chebyshev(u.pos, near.pos);
+
+    if (rallied.has(u.id)) continue;
+    // CHALLENGE DUEL: an aggressive high-wu general beside an enemy general.
+    if (doc.aggression > 0.6 && u.wu !== undefined && u.wu >= BATTLE_TUNING.duelWuMin && dist <= 1) {
+      const enemyGeneral = enemies.find((e) => e.wu !== undefined && e.wu >= BATTLE_TUNING.duelWuMin && chebyshev(u.pos, e.pos) <= 1);
+      if (enemyGeneral) { cmds.push({ kind: 'challengeDuel', unitId: u.id, targetUnitId: enemyGeneral.id }); continue; }
+    }
 
     // HOLD: hang back on favorable ground, letting the enemy come, when the
     // doctrine prefers defense and we are not adjacent and not obliged to press.

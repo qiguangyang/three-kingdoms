@@ -120,7 +120,7 @@ export const BattleScreen: React.FC = () => {
     if (kinds.has('duel')) playDuel();
     if (kinds.has('fire')) playFire();
     if (kinds.has('volley')) playVolley();
-    if (kinds.has('charge') || kinds.has('reserveCommitted')) playCharge();
+    if (kinds.has('charge') || kinds.has('reserveCommitted') || kinds.has('rally')) playCharge();
     if (kinds.has('clash')) playClash();
     if (kinds.has('moraleBreak') || kinds.has('rout')) playRout();
     const end = session.lastEvents.find((e) => e.kind === 'end');
@@ -156,6 +156,7 @@ export const BattleScreen: React.FC = () => {
       ['charge', 'battle.narr.charge'],
       ['reserveCommitted', 'battle.narr.charge'],
       ['volley', 'battle.narr.volley'],
+      ['rally', 'battle.narr.rally'],
     ];
     const fighting = ['fire', 'flood', 'duel', 'clash', 'volley', 'charge', 'rout', 'moraleBreak'].some((k) => kinds.has(k));
     if (fighting) combatStarted.current = true;

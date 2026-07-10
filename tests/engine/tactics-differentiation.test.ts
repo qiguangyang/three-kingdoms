@@ -43,4 +43,11 @@ describe('doctrine changes how an army fights', () => {
       attacker: { troops: 9000, troopType: 'cavalry', wu: 55, zhi: 80, command: 85, personality: 'turtle' } });
     expect(aggressive.leverCounts.charge ?? 0).toBeGreaterThan(cautious.leverCounts.charge ?? 0);
   });
+
+  it('an aggressive commander challenges duels where a cautious one does not', () => {
+    const base = { seed: 7, defender: { troops: 8000, wu: 96, zhi: 60, command: 85, personality: 'active' as const } };
+    const aggressive = simulateHeadless({ ...base, attacker: { troops: 8000, wu: 99, zhi: 30, command: 70, personality: 'active' as const } });
+    const cautious = simulateHeadless({ ...base, attacker: { troops: 8000, wu: 62, zhi: 92, command: 88, personality: 'turtle' as const } });
+    expect(aggressive.leverCounts.challengeDuel ?? 0).toBeGreaterThan(cautious.leverCounts.challengeDuel ?? 0);
+  });
 });
