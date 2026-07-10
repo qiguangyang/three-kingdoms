@@ -98,6 +98,31 @@ describe('stepBattle — movement + melee', () => {
     expect(6000 - eHeld.troops).toBeGreaterThan(6000 - eIdle.troops); // held unit inflicts more
     expect(6000 - aHeld.troops).toBeLessThan(6000 - aIdle.troops); // and suffers less
   });
+
+  it('honors a meleeAttack order: a unit hits its ordered target, not just the nearest', () => {
+    // 'a' is adjacent to BOTH 'weak' (x=3) and 'strong' (x=5). Default melee picks
+    // the first adjacent found; an explicit order must direct it at 'strong'.
+    const mk = () => battle([
+      unit({ id: 'a', factionId: 'A', pos: { x: 4, y: 4 }, troops: 6000 }),
+      unit({ id: 'weak', factionId: 'B', pos: { x: 3, y: 4 }, troops: 6000 }),
+      unit({ id: 'strong', factionId: 'B', pos: { x: 5, y: 4 }, troops: 6000 }),
+    ]);
+    const { battle: next, events } = stepBattle({ battle: mk(), commands: [{ kind: 'meleeAttack', unitId: 'a', targetUnitId: 'strong' }] });
+    const strong = next.units.find((x) => x.id === 'strong')!;
+    expect(strong.troops).toBeLessThan(6000); // the ordered target took the hit
+    // Both adjacent enemies fight 'a' either way, so troop counts alone can't tell
+    // focus-fire apart from the default; the clash 'a' *initiates* is the real tell.
+    // Without target-honoring 'a' clashes the nearest ('weak'); the order redirects it.
+    expect(events.some((e) => e.kind === 'clash' && e.unitId === 'a' && e.targetUnitId === 'strong')).toBe(true);
+  });
+
+  it('melee is unchanged when no meleeAttack order is given (determinism preserved)', () => {
+    const mk = () => battle([
+      unit({ id: 'a', factionId: 'A', pos: { x: 4, y: 4 } }),
+      unit({ id: 'e', factionId: 'B', pos: { x: 5, y: 4 } }),
+    ]);
+    expect(stepBattle({ battle: mk(), commands: [] })).toEqual(stepBattle({ battle: mk(), commands: [] }));
+  });
 });
 
 describe('stepBattle — ranged, duel, morale, end', () => {

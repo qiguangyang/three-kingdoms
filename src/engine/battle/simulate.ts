@@ -195,7 +195,15 @@ export function stepBattle(input: StepInput): StepResult {
   const resolvedPairs = new Set<string>();
   for (const u of units) {
     if (!isActive(u)) continue;
-    const enemy = units.find((e) => e.factionId !== u.factionId && isActive(e) && chebyshev(u.pos, e.pos) <= 1);
+    // Prefer an explicitly ordered target when it is adjacent (focus fire);
+    // otherwise fall back to the first adjacent enemy (unchanged default).
+    const order = orders.get(u.id);
+    let enemy: BattleUnit | undefined;
+    if (order && order.kind === 'meleeAttack') {
+      const t = byId(order.targetUnitId);
+      if (t && t.factionId !== u.factionId && isActive(t) && chebyshev(u.pos, t.pos) <= 1) enemy = t;
+    }
+    if (!enemy) enemy = units.find((e) => e.factionId !== u.factionId && isActive(e) && chebyshev(u.pos, e.pos) <= 1);
     if (!enemy) continue;
     const key = [u.id, enemy.id].sort().join('|');
     if (resolvedPairs.has(key)) continue;
