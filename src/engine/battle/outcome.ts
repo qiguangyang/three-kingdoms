@@ -18,8 +18,10 @@ import type {
 } from '../types.js';
 import { stepBattle } from './simulate.js';
 
-// Personality-driven default orders for a side (thin wrapper over the existing
-// tactical AI; kept here so the sim module has no AI dependency).
+// Personality-driven default orders for a side. Delegates to the utility
+// tactical planner (src/engine/ai/tactics/), and is kept here so the sim module
+// has no AI dependency. Drives the enemy, the player's auto-line, and headless
+// resolution alike.
 export function defaultTacticalCommands(
   battle: Battle,
   factionId: FactionId,
@@ -29,10 +31,11 @@ export function defaultTacticalCommands(
 }
 
 // Troops still actively holding the field for a side. Only 'fielded' units
-// count: a reserve block that was never committed (no tactical AI currently
-// issues commitReserves) does not keep a city in contention once its fielded
-// defense is annihilated, and a 'routing'/'gone' unit is no longer fighting
-// either way.
+// count: a reserve block still uncommitted at battle's end is not defending, so
+// it does not keep a city in contention once the fielded defense is
+// annihilated, and a 'routing'/'gone' unit is no longer fighting either way.
+// (The planner can commit reserves mid-battle; once committed they are
+// 'fielded' and counted here.)
 function sumTroops(battle: Battle, factionId: FactionId): number {
   return battle.units
     .filter((u) => u.factionId === factionId && u.state === 'fielded')

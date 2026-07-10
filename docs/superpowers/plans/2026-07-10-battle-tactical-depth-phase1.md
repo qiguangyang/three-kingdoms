@@ -1273,3 +1273,13 @@ git commit -m "battle/ai: assert doctrine measurably changes tactical behavior"
 **2. Inline Execution** — Execute tasks in this session using executing-plans, batch execution with checkpoints.
 
 **Which approach?**
+
+---
+
+## Post-execution note (2026-07-10)
+
+Phase 1 was executed via subagent-driven development; all 9 tasks landed green (232 tests, typecheck + build clean) and passed a whole-branch review (no Critical/Important findings).
+
+**One authorized deviation from the 9-task plan:** during Task 8 the balance harness surfaced a real latent combat bug — the melee clash used a **single shared RNG jitter for both sides**, so perfectly symmetric forces annihilated each other identically every day and the even-matchup "upsets happen both ways" invariant failed (attacker win-rate 0.0; no `BATTLE_TUNING` scalar can repair a symmetric problem). The fix — **two independent per-side jitter draws** in `simulate.ts`'s melee phase (commit `e86bab6`, with a regression test) — is pure, deterministic, expected-casualty-neutral, on-screen-only, and is what lets the even-matchup invariant pass. This was an 11th sim change beyond the written tasks, authorized by the controller and reviewed clean.
+
+**Tracked limitation for the Phase 4 balance pass:** melee "focus fire" (honoring a `meleeAttack` target, Task 7) only changes which clash a unit *initiates* (event labeling + RNG order), not casualty concentration — in the all-adjacent-pairs melee model every adjacent pair fights once regardless. Ranged focus-fire *does* concentrate. Do not credit melee focus-fire with a concentration effect it does not yet have; giving melee single-target semantics is future work.
