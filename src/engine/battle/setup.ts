@@ -46,6 +46,15 @@ export function createBattle(state: GameState, input: BattleSetupInput): Battle 
   const city = state.cities[input.cityId]!;
   const field = generateField(city, state.rngState >>> 0);
 
+  // Deterministic battlefield wind derived from the field seed. Always > 0 so a
+  // unit beside a forest can call the fire gambit; direction is one of 8.
+  const windDirs: { x: number; y: number }[] = [
+    { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
+    { x: 1, y: 1 }, { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 },
+  ];
+  const windSeed = (field.seed * 2654435761) >>> 0;
+  const wind = { dir: windDirs[windSeed % 8]!, strength: 0.3 + (windSeed % 61) / 100 }; // 0.3..0.9
+
   const attackerGenerals = input.attackingGeneralIds
     .map((id) => state.generals[id])
     .filter((g): g is General => Boolean(g));
@@ -124,6 +133,7 @@ export function createBattle(state: GameState, input: BattleSetupInput): Battle 
     units,
     field,
     seed: field.seed,
+    wind,
     rngCursor: field.seed,
     startTroops: {
       attacker: input.attackingTroops,

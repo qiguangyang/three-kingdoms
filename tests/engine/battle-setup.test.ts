@@ -79,4 +79,16 @@ describe('createBattle', () => {
     const garrison = battle.units.find((u) => u.generalId === '' && u.factionId === target.factionId);
     if (garrison) expect(garrison.zhi).toBeUndefined();
   });
+
+  it('sets a deterministic wind on the battle (same seed -> same wind)', () => {
+    const s = buildInitialState({ scenario: SCENARIO_DONGZHUO, playerFactionId: 'caocao', refData: REF_DATA, seed: 12 });
+    const target = Object.values(s.cities).find((c) => c.factionId && c.factionId !== 'caocao')!;
+    const mk = () => createBattle(s, { cityId: target.id, attackerFactionId: 'caocao', defenderFactionId: target.factionId!, attackingGeneralIds: ['caocao'], attackingTroops: 6000 });
+    const w = mk().wind!;
+    expect(w).toBeDefined();
+    expect(w.strength).toBeGreaterThan(0);
+    expect(w.strength).toBeLessThanOrEqual(0.9);
+    expect(Math.abs(w.dir.x) + Math.abs(w.dir.y)).toBeGreaterThan(0); // a real direction
+    expect(mk().wind).toEqual(w); // deterministic
+  });
 });

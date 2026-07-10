@@ -35,6 +35,20 @@ describe('detectGambits', () => {
     expect(detectGambits(windy).map((g) => g.id)).toContain('fireAttack');
   });
 
+  it('offers fireAttack when a unit stands by forest with wind up', () => {
+    const cells = new Array(24).fill('plain');
+    cells[1 * 6 + 2] = 'forest'; // forest at (x=2,y=1)
+    const f = field(cells);
+    const windy: Battle = {
+      ...mk([
+        u({ id: 'a', factionId: 'A', pos: { x: 2, y: 2 } }), // adjacent (below) the forest cell
+        u({ id: 'e', factionId: 'B', pos: { x: 3, y: 2 } }), // enemy nearby
+      ], f),
+      wind: { dir: { x: 0, y: -1 }, strength: 0.5 },
+    };
+    expect(detectGambits(windy).some((g) => g.id === 'fireAttack')).toBe(true);
+  });
+
   it('offers duelChallenge when two high-wu generals are adjacent', () => {
     const f = field(new Array(24).fill('plain'));
     const b = mk([
