@@ -18,6 +18,8 @@ const KEYS = [
   'battle.reveal.tag', 'battle.reveal.cavalryCharge', 'battle.reveal.fireAttack',
   'battle.reveal.floodAttack', 'battle.reveal.duelChallenge', 'battle.reveal.fordCrossing',
   'battle.reveal.ambush', 'battle.mute', 'battle.unmute',
+  'battle.decision.tray', 'battle.decision.holdLine', 'battle.decision.focusFire',
+  'battle.decision.pivotal', 'battle.decision.continue',
 ] as const;
 
 describe('battle screen i18n keys', () => {

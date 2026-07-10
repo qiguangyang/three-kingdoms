@@ -13,7 +13,7 @@ import { REF_DATA } from '../data/index.js';
 import type { Locale } from '../i18n/types.js';
 import { setLocale } from '../i18n/locale.js';
 import {
-  autoResolveSession, chooseGambit, queuePlayerCommand, resolveDay, sessionResult, setSpeed, startSession,
+  autoResolveSession, chooseDecision, chooseGambit, queuePlayerCommand, resolveDay, sessionResult, setSpeed, startSession,
 } from './battleSession.js';
 import type { BattleSession } from './battleSession.js';
 
@@ -252,6 +252,10 @@ export function submitBattleOrders(cmds: TacticalCommand[]): void {
 
 export function chooseBattleGambit(gambitId: GambitId): void {
   gameStore.setState((s) => (s.battle ? { ...s, battle: chooseGambit(s.battle, gambitId) } : s));
+}
+
+export function chooseBattleDecision(id: string): void {
+  gameStore.setState((s) => (s.battle ? { ...s, battle: chooseDecision(s.battle, id) } : s));
 }
 
 export function resolveBattleDay(): void {

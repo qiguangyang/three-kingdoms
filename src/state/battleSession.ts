@@ -18,6 +18,8 @@ import type {
 // Gambit / GambitId / Vec2 live in the battle-local types module, not the
 // engine barrel (../engine/types.js does not re-export them).
 import type { Gambit, GambitId, Vec2 } from '../engine/battle/types.js';
+import { offerPlayerDecisions } from '../engine/ai/tactics/index.js';
+import type { OfferedDecision } from '../engine/ai/tactics/index.js';
 
 export type BattlePhase = 'awaitingOrders' | 'resolving' | 'resolved';
 
@@ -31,6 +33,7 @@ export interface BattleSession {
   queuedPlayerCommands: TacticalCommand[];
   lastEvents: ReturnType<typeof stepBattle>['events'];
   gambits: Gambit[];
+  offeredDecisions: OfferedDecision[];
   attackerWon: boolean | null;
   endReason: 'destroyed' | 'timeout' | null;
 }
@@ -100,6 +103,7 @@ export function startSession(
     queuedPlayerCommands: [],
     lastEvents: [],
     gambits: filterPlayerGambits(battle, detectGambits(battle), playerFactionId),
+    offeredDecisions: offerPlayerDecisions(battle, playerFactionId),
     attackerWon: null,
     endReason: null,
   };
@@ -141,13 +145,14 @@ export function resolveDay(session: BattleSession): BattleSession {
   const { battle: next, events } = stepBattle({ battle: session.battle, commands: mergeCommands(session) });
   const end = events.find((e) => e.kind === 'end');
   if (end && end.kind === 'end') {
-    return { ...session, battle: next, lastEvents: events, gambits: [], phase: 'resolved', attackerWon: end.attackerWon, endReason: end.reason, queuedPlayerCommands: [] };
+    return { ...session, battle: next, lastEvents: events, gambits: [], offeredDecisions: [], phase: 'resolved', attackerWon: end.attackerWon, endReason: end.reason, queuedPlayerCommands: [] };
   }
   return {
     ...session,
     battle: next,
     lastEvents: events,
     gambits: filterPlayerGambits(next, detectGambits(next), session.playerFactionId),
+    offeredDecisions: offerPlayerDecisions(next, session.playerFactionId),
     phase: 'awaitingOrders',
     queuedPlayerCommands: [],
   };
@@ -179,4 +184,25 @@ export function autoResolveSession(session: BattleSession): BattleSession {
 
 export function sessionResult(state: GameState, session: BattleSession): QuickBattleResult {
   return battleToResult(state, session.battle);
+}
+
+export function chooseDecision(session: BattleSession, id: string): BattleSession {
+  const d = session.offeredDecisions.find((x) => x.id === id);
+  if (!d) return session;
+  let next = session;
+  for (const cmd of d.commands) next = queuePlayerCommand(next, cmd);
+  return next;
+}
+
+export function pendingPivotalDecision(session: BattleSession): OfferedDecision | null {
+  return session.offeredDecisions.find((d) => d.salient) ?? null;
+}
+
+export function chargeableUnitIds(session: BattleSession): string[] {
+  const ordered = new Set(
+    session.queuedPlayerCommands.filter((c) => 'unitId' in c).map((c) => (c as { unitId: string }).unitId),
+  );
+  return session.battle.units
+    .filter((u) => u.factionId === session.playerFactionId && u.state === 'fielded' && u.troops > 0 && !ordered.has(u.id))
+    .map((u) => u.id);
 }

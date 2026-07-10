@@ -3,7 +3,7 @@ import { buildInitialState } from '../../src/engine/scenario.js';
 import { SCENARIO_DONGZHUO } from '../../src/data/scenarios/s1-dongzhuo.js';
 import { REF_DATA } from '../../src/data/index.js';
 import { createBattle } from '../../src/engine/battle/setup.js';
-import { gameStore, loadGame, finishBattle, quickResolveBattle } from '../../src/state/store.js';
+import { gameStore, loadGame, finishBattle, quickResolveBattle, chooseBattleDecision } from '../../src/state/store.js';
 
 function seedWithPendingBattle() {
   const s = buildInitialState({ scenario: SCENARIO_DONGZHUO, playerFactionId: 'caocao', refData: REF_DATA, seed: 100 });
@@ -34,5 +34,18 @@ describe('battle store integration', () => {
     expect(st.battle).toBeNull();
     expect(st.game!.pendingBattle).toBeUndefined();
     expect(['main', 'gameOver']).toContain(st.ui.screen.kind);
+  });
+
+  it('chooseBattleDecision queues the chosen decision\'s orders into the live session', () => {
+    const { game } = seedWithPendingBattle();
+    loadGame({ game, locale: 'zh' });
+    const before = gameStore.getState().battle!;
+    // The seeded siege always offers at least a focus-fire decision; prefer it,
+    // but fall back to any offered decision so the assertion stays meaningful.
+    expect(before.offeredDecisions.length).toBeGreaterThan(0);
+    const decision = before.offeredDecisions.find((d) => d.id.startsWith('focusFire')) ?? before.offeredDecisions[0];
+    chooseBattleDecision(decision.id);
+    const after = gameStore.getState().battle!;
+    expect(after.queuedPlayerCommands.length).toBeGreaterThan(before.queuedPlayerCommands.length);
   });
 });
