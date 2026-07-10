@@ -21,6 +21,7 @@ import type { City, GameState } from '../../engine/types.js';
 import { FACTION_GLYPH, factionColor } from '../theme.js';
 import { pickName } from '../../i18n/locale.js';
 import { gridToWorld, worldToGrid, markerScale, WORLD_W, WORLD_D } from './mapGeometry.js';
+import { MAP_WIDTH, MAP_HEIGHT } from '../../engine/constants.js';
 
 // ---- render-layer tuning (world units; the map spans WORLD_W x WORLD_D,
 // ~575 x 540 world units, centered on the origin via gridToWorld — the render
@@ -32,18 +33,18 @@ const UPLAND_H = 26; // extra elevation the fbm relief adds toward the interior
 const SEA_FLOOR = -3; // elevation of sea-floor vertices (below the water plane)
 const WATER_Y = 1.4; // sea level; land emerges above this, coast fringe sits below
 const RELIEF_FREQ = 0.035; // fbm frequency over logical grid coords
-const LAND_SEGMENTS_X = 280; // landmass plane subdivisions (~2 world units/cell)
-const LAND_SEGMENTS_Z = 240;
+const LAND_SEGMENTS_X = 460; // landmass plane subdivisions (higher-res relief + colour)
+const LAND_SEGMENTS_Z = 400;
 const RIVER_WIDTH = 2.0; // world-unit radius of a river ribbon
 const RIVER_COLOR = 0x3f6f96; // blue-grey river water
 const YELLOW_RIVER_COLOR = 0xb79149; // the Yellow River runs ochre with loess silt
 
 // Dusk look, borrowed from BattleScene's `dusk` environment preset so the two
 // scenes read as the same time of day.
-const SKY_TOP = 0x2a3b60;
-const SKY_HORIZON = 0x93a0b4;
-const FOG_COLOR = 0x93a0b4;
-const FOG_DENSITY = 0.0009; // low: the far landmass stays visible, edges haze out
+const SKY_TOP = 0x5b7fb0; // daylight sky for a flat, satellite-imagery feel
+const SKY_HORIZON = 0xbfc9d4;
+const FOG_COLOR = 0xbfc9d4;
+const FOG_DENSITY = 0.0006; // very low: crisp, satellite-like, edges barely haze
 
 // ---- city-marker tuning (world units) ----
 // markerScale() returns ~1..2.2 (economic importance); multiply into world units
@@ -198,6 +199,17 @@ export class MapScene {
     this.controls.dampingFactor = 0.08;
     this.controls.enableZoom = true; // wheel zooms in/out toward the map
     this.controls.zoomSpeed = 1.1;
+    // Left-drag PANS the map (reposition, like a satellite map); right-drag
+    // rotates, wheel zooms. Touch: one finger pans, two fingers zoom/rotate.
+    this.controls.enablePan = true;
+    this.controls.screenSpacePanning = true;
+    this.controls.panSpeed = 1.0;
+    this.controls.mouseButtons = {
+      LEFT: THREE.MOUSE.PAN,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.ROTATE,
+    };
+    this.controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
     this.controls.target.set(0, 0, 0);
     // Clamp so the map stays legible and you can't dip under the ground:
     // minPolar keeps a near-top-down cap; maxPolar stops just above the horizon.
@@ -208,10 +220,10 @@ export class MapScene {
 
     // Dusk lighting, mirroring the battle's `dusk` preset (warm low sun, cool
     // sky fill, faint ambient).
-    this.hemi = new THREE.HemisphereLight(0xaec4e8, 0x4a3d28, 0.55);
+    this.hemi = new THREE.HemisphereLight(0xd0dcec, 0x5c5344, 0.75);
     this.scene.add(this.hemi);
-    this.sun = new THREE.DirectionalLight(0xffd9a0, 2.1);
-    this.sun.position.set(-180, 260, 220);
+    this.sun = new THREE.DirectionalLight(0xfff4e2, 2.4);
+    this.sun.position.set(-110, 340, 180);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.camera.near = 1;
@@ -223,7 +235,7 @@ export class MapScene {
     this.sun.shadow.camera.bottom = -s;
     this.sun.shadow.bias = -0.0006;
     this.scene.add(this.sun);
-    this.ambient = new THREE.AmbientLight(0x30364a, 0.4);
+    this.ambient = new THREE.AmbientLight(0x59616e, 0.5);
     this.scene.add(this.ambient);
 
     this.buildLandmass();
@@ -237,7 +249,7 @@ export class MapScene {
     // finish. Threshold is kept high so the land itself does not bloom.
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.6, 0.75, 0.8));
+    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.16, 0.7, 0.9));
     this.composer.addPass(new OutputPass());
     this.composer.addPass(new ShaderPass(GRADE_SHADER));
 
@@ -305,7 +317,13 @@ export class MapScene {
       const wz = pos.getZ(i);
       const h = this.landHeightAt(wx, wz);
       pos.setY(i, h);
-      const c = h > SEA_FLOOR + 0.001 ? landRamp(h) : SEABED_COLOR;
+      let c: RGB;
+      if (h > SEA_FLOOR + 0.001) {
+        const g = worldToGrid(wx, wz);
+        c = biomeColor(g.x, g.y, h);
+      } else {
+        c = SEABED_COLOR;
+      }
       colors.push(c[0], c[1], c[2]);
     }
     geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -341,7 +359,7 @@ export class MapScene {
     wgeo.rotateX(-Math.PI / 2);
     this.waterMat = new THREE.ShaderMaterial({
       transparent: true,
-      uniforms: { uT: { value: 0 }, uCol: { value: new THREE.Color(0x1a3850) } },
+      uniforms: { uT: { value: 0 }, uCol: { value: new THREE.Color(0x1c4d6b) } },
       vertexShader:
         'uniform float uT; varying float vR; varying vec3 vW;' +
         'void main(){ vec3 p = position;' +
@@ -441,11 +459,11 @@ export class MapScene {
       if (bf && pointInPolygon(wx, wz, landPolyWorld)) {
         // Lighten toward a soft pastel so the realms read like the reference
         // atlas's flat fills rather than a dark wash over the terrain.
-        col.set(factionColor(bf)).lerp(PASTEL, 0.28);
+        col.set(factionColor(bf)).lerp(PASTEL, 0.22);
         cols[i * 3] = col.r;
         cols[i * 3 + 1] = col.g;
         cols[i * 3 + 2] = col.b;
-        alphas[i] = 0.5;
+        alphas[i] = 0.32;
       } else {
         alphas[i] = 0;
       }
@@ -1106,29 +1124,47 @@ function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: n
 const SEABED_COLOR: [number, number, number] = [0.1, 0.18, 0.24];
 
 // Height -> land colour: coast sand -> lowland green -> upland brown -> pale rock.
-function landRamp(h: number): [number, number, number] {
-  const stops: Array<[number, [number, number, number]]> = [
-    [0.0, [0.78, 0.71, 0.52]], // waterline sand
-    [2.5, [0.72, 0.66, 0.47]], // shore sand
-    [7, [0.34, 0.44, 0.26]], // lowland green
-    [16, [0.3, 0.4, 0.24]], // rolling green
-    [24, [0.42, 0.35, 0.26]], // upland brown
-    [30, [0.52, 0.5, 0.47]], // pale rock
-  ];
-  if (h <= stops[0]![0]) return stops[0]![1];
-  for (let i = 1; i < stops.length; i++) {
-    if (h <= stops[i]![0]) {
-      const a = stops[i - 1]!;
-      const b = stops[i]!;
-      const t = (h - a[0]) / (b[0] - a[0]);
-      return [
-        a[1][0] + (b[1][0] - a[1][0]) * t,
-        a[1][1] + (b[1][1] - a[1][1]) * t,
-        a[1][2] + (b[1][2] - a[1][2]) * t,
-      ];
-    }
+type RGB = [number, number, number];
+const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
+const mixRGB = (a: RGB, b: RGB, t: number): RGB => [
+  a[0] + (b[0] - a[0]) * t,
+  a[1] + (b[1] - a[1]) * t,
+  a[2] + (b[2] - a[2]) * t,
+];
+
+// Satellite-style ground colour keyed on logical position + elevation, like real
+// aerial imagery of China: arid tans/loess in the northwest greening toward the
+// wet southeast, grey rock and snow on the high peaks, sandy beaches at the
+// waterline, with fine noise mottling for texture. gx in 0..MAP_WIDTH (west->
+// east), gy in 0..MAP_HEIGHT (north->south), h = terrain height.
+function biomeColor(gx: number, gy: number, h: number): RGB {
+  const lon = clamp01(gx / MAP_WIDTH); // 0 west .. 1 east
+  const lat = clamp01(gy / MAP_HEIGHT); // 0 north .. 1 south
+  // Two octaves of high-frequency noise: one biases wetness, both add texture.
+  const m = fbm(gx * 0.12, gy * 0.12, MAP_SEED + 7) - 0.5; // -0.5..0.5
+  const m2 = fbm(gx * 0.34, gy * 0.31, MAP_SEED + 19) - 0.5;
+  const mottle = m * 0.08 + m2 * 0.05;
+  // Wetness rises toward the south-east (monsoon), falls toward the arid NW.
+  const wet = clamp01(lon * 0.5 + lat * 0.62 + m * 0.28);
+  const desert: RGB = [0.82, 0.73, 0.54];
+  const steppe: RGB = [0.64, 0.59, 0.4];
+  const grass: RGB = [0.48, 0.55, 0.31];
+  const forest: RGB = [0.28, 0.43, 0.21];
+  let base: RGB =
+    wet < 0.34
+      ? mixRGB(desert, steppe, wet / 0.34)
+      : wet < 0.62
+        ? mixRGB(steppe, grass, (wet - 0.34) / 0.28)
+        : mixRGB(grass, forest, (wet - 0.62) / 0.38);
+  // Sandy beach fading into the ground over the first couple of height units.
+  if (h < 1.6) base = mixRGB([0.8, 0.74, 0.58], base, clamp01(h / 1.6));
+  // Grey rock on the uplands, white snow on the highest peaks.
+  if (h > 14) {
+    const rock: RGB = [0.52, 0.48, 0.42];
+    base = mixRGB(base, rock, clamp01((h - 14) / 12) * 0.82);
+    if (h > 24) base = mixRGB(base, [0.93, 0.95, 0.97], clamp01((h - 24) / 6));
   }
-  return stops[stops.length - 1]![1];
+  return [clamp01(base[0] + mottle), clamp01(base[1] + mottle * 0.9), clamp01(base[2] + mottle * 0.8)];
 }
 
 function envHash(ix: number, iy: number, seed: number): number {
