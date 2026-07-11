@@ -6,6 +6,8 @@ import type { FactionAgent, GameState, LogEntry, Personality, Scenario, Strategi
 // (../engine/types.js imports it internally but does not re-export it).
 import type { GambitId } from '../engine/battle/types.js';
 import { buildInitialState } from '../engine/scenario.js';
+import { SCENARIO_DONGZHUO } from '../data/scenarios/s1-dongzhuo.js';
+import { seedObjectives } from '../engine/story/objectives.js';
 import { advanceMonth, applyCommand, checkOutcome } from '../engine/turn.js';
 import { schedulePlayerCommand, tickDays } from '../engine/pendingOp.js';
 import { CONTINUOUS_SLOT, loadFromSlot, saveToSlot } from './persistence.js';
@@ -113,6 +115,38 @@ export function newGame(scenario: Scenario, playerFactionId: string, seed: numbe
     agents,
     ui: { ...initialUI, screen: { kind: 'main' }, locale: gameStore.getState().ui.locale },
   });
+}
+
+// Launch the guided Story Mode campaign at Liu Bei's Chapter 1. Builds the
+// Chapter-1 scenario (s1-dongzhuo) with Liu Bei as the player faction, tags
+// the game with storyMode so objective tables / briefings / choice-events
+// become protagonist-specific, seeds the chapter's objectives, wires up AI
+// agents for every other faction, and opens the opening briefing before the
+// campaign map. A fixed seed keeps the launch deterministic.
+export function startStoryMode(): void {
+  const scenario = SCENARIO_DONGZHUO;
+  const built = buildInitialState({
+    scenario,
+    playerFactionId: 'liubei',
+    refData: REF_DATA,
+    seed: 1,
+  });
+  const withStory: GameState = {
+    ...built,
+    storyMode: { protagonistFactionId: 'liubei', chapter: 1 },
+  };
+  const game = seedObjectives(withStory);
+  const agents: Record<string, FactionAgent> = {};
+  for (const f of scenario.factions) {
+    if (f.id === 'liubei') continue;
+    agents[f.id] = makeDefaultAgent(f.id, f.personality);
+  }
+  gameStore.setState((s) => ({
+    ...s,
+    game,
+    agents,
+    ui: { ...initialUI, screen: { kind: 'briefing' }, locale: s.ui.locale },
+  }));
 }
 
 // Legacy: end-turn = advance a full month at once. Retained for callers

@@ -20,6 +20,8 @@ export const en: MessageCatalog = {
     'The warlords rise, and the Han\'s mandate flickers low. From a commoner\'s beginnings you have carved a name into a world of chaos. The winds shift, and the years slip swiftly by…',
 
   'title.newGame': 'New Game',
+  'title.storyMode': 'Story Mode',
+  'title.freePlay': 'Free Play',
   'title.loadGame': 'Load Save',
   'title.about': 'About',
   'title.quit': 'Quit',

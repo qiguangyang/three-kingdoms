@@ -20,6 +20,8 @@ export const zh: MessageCatalog = {
     '群雄纷起，汉祚将倾。你以一介布衣立身乱世，名已初显。风云变幻，数载春秋倏忽而过……',
 
   'title.newGame': '新游戏',
+  'title.storyMode': '剧情模式',
+  'title.freePlay': '自由模式',
   'title.loadGame': '读取存档',
   'title.about': '关于',
   'title.quit': '退出',

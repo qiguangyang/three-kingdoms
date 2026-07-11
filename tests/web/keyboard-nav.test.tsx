@@ -17,8 +17,9 @@ beforeEach(() => {
 describe('keyboard navigation', () => {
   it('Title screen: ArrowDown + Enter selects the highlighted option', () => {
     render(<App />);
-    // Start on "新游戏" (active=0). ArrowDown moves to "读取存档" (active=1),
-    // then Enter triggers the load screen.
+    // Options are [story, freePlay, load, about]. Start on "剧情模式" (active=0).
+    // ArrowDown twice moves to "读取存档" (active=2), then Enter opens load.
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
     fireEvent.keyDown(window, { key: 'ArrowDown' });
     fireEvent.keyDown(window, { key: 'Enter' });
     expect(gameStore.getState().ui.screen.kind).toBe('load');
@@ -28,16 +29,19 @@ describe('keyboard navigation', () => {
     render(<App />);
     fireEvent.keyDown(window, { key: 'j' });
     fireEvent.keyDown(window, { key: 'j' });
+    fireEvent.keyDown(window, { key: 'j' });
     fireEvent.keyDown(window, { key: 'k' });
     fireEvent.keyDown(window, { key: 'Enter' });
-    // Pressed j twice (→ active=2 = about), then k once (→ active=1 = load).
+    // Pressed j three times (→ active=3 = about), then k once (→ active=2 = load).
     expect(gameStore.getState().ui.screen.kind).toBe('load');
   });
 
-  it('Title screen: Enter on default highlight goes to scenario select', () => {
+  it('Title screen: Enter on default highlight launches Story Mode (briefing)', () => {
     render(<App />);
+    // The default highlight is now "剧情模式" (Story Mode), which opens the
+    // Chapter-1 opening briefing before the campaign map.
     fireEvent.keyDown(window, { key: 'Enter' });
-    expect(gameStore.getState().ui.screen.kind).toBe('scenarioSelect');
+    expect(gameStore.getState().ui.screen.kind).toBe('briefing');
   });
 
   it('Scenario screen: Esc returns to title', () => {
@@ -49,9 +53,9 @@ describe('keyboard navigation', () => {
 
   it('Title screen: g toggles locale', () => {
     render(<App />);
-    expect(screen.getByText('新游戏')).toBeInTheDocument();
+    expect(screen.getByText('剧情模式')).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'g' });
     // The display text flips.
-    expect(screen.getByText('New Game')).toBeInTheDocument();
+    expect(screen.getByText('Story Mode')).toBeInTheDocument();
   });
 });

@@ -30,6 +30,8 @@ export type MessageKey =
 
   // Title screen
   | 'title.newGame'
+  | 'title.storyMode'
+  | 'title.freePlay'
   | 'title.loadGame'
   | 'title.about'
   | 'title.quit'

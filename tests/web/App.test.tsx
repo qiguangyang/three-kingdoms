@@ -20,13 +20,13 @@ describe('App router', () => {
   it('renders the title screen with the four nav buttons', () => {
     render(<App />);
     expect(screen.getByText('三 国')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '新游戏' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '自由模式' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '读取存档' })).toBeInTheDocument();
   });
 
   it('navigates Title → Scenario select', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '新游戏' }));
+    fireEvent.click(screen.getByRole('button', { name: '自由模式' }));
     expect(screen.getByText('选择剧本')).toBeInTheDocument();
     // The scenario name appears in both the list and the right-hand detail
     // panel, so multiple matches are expected.
@@ -42,8 +42,8 @@ describe('App router', () => {
 
   it('toggleLocale: clicking 中/EN flips the language', () => {
     render(<App />);
-    expect(screen.getByText('新游戏')).toBeInTheDocument();
+    expect(screen.getByText('自由模式')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /中 \/ EN/ }));
-    expect(screen.getByRole('button', { name: 'New Game' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Free Play' })).toBeInTheDocument();
   });
 });
