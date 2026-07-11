@@ -12,7 +12,7 @@ import { CITIES } from '../../data/cities.js';
 import { GENERALS } from '../../data/generals/index.js';
 import {
   playCharge, playClash, playDuel, playFire, playGong, playRetreat, playRout, playVolley,
-  startBattleMusic, stopBattleMusic, setBattleIntensity, isMuted, toggleMuted,
+  startBattleMusic, stopBattleMusic, setBattleIntensity, playVictoryTheme, playDefeatTheme, isMuted, toggleMuted,
 } from '../audio/battle.js';
 import { BattleView } from './BattleView.js';
 import { pendingPivotalDecision, chargeableUnitIds } from '../../state/battleSession.js';
@@ -124,7 +124,12 @@ export const BattleScreen: React.FC = () => {
     if (kinds.has('clash')) playClash();
     if (kinds.has('moraleBreak') || kinds.has('rout')) playRout();
     const end = session.lastEvents.find((e) => e.kind === 'end');
-    if (end && end.kind === 'end') (end.attackerWon === session.playerIsAttacker ? playGong : playRetreat)();
+    if (end && end.kind === 'end') {
+      // Instant procedural hit for immediate feedback, plus the generated
+      // victory/defeat theme fading in under it as the bed hands off.
+      if (end.attackerWon === session.playerIsAttacker) { playGong(); playVictoryTheme(); }
+      else { playRetreat(); playDefeatTheme(); }
+    }
 
     // Caption the single most dramatic event of the day. Only rare, decisive beats
     // are captioned (clash/volley happen almost every engaged day and would strobe
@@ -255,102 +260,102 @@ export const BattleScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Bottom command cluster */}
+      {/* Command rails — split to the bottom corners so the centre-bottom stays
+          clear for the narration subtitle. Left = playback + your orders;
+          right = the commander's contextual levers + the pivotal decision. */}
       {!resolved && (
-        <div className="absolute inset-x-0 bottom-5 flex flex-col items-center gap-2 px-4">
-          {/* Gambit opportunities — highlighted above the controls */}
-          {session.gambits.length > 0 && (
-            <div className="flex flex-wrap items-center justify-center gap-2 px-3 py-2" style={{ ...PANEL, borderColor: 'rgba(201,163,92,.5)' }}>
-              <span className="font-display text-xs" style={{ letterSpacing: '0.28em', color: GOLD }}>{t('battle.gambits')}</span>
-              {/* One button per distinct stratagem: chooseGambit resolves by id
-                  (first match), so duplicate-id gambits from different units are
-                  the same option — showing them twice misleads and collides keys. */}
-              {session.gambits.filter((g, i, a) => a.findIndex((x) => x.id === g.id) === i).map((g) => (
-                <CinBtn key={g.id} variant="gold" onClick={() => {
-                  revealN.current += 1;
-                  setReveal({ nameKey: g.labelKey as MessageKey, descKey: `battle.reveal.${g.id}` as MessageKey, n: revealN.current });
-                  chooseBattleGambit(g.id);
-                  resolveBattleDay();
-                }}>
-                  {t(g.labelKey as MessageKey)}
+        <>
+          {/* Left rail — playback controls + per-unit orders */}
+          <div className="absolute left-4 bottom-4 flex max-w-[42%] flex-col items-start gap-2">
+            <div className="flex flex-wrap items-center gap-2 px-3 py-2" style={PANEL}>
+              <CinBtn variant="gold" onClick={() => resolveBattleDay()}>{t('battle.advanceDay')}</CinBtn>
+              <CinBtn onClick={() => setPlaying((p) => !p)}>{playing ? t('battle.pause') : t('battle.play')}</CinBtn>
+              <span className="mx-1 h-5 w-px" style={{ background: LINE }} />
+              {[1, 2, 4].map((sp) => (
+                <CinBtn key={sp} active={session.speed === sp} onClick={() => setBattleSpeed(sp as 1 | 2 | 4)}>
+                  {t('battle.speed')} ×{sp}
                 </CinBtn>
               ))}
+              <span className="mx-1 h-5 w-px" style={{ background: LINE }} />
+              <CinBtn onClick={() => quickResolveBattle()}>{t('battle.quickResolve')}</CinBtn>
+              <CinBtn onClick={() => {
+                const m = toggleMuted();
+                setMuted(m);
+                if (m) stopBattleMusic();
+                else startBattleMusic();
+              }}>{muted ? `🔇 ${t('battle.unmute')}` : `🔊 ${t('battle.mute')}`}</CinBtn>
             </div>
-          )}
-
-          {/* Pivotal decision prompt — the only thing that pauses auto-play. */}
-          {playing && (() => {
-            const pivotal = pendingPivotalDecision(session);
-            const sig = pivotal ? `${session.battle.daysElapsed}:${pivotal.id}` : null;
-            if (!pivotal || dismissedPivotal === sig) return null;
-            return (
-              <div className="flex flex-col items-center gap-2 px-5 py-3" style={{ ...PANEL, borderColor: 'rgba(201,163,92,.6)' }}>
-                <span className="font-display text-sm" style={{ letterSpacing: '0.26em', color: GOLD }}>{t('battle.decision.pivotal')}</span>
-                <div className="flex items-center gap-2">
-                  <CinBtn variant="gold" onClick={() => { chooseBattleDecision(pivotal.id); resolveBattleDay(); }}>
-                    {t(pivotal.labelKey as MessageKey)}
-                  </CinBtn>
-                  <CinBtn onClick={() => setDismissedPivotal(sig)}>
-                    {t('battle.decision.continue')}
-                  </CinBtn>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Maneuver levers — the commander's contextual moves. */}
-          {session.offeredDecisions.length > 0 && (
-            <div className="flex flex-wrap items-center justify-center gap-2 px-3 py-2" style={PANEL}>
-              <span className="font-display text-xs" style={{ letterSpacing: '0.28em', color: GOLD }}>{t('battle.decision.tray')}</span>
-              {/* Don't list the currently-pivotal decision here while its prompt is
-                  up — otherwise the same lever would appear twice. */}
-              {session.offeredDecisions
-                .filter((d) => !(playing && pendingPivotalDecision(session)?.id === d.id))
-                .map((d) => (
-                  <CinBtn key={d.id} onClick={() => { chooseBattleDecision(d.id); resolveBattleDay(); }}>
-                    {t(d.labelKey as MessageKey)}
-                  </CinBtn>
+            {playerUnits.length > 0 && (
+              <div className="flex max-w-full flex-wrap items-center gap-1.5 px-3 py-1.5" style={PANEL}>
+                <span className="text-[10px] uppercase" style={{ letterSpacing: '0.2em', color: PAPER_DIM }}>{t('battle.yourOrders')}</span>
+                {playerUnits.map((u) => (
+                  <span key={u.id} className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs" style={{ background: 'rgba(255,255,255,.05)' }}>
+                    <span className="font-mono tabular-nums" style={{ color: PAPER_DIM }}>{u.troops.toLocaleString()}</span>
+                    <button className="text-[11px]" style={{ color: GOLD }} onClick={() => submitBattleOrders([{ kind: 'hold', unitId: u.id }])}>{t('battle.hold')}</button>
+                    <button className="text-[11px]" style={{ color: GOLD }} onClick={() => {
+                      const foe = battle.units.find((e) => e.factionId !== u.factionId && e.state === 'fielded');
+                      if (foe) submitBattleOrders([{ kind: 'charge', unitId: u.id, targetUnitId: foe.id }]);
+                    }}>{t('battle.charge')}</button>
+                  </span>
                 ))}
-            </div>
-          )}
-
-          {/* Primary controls */}
-          <div className="flex flex-wrap items-center justify-center gap-2 px-3 py-2" style={PANEL}>
-            <CinBtn variant="gold" onClick={() => resolveBattleDay()}>{t('battle.advanceDay')}</CinBtn>
-            <CinBtn onClick={() => setPlaying((p) => !p)}>{playing ? t('battle.pause') : t('battle.play')}</CinBtn>
-            <span className="mx-1 h-5 w-px" style={{ background: LINE }} />
-            {[1, 2, 4].map((sp) => (
-              <CinBtn key={sp} active={session.speed === sp} onClick={() => setBattleSpeed(sp as 1 | 2 | 4)}>
-                {t('battle.speed')} ×{sp}
-              </CinBtn>
-            ))}
-            <span className="mx-1 h-5 w-px" style={{ background: LINE }} />
-            <CinBtn onClick={() => quickResolveBattle()}>{t('battle.quickResolve')}</CinBtn>
-            <CinBtn onClick={() => {
-              const m = toggleMuted();
-              setMuted(m);
-              if (m) stopBattleMusic();
-              else startBattleMusic();
-            }}>{muted ? `🔇 ${t('battle.unmute')}` : `🔊 ${t('battle.mute')}`}</CinBtn>
+              </div>
+            )}
           </div>
 
-          {/* Per-unit orders */}
-          {playerUnits.length > 0 && (
-            <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 px-3 py-1.5" style={PANEL}>
-              <span className="text-[10px] uppercase" style={{ letterSpacing: '0.2em', color: PAPER_DIM }}>{t('battle.yourOrders')}</span>
-              {playerUnits.map((u) => (
-                <span key={u.id} className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs" style={{ background: 'rgba(255,255,255,.05)' }}>
-                  <span className="font-mono tabular-nums" style={{ color: PAPER_DIM }}>{u.troops.toLocaleString()}</span>
-                  <button className="text-[11px]" style={{ color: GOLD }} onClick={() => submitBattleOrders([{ kind: 'hold', unitId: u.id }])}>{t('battle.hold')}</button>
-                  <button className="text-[11px]" style={{ color: GOLD }} onClick={() => {
-                    const foe = battle.units.find((e) => e.factionId !== u.factionId && e.state === 'fielded');
-                    if (foe) submitBattleOrders([{ kind: 'charge', unitId: u.id, targetUnitId: foe.id }]);
-                  }}>{t('battle.charge')}</button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+          {/* Right rail — commander levers + the pivotal decision prompt */}
+          <div className="absolute right-4 bottom-4 flex max-w-[44%] flex-col items-end gap-2">
+            {/* Gambit opportunities (stratagems) */}
+            {session.gambits.length > 0 && (
+              <div className="flex flex-wrap items-center justify-end gap-2 px-3 py-2" style={{ ...PANEL, borderColor: 'rgba(201,163,92,.5)' }}>
+                <span className="font-display text-xs" style={{ letterSpacing: '0.28em', color: GOLD }}>{t('battle.gambits')}</span>
+                {session.gambits.filter((g, i, a) => a.findIndex((x) => x.id === g.id) === i).map((g) => (
+                  <CinBtn key={g.id} variant="gold" onClick={() => {
+                    revealN.current += 1;
+                    setReveal({ nameKey: g.labelKey as MessageKey, descKey: `battle.reveal.${g.id}` as MessageKey, n: revealN.current });
+                    chooseBattleGambit(g.id);
+                    resolveBattleDay();
+                  }}>
+                    {t(g.labelKey as MessageKey)}
+                  </CinBtn>
+                ))}
+              </div>
+            )}
+
+            {/* Maneuver levers — the commander's contextual moves. */}
+            {session.offeredDecisions.length > 0 && (
+              <div className="flex flex-wrap items-center justify-end gap-2 px-3 py-2" style={PANEL}>
+                <span className="font-display text-xs" style={{ letterSpacing: '0.28em', color: GOLD }}>{t('battle.decision.tray')}</span>
+                {session.offeredDecisions
+                  .filter((d) => !(playing && pendingPivotalDecision(session)?.id === d.id))
+                  .map((d) => (
+                    <CinBtn key={d.id} onClick={() => { chooseBattleDecision(d.id); resolveBattleDay(); }}>
+                      {t(d.labelKey as MessageKey)}
+                    </CinBtn>
+                  ))}
+              </div>
+            )}
+
+            {/* Pivotal decision prompt — the only thing that pauses auto-play. */}
+            {playing && (() => {
+              const pivotal = pendingPivotalDecision(session);
+              const sig = pivotal ? `${session.battle.daysElapsed}:${pivotal.id}` : null;
+              if (!pivotal || dismissedPivotal === sig) return null;
+              return (
+                <div className="flex flex-col items-end gap-2 px-5 py-3" style={{ ...PANEL, borderColor: 'rgba(201,163,92,.7)', boxShadow: '0 8px 30px rgba(0,0,0,.5), 0 0 22px rgba(201,163,92,.25)' }}>
+                  <span className="font-display text-sm" style={{ letterSpacing: '0.26em', color: GOLD }}>{t('battle.decision.pivotal')}</span>
+                  <div className="flex items-center gap-2">
+                    <CinBtn variant="gold" onClick={() => { chooseBattleDecision(pivotal.id); resolveBattleDay(); }}>
+                      {t(pivotal.labelKey as MessageKey)}
+                    </CinBtn>
+                    <CinBtn onClick={() => setDismissedPivotal(sig)}>
+                      {t('battle.decision.continue')}
+                    </CinBtn>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </>
       )}
 
       {/* Stratagem reveal card */}

@@ -20,6 +20,7 @@ import { FactionPanel } from '../components/FactionPanel.js';
 import { TurnDigest } from '../components/TurnDigest.js';
 import { FloatingPanel } from '../components/FloatingPanel.js';
 import { factionColor } from '../theme.js';
+import { startMapMusic, stopMapMusic } from '../audio/battle.js';
 import { CommandMenu, type MenuOption } from '../components/CommandMenu.js';
 import { Dialog } from '../components/Dialog.js';
 import { adjacentCities } from '../../engine/map.js';
@@ -52,6 +53,12 @@ export const MainScreen: React.FC = () => {
   const selectedCityId = useSession((s) => s.ui.selectedCityId);
   const turnDigest = useSession((s) => s.ui.turnDigest);
   const [modal, setModal] = useState<Modal>({ kind: 'none' });
+  // Campaign-map background theme: plays while the map is on screen and stops on
+  // leave (a battle takes over its own music, then the map theme resumes).
+  useEffect(() => {
+    startMapMusic();
+    return () => stopMapMusic();
+  }, []);
   // Derive map overlays from the engine's pendingOps. The map shows
   // every march in flight and every city under siege so the player can
   // see the campaign at a glance.

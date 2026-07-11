@@ -421,29 +421,29 @@ export class BattleScene {
       blades.push(bl);
     }
     const tuft = mergeGeometries(blades, false);
-    const grass = new THREE.InstancedMesh(tuft, new THREE.MeshStandardMaterial({ roughness: 1 }), 900);
+    const grass = new THREE.InstancedMesh(tuft, new THREE.MeshStandardMaterial({ roughness: 1 }), 380);
     const M = new THREE.Matrix4();
     const P = new THREE.Vector3();
     const Q = new THREE.Quaternion();
     const S = new THREE.Vector3();
     const CT = new THREE.Color();
     let g = 0;
-    for (let i = 0; i < 2200 && g < 900; i++) {
+    for (let i = 0; i < 2200 && g < 380; i++) {
       const x = (envHash(i, 3, seed) - 0.5) * fw.w * 0.98;
       const z = (envHash(i, 7, seed) - 0.5) * fw.h * 0.98;
       const cx = Math.round(x / CELL_SIZE + (field.width - 1) / 2);
       const cy = Math.round(z / CELL_SIZE + (field.height - 1) / 2);
       const cell = cellOf(cx, cy);
       if (cell === 'river' || cell === 'ford' || cell === 'wall' || cell === 'gate') continue;
-      if (envHash(i, 9, seed) > 0.7) continue; // patchy, not a lawn
-      const sc = 0.6 + envHash(i, 12, seed) * 0.9;
+      if (envHash(i, 9, seed) > 0.42) continue; // sparse dry tufts on churned ground
+      const sc = 0.55 + envHash(i, 12, seed) * 0.8;
       P.set(x, terrainHeight(cx, cy, field), z);
       Q.setFromAxisAngle(UP, envHash(i, 15, seed) * Math.PI);
-      S.set(sc, sc * (0.8 + envHash(i, 17, seed) * 0.6), sc);
+      S.set(sc, sc * (0.7 + envHash(i, 17, seed) * 0.5), sc);
       M.compose(P, Q, S);
       grass.setMatrixAt(g, M);
-      const v = 0.28 + envHash(i, 19, seed) * 0.22;
-      CT.setRGB(v * 0.72, v, v * 0.42); // varied grass greens
+      const v = 0.3 + envHash(i, 19, seed) * 0.22;
+      CT.setRGB(v * 0.95, v * 0.8, v * 0.42); // dry, sun-bleached straw
       grass.setColorAt(g, CT);
       g++;
     }
@@ -634,49 +634,56 @@ export class BattleScene {
     peaks.instanceMatrix.needsUpdate = true;
     this.scene.add(peaks);
 
-    // --- forests: instanced fir cones on the hills + on the field's forest cells ---
-    const treeGeo = new THREE.ConeGeometry(1.7, 5.4, 5);
-    treeGeo.translate(0, 2.7, 0);
-    const trees = new THREE.InstancedMesh(treeGeo, new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), 640);
+    // --- forests: instanced fir cones on the hills + on the field's forest cells.
+    // Sparser and smaller than a blanket, with per-tree size AND silhouette
+    // variance (some tall & slim, some short & squat) so the treeline reads as a
+    // real, varied stand rather than a cloned row. ---
+    const treeGeo = new THREE.ConeGeometry(1.25, 3.4, 5);
+    treeGeo.translate(0, 1.7, 0);
+    const trees = new THREE.InstancedMesh(treeGeo, new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), 300);
     let tk = 0;
     // woodland around the clearing, clumped into groves (fbm density) and thinning
     // toward the mountains, so it reads as a real forest rather than a blanket
-    for (let i = 0; i < 5200 && tk < 560; i++) {
+    for (let i = 0; i < 5200 && tk < 230; i++) {
       const ang = envHash(i, 2, seed) * Math.PI * 2;
       const rad = clearing + 2 + envHash(i, 4, seed) * (118 - clearing);
       const x = Math.cos(ang) * rad + (envHash(i, 6, seed) - 0.5) * 12;
       const z = Math.sin(ang) * rad + (envHash(i, 8, seed) - 0.5) * 12;
       const r = Math.hypot(x, z);
       if (r < clearing || r > 122) continue;
-      // grove density: fbm carves clearings and copses instead of an even fill
-      if (envFbm(x * 0.05, z * 0.05, seed + 31) < 0.46) continue;
+      // grove density: fbm carves clearings and copses (raised threshold -> fewer,
+      // tighter copses instead of a near-continuous belt)
+      if (envFbm(x * 0.05, z * 0.05, seed + 31) < 0.6) continue;
       const y = surroundHeight(x, z, clearing, seed);
-      const sc = 0.7 + envHash(i, 12, seed) * 1.5;
+      // height biased small (square of a 0..1 hash), width varied independently
+      const h = 0.5 + envHash(i, 12, seed) * envHash(i, 13, seed) * 1.35;
+      const w = h * (0.68 + envHash(i, 14, seed) * 0.6);
       P.set(x, y, z);
-      S.set(sc, sc, sc);
+      S.set(w, h, w);
       M.compose(P, Q, S);
       trees.setMatrixAt(tk, M);
-      const g = 0.2 + envHash(i, 15, seed) * 0.18; // varied greens
-      CT.setRGB(g * 0.7, g + 0.06, g * 0.55);
+      const g = 0.18 + envHash(i, 15, seed) * 0.22; // varied greens
+      CT.setRGB(g * 0.72, g + 0.05, g * 0.5);
       trees.setColorAt(tk, CT);
       tk++;
     }
-    // real trees standing on the playfield's forest cells
-    for (let cy = 0; cy < field.height && tk < 640; cy++) {
-      for (let cx = 0; cx < field.width && tk < 640; cx++) {
+    // real trees standing on the playfield's forest cells (a couple per cell)
+    for (let cy = 0; cy < field.height && tk < 300; cy++) {
+      for (let cx = 0; cx < field.width && tk < 300; cx++) {
         if (field.cells[cy * field.width + cx] !== 'forest') continue;
-        const w = cellWorldXZ(cx, cy, field);
+        const w0 = cellWorldXZ(cx, cy, field);
         const yy = terrainHeight(cx, cy, field);
-        for (let n = 0; n < 3 && tk < 640; n++) {
+        for (let n = 0; n < 2 && tk < 300; n++) {
           const jx = (envHash(cx * 7 + cy, n * 3 + 1, seed) - 0.5) * CELL_SIZE;
           const jz = (envHash(cx * 7 + cy, n * 3 + 2, seed) - 0.5) * CELL_SIZE;
-          const sc = 0.5 + envHash(cx * 7 + cy, n, seed) * 0.5;
-          P.set(w.x + jx, yy, w.z + jz);
-          S.set(sc, sc, sc);
+          const h = 0.5 + envHash(cx * 7 + cy, n, seed) * 0.55;
+          const w = h * (0.7 + envHash(cx * 7 + cy, n + 9, seed) * 0.5);
+          P.set(w0.x + jx, yy, w0.z + jz);
+          S.set(w, h, w);
           M.compose(P, Q, S);
           trees.setMatrixAt(tk, M);
-          const g = 0.2 + envHash(cx * 7 + cy, n + 4, seed) * 0.18;
-          CT.setRGB(g * 0.7, g + 0.06, g * 0.55);
+          const g = 0.18 + envHash(cx * 7 + cy, n + 4, seed) * 0.22;
+          CT.setRGB(g * 0.72, g + 0.05, g * 0.5);
           trees.setColorAt(tk, CT);
           tk++;
         }
@@ -1647,12 +1654,14 @@ function surroundHeight(x: number, z: number, clearing: number, seed: number): n
 // Height -> natural ground color for the surrounding terrain (dry grass -> green
 // -> rock -> pale peak).
 function groundRamp(h: number): [number, number, number] {
+  // Muddy/sandy basin: wet earth in the hollows rising to dry dirt and pale
+  // sandy slopes (matches the arid playfield palette in geometry.ts).
   const stops: Array<[number, [number, number, number]]> = [
-    [-1, [0.44, 0.44, 0.3]],
-    [3, [0.34, 0.42, 0.26]],
-    [12, [0.32, 0.36, 0.24]],
-    [26, [0.4, 0.38, 0.34]],
-    [48, [0.5, 0.5, 0.52]],
+    [-1, [0.48, 0.41, 0.29]],
+    [3, [0.5, 0.42, 0.3]],
+    [12, [0.46, 0.4, 0.31]],
+    [26, [0.47, 0.43, 0.37]],
+    [48, [0.52, 0.5, 0.49]],
   ];
   if (h <= stops[0]![0]) return stops[0]![1];
   for (let i = 1; i < stops.length; i++) {

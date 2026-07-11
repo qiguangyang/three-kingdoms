@@ -8,14 +8,14 @@ export const CELL_SIZE = 2;
 export const HEIGHT_SCALE = 3;
 
 const CELL_RGB: Record<BattleCell, [number, number, number]> = {
-  plain: [0.78, 0.72, 0.5],
-  hill: [0.62, 0.52, 0.36],
-  forest: [0.32, 0.45, 0.25],
+  plain: [0.8, 0.69, 0.47], // dry sand
+  hill: [0.56, 0.45, 0.31], // packed mud / dirt
+  forest: [0.34, 0.42, 0.26],
   river: [0.34, 0.55, 0.68],
-  ford: [0.6, 0.68, 0.66],
+  ford: [0.58, 0.56, 0.46], // wet churned crossing
   wall: [0.45, 0.4, 0.32],
   gate: [0.32, 0.26, 0.16],
-  ramp: [0.7, 0.62, 0.42],
+  ramp: [0.68, 0.56, 0.39],
 };
 
 export function cellColor(cell: BattleCell): [number, number, number] {
@@ -93,12 +93,14 @@ function fbm(x: number, y: number, seed: number): number {
   return sum / tot;
 }
 
-// Height (world Y) -> natural base color: dry lowland -> grass -> rock.
+// Height (world Y) -> natural base color: wet sand -> churned mud -> dry dirt.
+// Deliberately arid/earthy (no grass green) so the field reads as a muddy,
+// sandy battleground trampled by armies.
 const RAMP: Array<{ h: number; c: [number, number, number] }> = [
-  { h: 0.0, c: [0.66, 0.6, 0.44] },
-  { h: 0.7, c: [0.42, 0.49, 0.31] },
-  { h: 1.7, c: [0.49, 0.46, 0.34] },
-  { h: 3.2, c: [0.62, 0.58, 0.52] },
+  { h: 0.0, c: [0.71, 0.61, 0.43] }, // damp sand in the hollows
+  { h: 0.7, c: [0.54, 0.43, 0.3] },  // churned mud
+  { h: 1.7, c: [0.61, 0.51, 0.37] }, // dry dirt
+  { h: 3.2, c: [0.68, 0.61, 0.5] },  // pale sandy rise
 ];
 function rampColor(h: number): [number, number, number] {
   if (h <= RAMP[0]!.h) return [RAMP[0]!.c[0], RAMP[0]!.c[1], RAMP[0]!.c[2]];

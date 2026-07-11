@@ -130,6 +130,8 @@ export function playClash(): void {
     releaseMs: 180,
     glideTo: 130,
   });
+  // bright metal-on-metal ping riding the top
+  playTone({ freq: 2100, type: 'triangle', durationMs: 90, peakGain: 0.05, attackMs: 1, releaseMs: 80, glideTo: 1500 });
 }
 
 // Subtle metronome tick for each in-fiction day. Kept low-volume so it
@@ -180,10 +182,14 @@ export function playRetreat(): void {
   });
 }
 
-// Rising rush for a cavalry charge.
+// Rising rush + a low rolling rumble of hooves for a cavalry charge.
 export function playCharge(): void {
   if (isMuted()) return;
   playTone({ freq: 160, type: 'sawtooth', durationMs: 260, peakGain: 0.14, attackMs: 8, releaseMs: 120, glideTo: 320 });
+  const hooves: [number, number][] = [[0, 70], [70, 62], [140, 74], [210, 60]];
+  for (const [off, f] of hooves) {
+    setTimeout(() => playTone({ freq: f, type: 'sine', durationMs: 95, peakGain: 0.13, attackMs: 4, releaseMs: 60, glideTo: f - 12 }), off);
+  }
 }
 
 // Short hiss cluster for an arrow volley.
@@ -206,6 +212,8 @@ export function playDuel(): void {
   if (isMuted()) return;
   playTone({ freq: 990, type: 'square', durationMs: 120, peakGain: 0.1, attackMs: 2, releaseMs: 90, glideTo: 660 });
   setTimeout(() => playTone({ freq: 1240, type: 'square', durationMs: 140, peakGain: 0.1, attackMs: 2, releaseMs: 110, glideTo: 520 }), 130);
+  // ringing steel that hangs in the air after the exchange
+  setTimeout(() => playTone({ freq: 2600, type: 'triangle', durationMs: 460, peakGain: 0.045, attackMs: 1, releaseMs: 420, glideTo: 2100 }), 210);
 }
 
 // Falling tone for a rout.
@@ -214,92 +222,167 @@ export function playRout(): void {
   playTone({ freq: 420, type: 'sine', durationMs: 380, peakGain: 0.12, attackMs: 6, releaseMs: 260, glideTo: 90 });
 }
 
-// ── Procedural battle music bed ─────────────────────────────────────────────
-// A low drone (root/fifth/octave through a slowly-sweeping lowpass) under a war
-// drum whose tempo and weight rise with the fighting. Synthesized — no assets —
-// and it sits quietly under the event SFX. start on Begin, stop on finish/leave.
-interface Music {
-  master: GainNode;
-  filter: BiquadFilterNode;
-  drone: OscillatorNode[];
-  lfo: OscillatorNode;
-  drumTimer: ReturnType<typeof setTimeout> | null;
-  intensity: number;
-}
-let music: Music | null = null;
+// ── Battle music (AI-generated tracks, played as assets) ────────────────────
+// The looping battle bed + victory/defeat themes are generated with ACE-Step
+// (via the vuesub CLI) and shipped as mp3s in /public/audio. They play through
+// <audio> elements, kept out of the WebAudio SFX graph above; the mute flag
+// governs both layers. Combat SFX stay procedural — a music model can't
+// synthesize sword-clash / arrow foley one-shots.
+const AUDIO_BASE = '/audio/';
+const BED_MAX_GAIN = 0.6; // bed volume at full intensity
+const THEME_GAIN = 0.62;
 
-function drumHit(c: AudioContext, dest: AudioNode, intensity: number): void {
-  const now = c.currentTime;
-  const o = c.createOscillator();
-  o.type = 'sine';
-  o.frequency.setValueAtTime(94, now);
-  o.frequency.exponentialRampToValueAtTime(42, now + 0.16);
-  const g = c.createGain();
-  g.gain.setValueAtTime(0.0001, now);
-  g.gain.exponentialRampToValueAtTime(0.28 + intensity * 0.34, now + 0.012);
-  g.gain.exponentialRampToValueAtTime(0.0008, now + 0.34);
-  o.connect(g).connect(dest);
-  o.start(now);
-  o.stop(now + 0.4);
+const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
+// Bed loudness rises with the fighting (calm at deployment, full in melee).
+const bedVolume = (intensity: number): number => BED_MAX_GAIN * (0.5 + 0.5 * clamp01(intensity));
+
+let bed: HTMLAudioElement | null = null;
+let endTheme: HTMLAudioElement | null = null;
+let bedIntensity = 0.4;
+const fadeTimers = new WeakMap<HTMLAudioElement, ReturnType<typeof setInterval>>();
+
+function makeTrack(file: string, loop: boolean): HTMLAudioElement | null {
+  try {
+    const a = new Audio(AUDIO_BASE + file);
+    a.loop = loop;
+    a.preload = 'auto';
+    return a;
+  } catch {
+    return null; // Audio unavailable (e.g. jsdom) — degrade silently
+  }
+}
+
+// play() may reject (autoplay policy), throw, or — under jsdom — return
+// `undefined` instead of a Promise; swallow all three so callers never crash.
+function safePlay(el: HTMLAudioElement): void {
+  try {
+    const p = el.play() as unknown as Promise<void> | undefined;
+    if (p && typeof p.catch === 'function') p.catch(() => { /* needs a gesture — retried later */ });
+  } catch {
+    /* not implemented / blocked — ignore */
+  }
+}
+
+// Linear volume fade over `ms`, cancelling any fade already in flight on `el`.
+function fadeTo(el: HTMLAudioElement, target: number, ms: number, onDone?: () => void): void {
+  const prev = fadeTimers.get(el);
+  if (prev) clearInterval(prev);
+  const tgt = clamp01(target);
+  if (ms <= 0 || typeof performance === 'undefined') { el.volume = tgt; onDone?.(); return; }
+  const from = el.volume;
+  const start = performance.now();
+  const timer = setInterval(() => {
+    const t = Math.min(1, (performance.now() - start) / ms);
+    try { el.volume = clamp01(from + (tgt - from) * t); } catch { /* detached */ }
+    if (t >= 1) { clearInterval(timer); fadeTimers.delete(el); onDone?.(); }
+  }, 50);
+  fadeTimers.set(el, timer);
+}
+
+function fadeOutAndStop(el: HTMLAudioElement, ms: number): void {
+  fadeTo(el, 0, ms, () => { try { el.pause(); el.currentTime = 0; } catch { /* ignore */ } });
 }
 
 export function startBattleMusic(): void {
-  const c = ensureCtx();
-  if (!c || music) return;
-  const master = c.createGain();
-  master.gain.setValueAtTime(0, c.currentTime);
-  master.gain.linearRampToValueAtTime(0.2, c.currentTime + 2.5); // gentle fade-in
-  const filter = c.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.value = 460;
-  filter.Q.value = 0.9;
-  filter.connect(master).connect(c.destination);
-  const drone = [55, 82.5, 110].map((f, i) => {
-    const o = c.createOscillator();
-    o.type = i === 0 ? 'sawtooth' : 'triangle';
-    o.frequency.value = f;
-    o.detune.value = (i - 1) * 5;
-    const g = c.createGain();
-    g.gain.value = i === 0 ? 0.42 : 0.22;
-    o.connect(g).connect(filter);
-    o.start();
-    return o;
-  });
-  const lfo = c.createOscillator();
-  lfo.frequency.value = 0.05;
-  const lfoGain = c.createGain();
-  lfoGain.gain.value = 200;
-  lfo.connect(lfoGain).connect(filter.frequency);
-  lfo.start();
-  music = { master, filter, drone, lfo, drumTimer: null, intensity: 0.2 };
-  const beat = (): void => {
-    if (!music) return;
-    drumHit(c, master, music.intensity);
-    music.drumTimer = setTimeout(beat, 1500 - music.intensity * 650); // faster when intense
-  };
-  beat();
+  if (isMuted() || bed) return;
+  // A lingering victory/defeat theme from a previous battle gives way.
+  if (endTheme) { fadeOutAndStop(endTheme, 600); endTheme = null; }
+  bed = makeTrack('battle-bed.mp3', true);
+  if (!bed) return;
+  bed.volume = 0;
+  safePlay(bed);
+  fadeTo(bed, bedVolume(bedIntensity), 2400);
 }
 
-// 0 = calm deployment, 1 = full melee — drives drum tempo + weight.
+// 0 = calm deployment, 1 = full melee — modulates the bed's loudness.
 export function setBattleIntensity(x: number): void {
-  if (music) music.intensity = Math.max(0, Math.min(1, x));
+  bedIntensity = clamp01(x);
+  if (bed && !bed.paused) fadeTo(bed, bedVolume(bedIntensity), 1200);
 }
 
 export function stopBattleMusic(): void {
-  if (!music || !ctx) return;
-  const c = ctx;
-  const m = music;
-  music = null;
-  if (m.drumTimer) clearTimeout(m.drumTimer);
-  const now = c.currentTime;
-  m.master.gain.cancelScheduledValues(now);
-  m.master.gain.setValueAtTime(m.master.gain.value, now);
-  m.master.gain.linearRampToValueAtTime(0, now + 1.2);
-  const stopAt = now + 1.3;
-  for (const o of m.drone) { try { o.stop(stopAt); } catch { /* already stopped */ } }
-  try { m.lfo.stop(stopAt); } catch { /* ignore */ }
+  const b = bed;
+  bed = null;
+  if (b) fadeOutAndStop(b, 1100);
 }
 
+// One-shot end themes: hand off from the bed to a triumphant / mournful cue.
+function playTheme(file: string): void {
+  if (isMuted()) return;
+  stopBattleMusic();
+  if (endTheme) fadeOutAndStop(endTheme, 400);
+  const t = makeTrack(file, false);
+  if (!t) return;
+  endTheme = t;
+  t.volume = 0;
+  safePlay(t);
+  fadeTo(t, THEME_GAIN, 500);
+}
+export function playVictoryTheme(): void { playTheme('victory.mp3'); }
+export function playDefeatTheme(): void { playTheme('defeat.mp3'); }
+
 export function musicPlaying(): boolean {
-  return music !== null;
+  return bed !== null;
+}
+
+// ── Campaign-map theme (a looping playlist) ─────────────────────────────────
+// Five long, authentic Three Kingdoms-era pieces played back-to-back on an
+// endless rotation under the campaign map. Separate from the battle bed — the
+// two scenes never overlap. The browser may block the first play() (no gesture
+// yet on a fresh load); we retry on the first user interaction. A track that
+// fails to load (e.g. still being generated) is skipped rather than stalling
+// the rotation — but if every track in a row fails, we give up.
+const MAP_GAIN = 0.42;
+const MAP_TRACKS = ['map-1.mp3', 'map-2.mp3', 'map-3.mp3', 'map-4.mp3', 'map-5.mp3'];
+let mapActive = false;
+let mapEl: HTMLAudioElement | null = null;
+let mapIndex = 0;
+let mapErrorStreak = 0;
+
+function playMapTrack(i: number): void {
+  if (!mapActive || isMuted()) return;
+  const n = MAP_TRACKS.length;
+  mapIndex = ((i % n) + n) % n;
+  const el = makeTrack(MAP_TRACKS[mapIndex]!, false);
+  if (!el) return;
+  const prev = mapEl;
+  mapEl = el;
+  if (prev) fadeOutAndStop(prev, 1500);
+  el.volume = 0;
+  el.addEventListener('canplay', () => { mapErrorStreak = 0; }, { once: true });
+  // Advance to the next track when this one finishes — an endless rotation.
+  el.addEventListener('ended', () => { if (mapActive && mapEl === el) playMapTrack(mapIndex + 1); }, { once: true });
+  // Skip a track that can't load, unless every track has failed in a row.
+  el.addEventListener('error', () => {
+    if (!mapActive || mapEl !== el) return;
+    mapErrorStreak++;
+    if (mapErrorStreak <= MAP_TRACKS.length) setTimeout(() => { if (mapActive && mapEl === el) playMapTrack(mapIndex + 1); }, 400);
+  }, { once: true });
+  safePlay(el);
+  fadeTo(el, MAP_GAIN, 2500);
+}
+
+export function startMapMusic(): void {
+  if (isMuted() || mapActive) return;
+  mapActive = true;
+  mapErrorStreak = 0;
+  // Open on a rotating track so it doesn't always start on the same piece.
+  const start = Math.floor((typeof performance !== 'undefined' ? performance.now() : 0) / 1000) % MAP_TRACKS.length;
+  playMapTrack(start);
+  try {
+    const unlock = (): void => {
+      window.removeEventListener('pointerdown', unlock);
+      if (mapActive && mapEl && mapEl.paused) safePlay(mapEl); // resume if autoplay blocked it
+    };
+    window.addEventListener('pointerdown', unlock, { once: true });
+  } catch {
+    /* no window (SSR/tests) — ignore */
+  }
+}
+
+export function stopMapMusic(): void {
+  mapActive = false;
+  const el = mapEl;
+  mapEl = null;
+  if (el) fadeOutAndStop(el, 1500);
 }
