@@ -13,6 +13,12 @@ export const en: MessageCatalog = {
   'app.continue': 'Continue',
   'app.quitConfirm': 'Quit the game?',
 
+  'story.ch1.title': 'The Tyrant\'s Shadow',
+  'story.ch1.briefing':
+    'You are Liu Bei, magistrate of Pingyuan — one city, and two sworn brothers, Guan Yu and Zhang Fei, at your side. The Han crumbles as the tyrant Dong Zhuo holds the boy-emperor hostage and bleeds the realm. You are a man of humble birth but boundless purpose: in a world turned to chaos, a name built on virtue may yet raise a dynasty.',
+  'story.ch1.transition':
+    'The warlords rise, and the Han\'s mandate flickers low. From a commoner\'s beginnings you have carved a name into a world of chaos. The winds shift, and the years slip swiftly by…',
+
   'title.newGame': 'New Game',
   'title.loadGame': 'Load Save',
   'title.about': 'About',

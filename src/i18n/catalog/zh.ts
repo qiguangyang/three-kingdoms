@@ -13,6 +13,12 @@ export const zh: MessageCatalog = {
   'app.continue': '继续',
   'app.quitConfirm': '确认退出?',
 
+  'story.ch1.title': '董卓弄权',
+  'story.ch1.briefing':
+    '你是平原县令刘备，坐拥一城，身边只有关羽、张飞两位结义兄弟。汉室倾颓，董卓挟天子以令诸侯，暴虐四海。你出身寒微，却胸怀匡扶社稷之志——乱世将起，正是仁义立名之时。',
+  'story.ch1.transition':
+    '群雄纷起，汉祚将倾。你以一介布衣立身乱世，名已初显。风云变幻，数载春秋倏忽而过……',
+
   'title.newGame': '新游戏',
   'title.loadGame': '读取存档',
   'title.about': '关于',

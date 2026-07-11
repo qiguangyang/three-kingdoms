@@ -23,6 +23,11 @@ export type MessageKey =
   | 'app.continue'
   | 'app.quitConfirm'
 
+  // Story campaign — chapter framing (briefing / transition)
+  | 'story.ch1.title'
+  | 'story.ch1.briefing'
+  | 'story.ch1.transition'
+
   // Title screen
   | 'title.newGame'
   | 'title.loadGame'
