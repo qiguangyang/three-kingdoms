@@ -346,6 +346,12 @@ export const zh: MessageCatalog = {
   'objective.s1.xuzhouAid.desc': '应陶谦之请，率军解徐州之围，以信义动人心。',
   'objective.s1.foundation.title': '抉择基业',
   'objective.s1.foundation.desc': '面对陶谦让州之请，决定进退。',
+  'story.s1.coalition.title': '关东义盟',
+  'story.s1.coalition.body':
+    '董卓废立天子、鸩杀太后，四海共愤。关东十八路诸侯歃血为盟，共推袁绍为盟主，旌旗蔽野，同讨国贼。你率关、张二弟，引数百乡勇，随公孙瓒之军奔赴盟坛——势虽单薄，亦誓要在这讨逆的洪流中留下名姓。',
+  'story.s1.zhaoyun.title': '常山赵子龙',
+  'story.s1.zhaoyun.body':
+    '乱军之中，一员白袍小将单枪匹马，枪出如龙，于万军之内救主而还——常山赵云，字子龙。他此时寄身公孙瓒麾下，然其志不在于此。你与他一席倾谈，恍如故交；若能以诚相待、以义相结，这条常山之龙，或将随你一世。',
   'story.s1.xuzhou.title': '陶谦让徐州',
   'story.s1.xuzhou.body':
     '陶谦病笃，三让徐州于你。徐州乃四战之地，富庶却众目睽睽。取之，则一夕由客将而为诸侯；辞之，则仁名传遍天下，然基业无着。糜竺、陈登拱手相候，只待你一言。',

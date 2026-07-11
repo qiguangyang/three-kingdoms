@@ -352,6 +352,12 @@ export const en: MessageCatalog = {
     "Answer Tao Qian's plea, break the siege, and let your honor speak for you.",
   'objective.s1.foundation.title': 'A Foundation Offered',
   'objective.s1.foundation.desc': 'Decide your answer when Tao Qian offers you his province.',
+  'story.s1.coalition.title': 'The Guandong Coalition',
+  'story.s1.coalition.body':
+    "Dong Zhuo has cast down one emperor to enthrone a puppet and poisoned the dowager — and the realm rises in fury. Across the eastern passes eighteen lords swear a blood-oath and raise Yuan Shao as their chief; their banners darken the fields as they march upon the traitor. You bring your sworn brothers Guan and Zhang and a few hundred village men, riding under Gongsun Zan's colors to the muster — small among the mighty, yet resolved that your name, too, shall be written into this reckoning.",
+  'story.s1.zhaoyun.title': 'The Dragon of Changshan',
+  'story.s1.zhaoyun.body':
+    'In the churn of battle a young captain in white rides out alone, his spear striking like a dragon as he cuts his lord free from ten thousand blades — Zhao Yun of Changshan, styled Zilong. For now he serves under Gongsun Zan, yet his heart is not bound there. You share a single conversation and it is as though you have always known one another; treat him with sincerity and bind him with honor, and this dragon of Changshan may follow you all your days.',
   'story.s1.xuzhou.title': 'The Bequest of Xuzhou',
   'story.s1.xuzhou.body':
     'Tao Qian lies dying and three times presses Xuzhou upon you. It is rich country — and country every warlord covets. Take it, and overnight you rise from wandering guest to sovereign lord. Refuse it, and your name for righteousness spreads across the land — but you remain a man without a home. Mi Zhu and Chen Deng wait, needing only your word.',

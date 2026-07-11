@@ -201,4 +201,58 @@ describe('Scenario 1 — Liu Bei Chapter 1 content', () => {
     const next = decline.apply(staged);
     expect(next.cities['xiaopei'].factionId).toBe('caocao');
   });
+
+  it('surfaces the coalition and Zhao Yun beats as choice-less narrative events', () => {
+    const events = storyEventsFor('s1-dongzhuo', LIUBEI_MODE);
+    const coalition = events.find((e) => e.id === 'coalition_beat');
+    const zhaoyun = events.find((e) => e.id === 'zhaoyun_beat');
+    expect(coalition).toBeDefined();
+    expect(zhaoyun).toBeDefined();
+    expect(coalition!.choices.length).toBe(0);
+    expect(zhaoyun!.choices.length).toBe(0);
+  });
+
+  it('orders the beats before the Xuzhou bequest (coalition < zhaoyun < xuzhou)', () => {
+    const ids = storyEventsFor('s1-dongzhuo', LIUBEI_MODE).map((e) => e.id);
+    const iCoalition = ids.indexOf('coalition_beat');
+    const iZhaoyun = ids.indexOf('zhaoyun_beat');
+    const iXuzhou = ids.indexOf('xuzhou_bequest');
+    expect(iCoalition).toBeGreaterThanOrEqual(0);
+    expect(iCoalition).toBeLessThan(iZhaoyun);
+    expect(iZhaoyun).toBeLessThan(iXuzhou);
+  });
+
+  it('coalition_beat fires the tick the Guandong coalition forms', () => {
+    const beat = storyEventsFor('s1-dongzhuo', LIUBEI_MODE).find((e) => e.id === 'coalition_beat')!;
+    const base = baseState();
+    expect(beat.check(base)).toBe(false);
+    const afterCoalition: GameState = {
+      ...base,
+      events: [...base.events, { id: 'guandong_coalition', turn: 1, year: 189, month: 10 }],
+    };
+    expect(beat.check(afterCoalition)).toBe(true);
+  });
+
+  it('zhaoyun_beat fires after the coalition only while Zhao Yun still serves Gongsun Zan', () => {
+    const beat = storyEventsFor('s1-dongzhuo', LIUBEI_MODE).find((e) => e.id === 'zhaoyun_beat')!;
+    const base = baseState();
+    // Sanity: Zhao Yun begins under Gongsun Zan.
+    expect(base.generals['zhaoyun'].factionId).toBe('gongsunzan');
+    // Before the coalition: no fire even though he still serves Gongsun Zan.
+    expect(beat.check(base)).toBe(false);
+    const afterCoalition: GameState = {
+      ...base,
+      events: [...base.events, { id: 'guandong_coalition', turn: 1, year: 189, month: 10 }],
+    };
+    expect(beat.check(afterCoalition)).toBe(true);
+    // Once Zhao Yun joins Liu Bei, the nudge can no longer fire.
+    const afterRecruit: GameState = {
+      ...afterCoalition,
+      generals: {
+        ...afterCoalition.generals,
+        zhaoyun: { ...afterCoalition.generals['zhaoyun'], factionId: 'liubei' },
+      },
+    };
+    expect(beat.check(afterRecruit)).toBe(false);
+  });
 });

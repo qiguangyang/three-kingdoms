@@ -84,9 +84,37 @@ export const S1_LIUBEI_OBJECTIVES: ObjectiveDef[] = [
   },
 ];
 
-// Liu Bei — Chapter 1 story events (Appendix A). The single fateful choice of
-// the vertical slice: Tao Qian's bequest of Xuzhou.
+// The eighteen-lord coalition forms — surface the (otherwise silent) scripted
+// guandong_coalition event as a dramatic beat. Fires the same tick it forms
+// (scripted events run before the story-event scan). The framework records this
+// beat's id in state.events, so it fires exactly once — no separate seen-flag.
+const coalitionBeat: StoryEvent = {
+  id: 'coalition_beat',
+  check: (state) => hasEvent(state, 'guandong_coalition'),
+  titleKey: 'story.s1.coalition.title',
+  bodyKey: 'story.s1.coalition.body',
+  choices: [],
+};
+
+// A nudge toward recruiting Zhao Yun — fires after the coalition, while he still
+// serves Gongsun Zan. Once he joins Liu Bei (factionId 'liubei') it can't fire.
+const zhaoyunBeat: StoryEvent = {
+  id: 'zhaoyun_beat',
+  check: (state) =>
+    hasEvent(state, 'guandong_coalition') &&
+    state.generals['zhaoyun']?.factionId === 'gongsunzan',
+  titleKey: 'story.s1.zhaoyun.title',
+  bodyKey: 'story.s1.zhaoyun.body',
+  choices: [],
+};
+
+// Liu Bei — Chapter 1 story events (Appendix A). Two narrative beats deepen the
+// chapter (the coalition forming, the Dragon of Changshan), then the single
+// fateful choice of the vertical slice: Tao Qian's bequest of Xuzhou. First
+// eligible per tick fires, so beats precede the bequest in array order.
 export const S1_LIUBEI_EVENTS: StoryEvent[] = [
+  coalitionBeat,
+  zhaoyunBeat,
   {
     id: 'xuzhou_bequest',
     // Fires once Liu Bei has aided Xuzhou (holds a city there) and has not yet
