@@ -29,6 +29,14 @@ export const en: MessageCatalog = {
   'story.ch2.complete.title': 'Chapter Ⅱ Complete — The Dragon Slips the Snare',
   'story.ch2.complete.body':
     "You lived under another's roof and bargained with a tiger; over plums and warm wine your heart was nearly read, yet you veiled it and came through whole. Lü Bu is dead now and the snare is broken, and though you still hold no ground to call your own, your wings have thickened and hearts turn ever more to you. The dragon has not yet risen — but thunder is already faint on the wind. (To be continued)",
+  'story.ch3.title': 'The Fires of Red Cliffs',
+  'story.ch3.briefing':
+    'After three visits to his thatched hut, you have won Zhuge Liang, the Sleeping Dragon — a fish that has found its water at last. But Cao Cao marches south with a host said to number eight hundred thousand, and Jing Province trembles. Alone you cannot stand; only by binding an alliance with Sun Quan can you find life in a hopeless place. All hangs on this single stroke.',
+  'story.ch3.transition':
+    "One blaze at Red Cliffs sent Cao Cao north, and the realm's division into three is sealed. Jing Province is yours to stand upon at last — the dragon has left the deep. Fortune gathers, and a few short years race past…",
+  'story.ch3.complete.title': 'Chapter Ⅲ Complete — The Dragon Leaves the Deep',
+  'story.ch3.complete.body':
+    "One tower of flame, and Cao Cao's eight hundred thousand went up in smoke and ash; the northern host fled home in disarray. From the lone city of Jiangxia you rose — on the Sleeping Dragon's counsel and the Southlands' pact — to wrest from a hopeless corner the ground of Jing you had wandered a lifetime without a home to hold. The realm's division into three now takes shape in shadow; yet Yi Province is untaken and the Han unrestored, and the road runs on. The dragon has left the deep at last, and the thunder stirs — it waits only for its hour to mount the clouds. (To be continued)",
 
   'title.newGame': 'New Game',
   'title.storyMode': 'Story Mode',
@@ -400,4 +408,35 @@ export const en: MessageCatalog = {
   'choice.s2.plumwine.bide.label': 'Bide Your Time',
   'choice.s2.plumwine.bide.desc':
     "Cao Cao's grain and gold let your strength grow in safety; but under another's roof, linger too long and you may remain a vassal forever.",
+
+  // Story campaign — Liu Bei Chapter 3 content (Appendix C)
+  'objective.s3.longzhong.title': 'The Longzhong Plan',
+  'objective.s3.longzhong.desc':
+    "Embrace Zhuge Liang's grand design — hold Jing and Yi, and split the realm in three.",
+  'objective.s3.alliance.title': 'Forge the Alliance',
+  'objective.s3.alliance.desc':
+    'Send Zhuge Liang to the Southlands and bind Sun and Liu against Cao Cao.',
+  'objective.s3.burnFleet.title': 'Burn the Fleet',
+  'objective.s3.burnFleet.desc':
+    "Ride the east wind and shatter Cao Cao's chained ships with fire.",
+  'objective.s3.claimJing.title': 'Claim Jing Province',
+  'objective.s3.claimJing.desc': 'As Cao Cao reels, decide how you take the land of Jing.',
+  'story.s3.longzhong.title': 'The Longzhong Reply',
+  'story.s3.longzhong.body':
+    'In the thatched hut Zhuge Liang unrolls the shape of the age before you: "Cao Cao commands a host of a million and holds the Son of Heaven to command the lords — him you cannot meet head-on. Sun Quan is dug into the Southlands, an ally to lean on, not a prize to seize. But Jing and Yi are a thousand li of rich earth, and both may be yours to hold — make peace westward, soothe the tribes of the south, bind Sun Quan without and order your rule within, and a hegemon\'s work is done, the Han may yet be raised." The words part cloud from sun. You rise and bow low: With you, Master, I am a fish that has found its water.',
+  'story.s3.alliance.title': 'The Southlands Pact',
+  'story.s3.alliance.body':
+    'Zhuge Liang crosses the river alone, matching wits against a hall of scholars, goading Sun Quan and swaying Zhou Yu. The Southlands quarrel without end, surrender against war — until Lu Su holds firm for resistance, Zhou Yu begs the command, and Sun Quan hacks the corner from his desk: "The next man to speak of yielding to Cao ends as this table does!" So the pact of Sun and Liu is sealed. Zhou Yu raises thirty thousand marines and sails upriver to join you at Xiakou, one front against the north — in a hopeless hour, shoulders at last beside your own.',
+  'story.s3.eastwind.title': 'The East Wind',
+  'story.s3.eastwind.body':
+    "Deep in winter the river wind blew only from the northwest, and fire had nothing to ride. Zhuge Liang raised an altar and worked his rites, hair loose and sword in hand — and at the third watch the wind wheeled hard to the southeast. Huang Gai feigned surrender, ran ten fire-ships heaped with brushwood and oil before the wind, and drove them into Cao Cao's chained fleet. In a breath the flames leapt sky-high; wind fed fire, and the linked hulls burned to a single field of ash; Cao's men and horses were consumed or drowned past counting. Eight hundred thousand, undone in a night. Beneath the Red Cliffs, the fire lit the heavens.",
+  'story.s3.borrow.title': 'The Borrowing of Jing',
+  'story.s3.borrow.body':
+    'Red Cliffs is won, and Jing Province lies open. Zhuge Liang counsels: "borrow" Jing from the Southlands as your foothold — lent in name, but hard ever to return. Lu Su bargains in good faith, and Sun Quan is too strong to cross lightly. Take it, and you hold the strategic key to advancing on Yi Province; but let the name of oath-breaker stick, and the alliance may crack.',
+  'choice.s3.borrow.take.label': 'Borrow Jingzhou',
+  'choice.s3.borrow.take.desc':
+    "Win several commanderies of Jing as the base you have long lacked; but plant the seed of the Southlands' resentment — a fractured alliance may one day bring war.",
+  'choice.s3.borrow.honor.label': 'Honor the Terms',
+  'choice.s3.borrow.honor.desc':
+    'Cement the alliance and raise your renown, securing your flank; but your gains shrink and the road to Yi Province grows steeper.',
 };

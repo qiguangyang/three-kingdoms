@@ -29,6 +29,14 @@ export const zh: MessageCatalog = {
   'story.ch2.complete.title': '第二章 · 蛟龙脱困',
   'story.ch2.complete.body':
     '你曾寄人篱下，与虎谋皮，青梅煮酒之间几遭窥破，终以韬晦全身。今吕布已诛，牢笼已破，你虽仍无立锥之地，然羽翼渐丰、人心愈附。潜龙未升，风雷已隐隐可闻。（未完待续）',
+  'story.ch3.title': '火烧赤壁',
+  'story.ch3.briefing':
+    '三顾茅庐，你终得卧龙诸葛亮辅佐，如鱼得水。然曹操已挥师南下，八十万大军压境，荆州震动。孤军难支，唯有东联孙权、共抗强曹，方能于绝境中觅得生机——成败在此一举。',
+  'story.ch3.transition':
+    '赤壁一炬，曹操北归，天下三分之势已成。你终有荆州立足，龙已离渊。风云际会，数载光阴转瞬即逝……',
+  'story.ch3.complete.title': '第三章 完 — 龙已离渊',
+  'story.ch3.complete.body':
+    '一炬冲天，八十万曹军樯橹灰飞，北师仓皇遁归。你自江夏孤城而起，赖卧龙之谋、东吴之盟，终于绝境之中夺得荆州立足之地——飘泊半生，今始有寸土可守。天下三分之势已隐然成形，然益州未取、汉室未兴，前路犹长。潜龙已离深渊，云雷方动，只待乘时而上……（未完待续）',
 
   'title.newGame': '新游戏',
   'title.storyMode': '剧情模式',
@@ -387,4 +395,30 @@ export const zh: MessageCatalog = {
   'choice.s2.plumwine.break.desc': '重夺本部兵马，趁势袭取徐州为根基；然自此与曹操决裂，成其心腹之患，追兵将至。',
   'choice.s2.plumwine.bide.label': '蛰伏许都',
   'choice.s2.plumwine.bide.desc': '得曹操资粮扶持，实力稳步积累，安全无虞；然久居人下，行止受制，坐失良机则将永为附庸。',
+
+  // 剧情战役 — 刘备第三章内容（附录 C）
+  'objective.s3.longzhong.title': '隆中定策',
+  'objective.s3.longzhong.desc': '采纳诸葛亮「跨有荆益、三分天下」之大略。',
+  'objective.s3.alliance.title': '联吴抗曹',
+  'objective.s3.alliance.desc': '遣诸葛亮出使江东，促成孙刘联盟。',
+  'objective.s3.burnFleet.title': '火烧赤壁',
+  'objective.s3.burnFleet.desc': '借东风之利，以火攻大破曹军水寨。',
+  'objective.s3.claimJing.title': '略定荆州',
+  'objective.s3.claimJing.desc': '趁曹操败退，抉择如何取得荆州之地。',
+  'story.s3.longzhong.title': '隆中对策',
+  'story.s3.longzhong.body':
+    '草庐之中，诸葛亮为你铺开天下大势：「曹操拥百万之众，挟天子以令诸侯，此诚不可与争锋；孙权据有江东，可为援而不可图。唯荆、益二州沃野千里，可跨而有之——西和诸戎，南抚夷越，外结孙权，内修政理，则霸业可成，汉室可兴。」一席之言，如拨云见日。你离席长揖：先生之言，孤如鱼得水。',
+  'story.s3.alliance.title': '孙刘联盟',
+  'story.s3.alliance.body':
+    '诸葛亮孤身过江，舌战群儒，激孙权、说周瑜。江东主战主和，争论不休；终是鲁肃力主抗曹，周瑜慷慨请缨，孙权拔剑斫案：「敢再言降曹者，与此案同！」孙刘之盟遂成。周瑜起三万水军溯江而上，与你会师夏口，共御北来之众——绝境之中，终有并肩之人。',
+  'story.s3.eastwind.title': '借东风',
+  'story.s3.eastwind.body':
+    '隆冬之月，江上尽刮西北风，火攻无从借力。诸葛亮筑坛作法，披发仗剑——三更时分，风向骤转东南。黄盖诈降，以蒙冲斗舰十艘满载薪草膏油，乘风纵火，直扑曹军连环船阵。顷刻烈焰腾空，火借风势，樯橹相连尽成焦土；曹军人马烧溺，死者无数。八十万大军，一夕而溃。赤壁之下，火光烛天。',
+  'story.s3.borrow.title': '借荆州',
+  'story.s3.borrow.body':
+    '赤壁功成，荆州空虚。诸葛亮献计：可向东吴「借」荆州以为根本，名为暂借，实则难还。鲁肃诚意相商，孙权势大难违。取之则据战略要地、进可图益州；然背信之名一旦坐实，孙刘联盟恐生裂痕。',
+  'choice.s3.borrow.take.label': '借荆州',
+  'choice.s3.borrow.take.desc': '立得荆州数郡为立业根基，兵精粮足、进取有路；然埋下东吴索还之患，日后同盟离心，恐招兵祸。',
+  'choice.s3.borrow.honor.label': '守盟约',
+  'choice.s3.borrow.honor.desc': '巩固孙刘联盟，声望大增，东南无后顾之忧；然所得之地大减，扩张受限，图取益州之路更为艰难。',
 };

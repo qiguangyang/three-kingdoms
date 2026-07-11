@@ -34,6 +34,11 @@ export type MessageKey =
   | 'story.ch2.transition'
   | 'story.ch2.complete.title'
   | 'story.ch2.complete.body'
+  | 'story.ch3.title'
+  | 'story.ch3.briefing'
+  | 'story.ch3.transition'
+  | 'story.ch3.complete.title'
+  | 'story.ch3.complete.body'
 
   // Title screen
   | 'title.newGame'
@@ -415,6 +420,26 @@ export type MessageKey =
   | 'choice.s2.plumwine.break.label'
   | 'choice.s2.plumwine.break.desc'
   | 'choice.s2.plumwine.bide.label'
-  | 'choice.s2.plumwine.bide.desc';
+  | 'choice.s2.plumwine.bide.desc'
+  | 'objective.s3.longzhong.title'
+  | 'objective.s3.longzhong.desc'
+  | 'objective.s3.alliance.title'
+  | 'objective.s3.alliance.desc'
+  | 'objective.s3.burnFleet.title'
+  | 'objective.s3.burnFleet.desc'
+  | 'objective.s3.claimJing.title'
+  | 'objective.s3.claimJing.desc'
+  | 'story.s3.longzhong.title'
+  | 'story.s3.longzhong.body'
+  | 'story.s3.alliance.title'
+  | 'story.s3.alliance.body'
+  | 'story.s3.eastwind.title'
+  | 'story.s3.eastwind.body'
+  | 'story.s3.borrow.title'
+  | 'story.s3.borrow.body'
+  | 'choice.s3.borrow.take.label'
+  | 'choice.s3.borrow.take.desc'
+  | 'choice.s3.borrow.honor.label'
+  | 'choice.s3.borrow.honor.desc';
 
 export type MessageCatalog = Record<MessageKey, string>;

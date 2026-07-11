@@ -14,6 +14,7 @@ import type { GameState } from '../types.js';
 import type { ObjectiveDef, StoryMode } from './types.js';
 import { S1_LIUBEI_OBJECTIVES } from '../../data/story/s1-liubei.js';
 import { S2_LIUBEI_OBJECTIVES } from '../../data/story/s2-liubei.js';
+import { S3_LIUBEI_OBJECTIVES } from '../../data/story/s3-liubei.js';
 
 // TEST-ONLY objective-table overlay keyed by scenarioId. setTestObjectives /
 // clearTestObjectives are TEST ONLY and are never called by production code;
@@ -47,6 +48,9 @@ export function objectivesFor(scenarioId: string, storyMode?: StoryMode): Object
   }
   if (scenarioId === 's2-junxiong' && storyMode?.protagonistFactionId === 'liubei') {
     return S2_LIUBEI_OBJECTIVES;
+  }
+  if (scenarioId === 's3-chibi' && storyMode?.protagonistFactionId === 'liubei') {
+    return S3_LIUBEI_OBJECTIVES;
   }
   return [];
 }
