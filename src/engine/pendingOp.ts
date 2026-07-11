@@ -215,6 +215,7 @@ export function tickDays(
   let next = state;
   for (let i = 0; i < daysToAdvance; i++) {
     if (next.pendingBattle) break; // a player battle is owed; stop advancing
+    if (next.pendingStoryEvent) break; // a story decision is owed; stop advancing
     next = tickOneDay(next, agents, options);
   }
   return next;
