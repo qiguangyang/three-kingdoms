@@ -176,6 +176,34 @@ const WILD: General[] = [
   g('nanfang', '南方小鬼', 'Nanfang Xiaogui', [99, 99, 99, 99], 25, 'xuan', 80, 'yunnan'),
 ];
 
+// Scenario 2 (群雄逐鹿, 196 CE) new general records. Added to GENERALS so their
+// ids resolve, but deliberately NOT wired into any FACTION_GENERAL_IDS array:
+// Scenario 2 references them via inline generalIds in its scenario file, keeping
+// Scenario 1's shared rosters byte-identical. Ownership is assigned by the
+// scenario loader (factionId stays null here). caizhong/hanxuan are WILD-style
+// searchers found in a specific city, like the WILD entries above.
+const S2_NEW: General[] = [
+  g('xunyou', '荀攸', 'Xun You', [30, 92, 65, 88], 39, 'infantry'),
+  g('yujin', '于禁', 'Yu Jin', [84, 70, 88, 70], 40, 'infantry'),
+  g('zhouyu', '周瑜', 'Zhou Yu', [80, 95, 95, 85], 21, 'navy'),
+  g('sunquan', '孙权', 'Sun Quan', [55, 80, 75, 88], 14, 'infantry'),
+  g('zhoutai', '周泰', 'Zhou Tai', [88, 50, 75, 40], 26, 'navy'),
+  g('gaoshun', '高顺', 'Gao Shun', [88, 65, 88, 50], 40, 'infantry'),
+  g('zhangliao', '张辽', 'Zhang Liao', [92, 80, 92, 70], 27, 'cavalry'),
+  g('zangba', '臧霸', 'Zang Ba', [82, 65, 75, 55], 31, 'cavalry'),
+  g('chengong', '陈宫', 'Chen Gong', [35, 90, 70, 80], 41, 'infantry'),
+  g('zhangxiu', '张绣', 'Zhang Xiu', [88, 55, 80, 50], 33, 'cavalry'),
+  g('liuzhang', '刘璋', 'Liu Zhang', [15, 55, 45, 60], 35, 'infantry'),
+  g('chunyuqiong', '淳于琼', 'Chunyu Qiong', [72, 45, 68, 40], 46, 'cavalry'),
+  g('guotu', '郭图', 'Guo Tu', [25, 72, 55, 65], 40, 'infantry'),
+  g('xinping', '辛评', 'Xin Ping', [30, 70, 50, 68], 40, 'infantry'),
+  g('weixu', '魏续', 'Wei Xu', [72, 40, 65, 35], 35, 'cavalry'),
+  g('songxian', '宋宪', 'Song Xian', [73, 38, 63, 33], 34, 'cavalry'),
+  g('houcheng', '侯成', 'Hou Cheng', [74, 42, 64, 38], 36, 'cavalry'),
+  g('caizhong', '蔡中', 'Cai Zhong', [60, 40, 55, 35], 30, 'navy', 80, 'xiapi'),
+  g('hanxuan', '韩玄', 'Han Xuan', [55, 45, 58, 50], 45, 'infantry', 80, 'xiliang'),
+];
+
 const ALL = [
   ...DONG,
   ...YUAN_SHAO,
@@ -193,6 +221,7 @@ const ALL = [
   ...ZHANG_LU,
   ...GONGSUN_DU,
   ...WILD,
+  ...S2_NEW,
 ];
 
 export const GENERALS: Record<GeneralId, General> = Object.fromEntries(
