@@ -230,6 +230,10 @@ export function resolveStoryChoice(eventId: string, choiceId: string): void {
   // log a phantom storyChoice command or navigate away while the pause stands.
   // A beat DOES change state (clears pendingStoryEvent) so it isn't skipped.
   if (applied === game) return;
+  // Snapshot the log length BEFORE objective evaluation so an
+  // 'objective.completed' entry logged by this choice falls inside the digest
+  // slice (mirrors advanceDays' logLenBefore handling).
+  const logLenBefore = applied.log.length;
   // Reflect any objective the choice satisfied (e.g. a chapter's terminal
   // objective) BEFORE checkOutcome, so a chapter-completing choice wins/routes
   // in the same beat instead of one tick later.
@@ -242,13 +246,16 @@ export function resolveStoryChoice(eventId: string, choiceId: string): void {
       { turn: evaluated.turn, command, factionId: evaluated.playerFactionId },
     ],
   };
+  const digest = extractDigest(logLenBefore, next.log);
   const outcome = checkOutcome(next);
   gameStore.setState((s) => ({
     ...s,
     game: next,
+    // Only the main-screen branch carries the turn digest: a chapterComplete /
+    // gameOver outcome supersedes the "Objective complete" toast.
     ui: outcome
       ? { ...s.ui, screen: outcomeScreen(outcome, next) }
-      : { ...s.ui, screen: { kind: 'main' } },
+      : { ...s.ui, screen: { kind: 'main' }, turnDigest: digest },
   }));
 }
 

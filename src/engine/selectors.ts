@@ -99,6 +99,10 @@ export function hasVictory(state: GameState, factionId: FactionId): boolean {
       const required = objectivesFor(state.scenarioId, state.storyMode).filter(
         (o) => !o.optional,
       );
+      // Deliberate — and a latent trap: with zero non-optional objectives a
+      // Story-Mode game can NEVER win (storyMode also forecloses the
+      // unify/dominate fallback above), so every chapter author MUST give a
+      // chapter at least one non-optional objective.
       if (required.length === 0) return false;
       return required.every((def) =>
         state.objectives.some((o) => o.id === def.id && o.status === 'complete'),

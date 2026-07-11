@@ -195,6 +195,73 @@ describe('story store integration', () => {
     expect(objAfter?.status).toBe('complete');
   });
 
+  it('resolveStoryChoice surfaces an objective-complete entry in the turn digest', () => {
+    // A choice that completes an objective WITHOUT winning the chapter: two
+    // non-optional objectives, one that completes when the choice plants a
+    // marker and one that never does — so the arc is unfinished (routes to
+    // {kind:'main'}, not chapterComplete). The completed objective logs an
+    // 'objective.completed' entry, which the main-screen branch must lift into
+    // ui.turnDigest so the "Objective complete" toast fires on this path.
+    setTestObjectives('s1-dongzhuo', [
+      {
+        id: 'obj-digest-done',
+        titleKey: 'app.title',
+        descKey: 'app.subtitle',
+        check: (state) => state.objectives.some((o) => o.id === 'digest-marker'),
+      },
+      {
+        id: 'obj-digest-pending',
+        titleKey: 'app.title',
+        descKey: 'app.subtitle',
+        check: () => false, // never completes -> chapter stays unwon
+      },
+    ]);
+    setTestStoryEvents('s1-dongzhuo', [
+      {
+        id: 'digest-event',
+        check: () => true,
+        titleKey: 'app.title',
+        bodyKey: 'app.subtitle',
+        choices: [
+          {
+            id: 'do',
+            labelKey: 'app.confirm',
+            descKey: 'app.continue',
+            apply: (state) => ({
+              ...state,
+              objectives: [
+                ...state.objectives,
+                { id: 'digest-marker', status: 'complete' as const },
+              ],
+            }),
+          },
+        ],
+      },
+    ]);
+
+    newGame(SCENARIO_DONGZHUO, 'liubei', 1);
+    gameStore.setState((s) => ({
+      ...s,
+      game: {
+        ...s.game!,
+        storyMode: STORY_MODE,
+        objectives: [
+          { id: 'obj-digest-done', status: 'active' as const },
+          { id: 'obj-digest-pending', status: 'active' as const },
+        ],
+        pendingStoryEvent: { eventId: 'digest-event', scenarioId: 's1-dongzhuo' },
+      },
+      ui: { ...s.ui, screen: { kind: 'story', eventId: 'digest-event' } },
+    }));
+
+    resolveStoryChoice('digest-event', 'do');
+
+    const st = gameStore.getState();
+    // Routed back to the main screen (not a chapter win) with the digest set.
+    expect(st.ui.screen.kind).toBe('main');
+    expect(st.ui.turnDigest.some((e) => e.key === 'objective.completed')).toBe(true);
+  });
+
   it('Story-Mode victory (objectives complete) routes to the Chapter Complete screen', () => {
     // A single non-optional objective that completes once the chosen branch
     // plants a marker. Because setTestObjectives overrides the objective table
