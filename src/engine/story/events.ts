@@ -1,3 +1,4 @@
+import type { GameState } from '../types.js';
 import type { StoryEvent, StoryMode } from './types.js';
 
 // Story-event overlay keyed by scenarioId. The authored production table is
@@ -39,4 +40,22 @@ export function findStoryEvent(
   eventId: string,
 ): StoryEvent | undefined {
   return storyEventsFor(scenarioId, storyMode).find((event) => event.id === eventId);
+}
+
+// Apply the chosen branch of a queued story event, then lift the pause.
+// The event and choice are looked up by the state's scenario + story mode;
+// an unknown event or choice is an identity no-op so a stale/duplicate
+// command can never corrupt state. Pure: runs only choice.apply(state) and
+// clears pendingStoryEvent — no wall-clock, no RNG.
+export function applyStoryChoice(
+  state: GameState,
+  eventId: string,
+  choiceId: string,
+): GameState {
+  const event = findStoryEvent(state.scenarioId, state.storyMode, eventId);
+  if (!event) return state;
+  const choice = event.choices.find((c) => c.id === choiceId);
+  if (!choice) return state;
+  const applied = choice.apply(state);
+  return { ...applied, pendingStoryEvent: undefined };
 }
