@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { SCENARIOS } from '../../data/scenarios/index.js';
+import { GENERALS } from '../../data/generals/index.js';
 import { newGame, setScreen, toggleLocale } from '../../state/store.js';
 import { pickName, t } from '../../i18n/locale.js';
 import { useSession } from '../hooks/useSession.js';
@@ -146,7 +147,7 @@ export const FactionSelectScreen: React.FC<Props> = ({ scenarioId }) => {
                     key={id}
                     className="rounded border border-ink-300/40 bg-parchment-50 px-2 py-0.5"
                   >
-                    {id}
+                    {pickName(GENERALS[id]?.name ?? { zh: id, en: id })}
                   </span>
                 ))}
                 {f.generalIds.length > 8 && (

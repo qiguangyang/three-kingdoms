@@ -3,7 +3,7 @@ import type { MessageCatalog } from '../types.js';
 // Chinese UI strings. {var} placeholders are interpolated by t(key, vars).
 export const zh: MessageCatalog = {
   'app.title': '三国',
-  'app.subtitle': '终端战棋策略 · 致敬《三国霸业》',
+  'app.subtitle': '群雄逐鹿 · 谋定天下',
   'app.pressKey': '按任意键继续',
   'app.confirm': '确认',
   'app.cancel': '取消',

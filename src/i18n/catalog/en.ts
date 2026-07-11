@@ -3,7 +3,7 @@ import type { MessageCatalog } from '../types.js';
 // English UI strings. {var} placeholders are interpolated by t(key, vars).
 export const en: MessageCatalog = {
   'app.title': 'Three Kingdoms',
-  'app.subtitle': 'A TUI strategy game — tribute to Three Kingdoms Hegemony',
+  'app.subtitle': 'Warlords clash — strategize to rule the realm',
   'app.pressKey': 'Press any key to continue',
   'app.confirm': 'Confirm',
   'app.cancel': 'Cancel',
