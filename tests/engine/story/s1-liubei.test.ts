@@ -11,13 +11,26 @@ const LIUBEI_MODE: StoryMode = { protagonistFactionId: 'liubei', chapter: 1 };
 
 function baseState(): GameState {
   // Tao Qian starts holding xiapi, pengcheng, xiaopei (Xuzhou); Liu Bei holds
-  // only pingyuan; Zhao Yun starts under Gongsun Zan.
+  // only pingyuan; Zhao Yun starts under Gongsun Zan. buildInitialState packs
+  // all of Tao Qian's generals into his capital (first city listed) = xiapi.
   return buildInitialState({
     scenario: SCENARIO_DONGZHUO,
     playerFactionId: 'liubei',
     refData: REF_DATA,
     seed: 1,
   });
+}
+
+// Gating invariant: no Xuzhou city may be left holding a general whose
+// factionId points at a faction that no longer owns that city (a dead-faction
+// officer stranded inside — who would otherwise still defend it).
+function expectNoStrandedGenerals(state: GameState): void {
+  for (const cityId of ['xiapi', 'pengcheng', 'xiaopei']) {
+    const city = state.cities[cityId];
+    for (const gid of city.generals) {
+      expect(state.generals[gid].factionId).toBe(city.factionId);
+    }
+  }
 }
 
 describe('Scenario 1 — Liu Bei Chapter 1 content', () => {
@@ -105,13 +118,87 @@ describe('Scenario 1 — Liu Bei Chapter 1 content', () => {
     expect(next.events.some((e) => e.id === 'xuzhou_accepted')).toBe(true);
   });
 
+  it('Accept reassigns the stationed Xuzhou generals to Liu Bei (none stranded)', () => {
+    const bequest = storyEventsFor('s1-dongzhuo', LIUBEI_MODE).find((e) => e.id === 'xuzhou_bequest')!;
+    const accept = bequest.choices.find((c) => c.id === 'accept')!;
+    const base = baseState();
+    // Sanity: Tao Qian's officers (Mi Zhu, Chen Deng, ...) start in xiapi as taoqian.
+    const stationed = base.cities['xiapi'].generals;
+    expect(stationed.length).toBeGreaterThan(0);
+    for (const gid of stationed) expect(base.generals[gid].factionId).toBe('taoqian');
+
+    const next = accept.apply(base);
+    // Each transferred city's generals now belong to Liu Bei, still at that city.
+    for (const gid of stationed) {
+      expect(next.cities['xiapi'].generals).toContain(gid);
+      expect(next.generals[gid].factionId).toBe('liubei');
+      expect(next.generals[gid].locationCityId).toBe('xiapi');
+    }
+    expectNoStrandedGenerals(next);
+    // Purity: the input state's general records are untouched.
+    expect(base.generals[stationed[0]].factionId).toBe('taoqian');
+  });
+
   it('Decline gives Liu Bei only Xiaopei and leaves the rest of Xuzhou to Tao Qian', () => {
     const bequest = storyEventsFor('s1-dongzhuo', LIUBEI_MODE).find((e) => e.id === 'xuzhou_bequest')!;
     const decline = bequest.choices.find((c) => c.id === 'decline')!;
-    const next = decline.apply(baseState());
+    const base = baseState();
+    const next = decline.apply(base);
     expect(next.cities['xiaopei'].factionId).toBe('liubei');
     expect(next.cities['xiapi'].factionId).toBe('taoqian');
     expect(next.cities['pengcheng'].factionId).toBe('taoqian');
     expect(next.events.some((e) => e.id === 'xuzhou_declined')).toBe(true);
+
+    // Decline must NOT touch the main province: xiapi's stationed generals stay
+    // with Tao Qian — never reverted, never stranded.
+    const stationed = base.cities['xiapi'].generals;
+    expect(stationed.length).toBeGreaterThan(0);
+    for (const gid of stationed) expect(next.generals[gid].factionId).toBe('taoqian');
+    expectNoStrandedGenerals(next);
+  });
+
+  it('Decline reassigns Xiaopei\'s stationed generals to Liu Bei when it transfers', () => {
+    const bequest = storyEventsFor('s1-dongzhuo', LIUBEI_MODE).find((e) => e.id === 'xuzhou_bequest')!;
+    const decline = bequest.choices.find((c) => c.id === 'decline')!;
+    const base = baseState();
+    // Station a Tao Qian officer in Xiaopei (moved out of xiapi to keep state
+    // consistent) so Decline's transfer actually has a general to reassign.
+    const staged: GameState = {
+      ...base,
+      cities: {
+        ...base.cities,
+        xiapi: {
+          ...base.cities['xiapi'],
+          generals: base.cities['xiapi'].generals.filter((g) => g !== 'mizhu'),
+        },
+        xiaopei: { ...base.cities['xiaopei'], factionId: 'taoqian', generals: ['mizhu'] },
+      },
+      generals: {
+        ...base.generals,
+        mizhu: { ...base.generals['mizhu'], factionId: 'taoqian', locationCityId: 'xiaopei' },
+      },
+    };
+    const next = decline.apply(staged);
+    expect(next.cities['xiaopei'].factionId).toBe('liubei');
+    expect(next.cities['xiaopei'].generals).toContain('mizhu');
+    expect(next.generals['mizhu'].factionId).toBe('liubei');
+    expect(next.generals['mizhu'].locationCityId).toBe('xiaopei');
+    expectNoStrandedGenerals(next);
+  });
+
+  it('Decline does not seize Xiaopei when a third party already holds it', () => {
+    const bequest = storyEventsFor('s1-dongzhuo', LIUBEI_MODE).find((e) => e.id === 'xuzhou_bequest')!;
+    const decline = bequest.choices.find((c) => c.id === 'decline')!;
+    const base = baseState();
+    // A third party (not Tao Qian) holds Xiaopei -> Decline must leave it alone.
+    const staged: GameState = {
+      ...base,
+      cities: {
+        ...base.cities,
+        xiaopei: { ...base.cities['xiaopei'], factionId: 'caocao', generals: [] },
+      },
+    };
+    const next = decline.apply(staged);
+    expect(next.cities['xiaopei'].factionId).toBe('caocao');
   });
 });

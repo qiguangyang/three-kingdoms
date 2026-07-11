@@ -183,6 +183,10 @@ export function advanceDays(days: number): void {
   }
   // A story event fired mid-advance and froze the tick (mirrors pendingBattle).
   // Commit the frozen state and route to the StoryEvent modal for a decision.
+  // The pause is INTENTIONALLY taken at the MONTH BOUNDARY (non-atomic vs.
+  // pendingBattle): the firing month's settlement/AI/turn have already
+  // completed exactly once inside tickDays before the freeze — do NOT try to
+  // freeze earlier, or that month would be re-run when the player resumes.
   if (next.pendingStoryEvent) {
     const eventId = next.pendingStoryEvent.eventId;
     gameStore.setState((s) => ({
@@ -212,6 +216,10 @@ export function resolveStoryChoice(eventId: string, choiceId: string): void {
   const { game } = gameStore.getState();
   if (!game) return;
   const applied = applyStoryChoice(game, eventId, choiceId);
+  // An identity no-op (unknown event/invalid choice) changed nothing: don't
+  // log a phantom storyChoice command or navigate away while the pause stands.
+  // A beat DOES change state (clears pendingStoryEvent) so it isn't skipped.
+  if (applied === game) return;
   const command: StrategicCommand = { kind: 'storyChoice', eventId, choiceId };
   const next: GameState = {
     ...applied,

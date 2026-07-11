@@ -107,6 +107,33 @@ describe('story store integration', () => {
     expect(last.factionId).toBe('liubei');
   });
 
+  it('resolveStoryChoice with an unknown event id is a full no-op (no command, screen/pending unchanged)', () => {
+    // No overlay event registered for this id -> applyStoryChoice returns the
+    // state unchanged (identity), so resolveStoryChoice must NOT log a phantom
+    // command or navigate away, and must leave the pause standing.
+    newGame(SCENARIO_DONGZHUO, 'liubei', 1);
+    gameStore.setState((s) => ({
+      ...s,
+      game: {
+        ...s.game!,
+        storyMode: STORY_MODE,
+        pendingStoryEvent: { eventId: 'still-pending', scenarioId: 's1-dongzhuo' },
+      },
+      ui: { ...s.ui, screen: { kind: 'story', eventId: 'still-pending' } },
+    }));
+    const beforeGame = gameStore.getState().game!;
+    const beforeActionLen = beforeGame.actionLog.length;
+
+    resolveStoryChoice('no-such-event', 'accept');
+
+    const st = gameStore.getState();
+    // Nothing was logged and the store did not move off the story screen.
+    expect(st.game!.actionLog.length).toBe(beforeActionLen);
+    expect(st.ui.screen).toEqual({ kind: 'story', eventId: 'still-pending' });
+    expect(st.game!.pendingStoryEvent).toEqual({ eventId: 'still-pending', scenarioId: 's1-dongzhuo' });
+    expect(st.game).toBe(beforeGame); // untouched reference
+  });
+
   it('loadGame with a pending story event resumes on the story screen', () => {
     const base = buildInitialState({
       scenario: SCENARIO_DONGZHUO,

@@ -105,6 +105,42 @@ describe('applyStoryChoice', () => {
     expect(result).toBe(state);
     expect(result.pendingStoryEvent).toEqual(state.pendingStoryEvent);
   });
+
+  it('clears pendingStoryEvent for a narrative beat (choices: []) dismissed with an empty choiceId', () => {
+    // A beat has no choices; the StoryEventModal dismisses it via choiceId ''.
+    // find(c => c.id === '') is undefined, so without the beat branch the pause
+    // would never lift and the next advanceDays would immediately re-pause.
+    const beat: StoryEvent = {
+      id: 'test-beat-event',
+      check: () => true,
+      titleKey: 'app.title',
+      bodyKey: 'app.subtitle',
+      choices: [],
+    };
+    setTestStoryEvents('s1-dongzhuo', [beat]);
+    const base = buildInitialState({
+      scenario: SCENARIO_DONGZHUO,
+      playerFactionId: 'liubei',
+      refData: REF_DATA,
+      seed: 1,
+    });
+    const state: GameState = {
+      ...base,
+      storyMode: STORY_MODE,
+      pendingStoryEvent: { eventId: 'test-beat-event', scenarioId: 's1-dongzhuo' },
+    };
+
+    const result = applyStoryChoice(state, 'test-beat-event', '');
+
+    // The pause is lifted even though no choice matched ''.
+    expect(result).not.toBe(state);
+    expect(result.pendingStoryEvent).toBeUndefined();
+    // Nothing else changed: a beat has no branch to run.
+    expect({ ...result, pendingStoryEvent: undefined }).toEqual({
+      ...state,
+      pendingStoryEvent: undefined,
+    });
+  });
 });
 
 describe('storyChoice strategic command', () => {

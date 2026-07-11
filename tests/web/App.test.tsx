@@ -17,7 +17,7 @@ beforeEach(() => {
 });
 
 describe('App router', () => {
-  it('renders the title screen with the four nav buttons', () => {
+  it('renders the title screen with the game name and Free Play / Load buttons', () => {
     render(<App />);
     expect(screen.getByText('三 国')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '自由模式' })).toBeInTheDocument();

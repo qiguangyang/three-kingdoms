@@ -55,9 +55,15 @@ export function applyStoryChoice(
   choiceId: string,
 ): GameState {
   const event = findStoryEvent(state.scenarioId, state.storyMode, eventId);
-  if (!event) return state;
+  if (!event) return state; // unknown event -> identity no-op, keep pending
+  // A narrative beat has no choices; the modal dismisses it with choiceId ''.
+  // There's no branch to run, so just lift the pause — otherwise the beat's
+  // pendingStoryEvent would never clear and the next advanceDays re-pauses.
+  if (event.choices.length === 0) {
+    return { ...state, pendingStoryEvent: undefined };
+  }
   const choice = event.choices.find((c) => c.id === choiceId);
-  if (!choice) return state;
+  if (!choice) return state; // invalid choice -> identity no-op, keep pending
   const applied = choice.apply(state);
   return { ...applied, pendingStoryEvent: undefined };
 }
