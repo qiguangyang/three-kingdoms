@@ -21,6 +21,14 @@ export const en: MessageCatalog = {
   'story.ch1.complete.title': 'Chapter Ⅰ Complete — A Name Forged in Chaos',
   'story.ch1.complete.body':
     'From the magistrate of a single town, your name for honor now carries to the four seas. By faith you have gathered captains, by virtue won hearts, and amid the scramble of warlords you have found firm ground to stand. The Han is not yet restored and your great work has only begun — but the realm will not soon forget the name of Liu Xuande. The dragon has stirred; await the turning of the winds. (To be continued)',
+  'story.ch2.title': 'Among Wolves',
+  'story.ch2.briefing':
+    "Lü Bu has betrayed you and seized your seat; Xuzhou is lost, and you shelter in Xiaopei with nowhere firm to stand. Cao Cao watches from the north like a tiger; Lü Bu turns his coat again to the east. You drift like duckweed among the mighty. Yet a great man bends before he rises — the dragon waits in the deep for the hour to mount the clouds.",
+  'story.ch2.transition':
+    'Beside the tiger, you never became its hound. You have slipped the cage — landless still, but harder of purpose than before. Through wandering and want, the years fall away once more…',
+  'story.ch2.complete.title': 'Chapter Ⅱ Complete — The Dragon Slips the Snare',
+  'story.ch2.complete.body':
+    "You lived under another's roof and bargained with a tiger; over plums and warm wine your heart was nearly read, yet you veiled it and came through whole. Lü Bu is dead now and the snare is broken, and though you still hold no ground to call your own, your wings have thickened and hearts turn ever more to you. The dragon has not yet risen — but thunder is already faint on the wind. (To be continued)",
 
   'title.newGame': 'New Game',
   'title.storyMode': 'Story Mode',
@@ -367,4 +375,29 @@ export const en: MessageCatalog = {
   'choice.s1.xuzhou.decline.label': 'Decline Xuzhou',
   'choice.s1.xuzhou.decline.desc':
     'Renown soars and hearts turn to you — recruiting worthy men grows far easier hereafter; but you hold only Xiaopei, a slender foundation for a hard road.',
+
+  // Story campaign — Liu Bei Chapter 2 content (Appendix C)
+  'objective.s2.outlastLvbu.title': 'Outlast Lü Bu',
+  'objective.s2.outlastLvbu.desc':
+    "Keep your people whole under the treacherous warlord's shadow until the wolf is put down.",
+  'objective.s2.shelter.title': 'Shelter in Xudu',
+  'objective.s2.shelter.desc': 'Take refuge with Cao Cao and borrow his strength while you plan.',
+  'objective.s2.plumWine.title': 'The Plum-Wine Reckoning',
+  'objective.s2.plumWine.desc':
+    "At Cao Cao's table, hide your ambition, play the harmless man, and choose your course.",
+  'objective.s2.breakFree.title': 'Break the Leash',
+  'objective.s2.breakFree.desc':
+    "Seize the moment to slip Cao Cao's grasp and win a base to fight from.",
+  'story.s2.shelter.title': 'Under the Roof at Xudu',
+  'story.s2.shelter.body':
+    'Xiaopei cannot hold, so you gather your baggage, ride north, and place yourself under Cao Cao. He names you Governor of Yu Province, grants you soldiers and grain, and sends you back to Xiaopei to bar Lü Bu\'s road. Cheng Yu urges him to cut you down early; Cao Cao only laughs it off — "This is the hour to gather heroes; to kill one man and lose the realm\'s heart will not do." You bow your thanks and withdraw, knowing that in this tiger\'s den every word and glance is watched.',
+  'story.s2.plumwine.title': 'Green Plums and Warm Wine',
+  'story.s2.plumwine.body':
+    'Cao Cao lays out green plums and warm wine, then points his chopsticks from himself to you: "The only heroes in this realm today are you and I." Thunder cracks — you let your chopsticks fall as if startled, stoop to gather them, and bury your fear beneath the storm. When the cup is set down you weigh it: seize on Yuan Shu\'s northward flight to beg an army and break away on your own — or bide as his hound a while longer, your claws sheathed?',
+  'choice.s2.plumwine.break.label': 'Break Free',
+  'choice.s2.plumwine.break.desc':
+    'Reclaim your own troops and snatch Xuzhou for a foothold; but you break with Cao Cao for good — you become the thorn in his side, and his pursuers will come.',
+  'choice.s2.plumwine.bide.label': 'Bide Your Time',
+  'choice.s2.plumwine.bide.desc':
+    "Cao Cao's grain and gold let your strength grow in safety; but under another's roof, linger too long and you may remain a vassal forever.",
 };

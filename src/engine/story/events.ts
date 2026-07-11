@@ -1,6 +1,7 @@
 import type { GameState } from '../types.js';
 import type { StoryEvent, StoryMode } from './types.js';
 import { S1_LIUBEI_EVENTS } from '../../data/story/s1-liubei.js';
+import { S2_LIUBEI_EVENTS } from '../../data/story/s2-liubei.js';
 
 // Story-event overlay keyed by scenarioId. The authored production table is
 // empty for now; real narrative content is added in a later content task.
@@ -26,10 +27,11 @@ export function clearTestStoryEvents(): void {
 // real Liu Bei content is authored in a later task. The test overlay is merged
 // in so the tick-pause pipeline is drivable in unit tests.
 export function storyEventsFor(scenarioId: string, storyMode?: StoryMode): StoryEvent[] {
-  const authored: StoryEvent[] =
-    scenarioId === 's1-dongzhuo' && storyMode?.protagonistFactionId === 'liubei'
-      ? S1_LIUBEI_EVENTS
-      : [];
+  let authored: StoryEvent[] = [];
+  if (storyMode?.protagonistFactionId === 'liubei') {
+    if (scenarioId === 's1-dongzhuo') authored = S1_LIUBEI_EVENTS;
+    else if (scenarioId === 's2-junxiong') authored = S2_LIUBEI_EVENTS;
+  }
   const overlay = storyEventOverlay.get(scenarioId) ?? [];
   return [...authored, ...overlay];
 }
@@ -57,10 +59,13 @@ export function applyStoryChoice(
   const event = findStoryEvent(state.scenarioId, state.storyMode, eventId);
   if (!event) return state; // unknown event -> identity no-op, keep pending
   // A narrative beat has no choices; the modal dismisses it with choiceId ''.
-  // There's no branch to run, so just lift the pause — otherwise the beat's
-  // pendingStoryEvent would never clear and the next advanceDays re-pauses.
+  // Run its optional apply (e.g. injecting reinforcements) — a purely narrative
+  // beat has no apply and only lifts the pause. Either way, clear the pause;
+  // otherwise the beat's pendingStoryEvent would never clear and the next
+  // advanceDays would immediately re-pause.
   if (event.choices.length === 0) {
-    return { ...state, pendingStoryEvent: undefined };
+    const applied = event.apply ? event.apply(state) : state;
+    return { ...applied, pendingStoryEvent: undefined };
   }
   const choice = event.choices.find((c) => c.id === choiceId);
   if (!choice) return state; // invalid choice -> identity no-op, keep pending

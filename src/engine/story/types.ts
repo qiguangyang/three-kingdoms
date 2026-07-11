@@ -41,6 +41,12 @@ export interface StoryEvent {
   bodyKey: MessageKey;
   choices: StoryChoice[]; // [] => narrative beat (single "continue")
   portrait?: string;
+  // Optional pure state-change applied when a BEAT (choices: []) is dismissed.
+  // Choice-events carry their effect on each StoryChoice.apply instead; this
+  // lets a choiceless beat still mutate state (e.g. inject reinforcements) when
+  // it is resolved. Ignored for choice-events. Undefined => the beat is purely
+  // narrative and only lifts the pause.
+  apply?: (state: GameState) => GameState;
 }
 
 export interface PendingStoryEvent {

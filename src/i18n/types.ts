@@ -29,6 +29,11 @@ export type MessageKey =
   | 'story.ch1.transition'
   | 'story.ch1.complete.title'
   | 'story.ch1.complete.body'
+  | 'story.ch2.title'
+  | 'story.ch2.briefing'
+  | 'story.ch2.transition'
+  | 'story.ch2.complete.title'
+  | 'story.ch2.complete.body'
 
   // Title screen
   | 'title.newGame'
@@ -392,6 +397,24 @@ export type MessageKey =
   | 'choice.s1.xuzhou.accept.label'
   | 'choice.s1.xuzhou.accept.desc'
   | 'choice.s1.xuzhou.decline.label'
-  | 'choice.s1.xuzhou.decline.desc';
+  | 'choice.s1.xuzhou.decline.desc'
+
+  // Story campaign — Liu Bei Chapter 2 content (Appendix C)
+  | 'objective.s2.outlastLvbu.title'
+  | 'objective.s2.outlastLvbu.desc'
+  | 'objective.s2.shelter.title'
+  | 'objective.s2.shelter.desc'
+  | 'objective.s2.plumWine.title'
+  | 'objective.s2.plumWine.desc'
+  | 'objective.s2.breakFree.title'
+  | 'objective.s2.breakFree.desc'
+  | 'story.s2.shelter.title'
+  | 'story.s2.shelter.body'
+  | 'story.s2.plumwine.title'
+  | 'story.s2.plumwine.body'
+  | 'choice.s2.plumwine.break.label'
+  | 'choice.s2.plumwine.break.desc'
+  | 'choice.s2.plumwine.bide.label'
+  | 'choice.s2.plumwine.bide.desc';
 
 export type MessageCatalog = Record<MessageKey, string>;

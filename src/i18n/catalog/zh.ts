@@ -21,6 +21,14 @@ export const zh: MessageCatalog = {
   'story.ch1.complete.title': '第一章 · 义名初立',
   'story.ch1.complete.body':
     '从平原一城之令，到义名传于四海——你以信义聚将，以仁德收心，于群雄割据之间立稳了脚跟。汉室未复，霸业方兴，然天下已然记住"刘玄德"三字。潜龙已动，且待风云再起。（未完待续）',
+  'story.ch2.title': '群雄逐鹿',
+  'story.ch2.briefing':
+    '吕布背信夺城，你痛失徐州，寄身小沛，进退失据。北有曹操虎视，东有吕布反覆，你如浮萍飘摇于群雄之间。然大丈夫能屈能伸——潜龙在渊，静待腾云之时。',
+  'story.ch2.transition':
+    '猛虎之侧，你终未沦为鹰犬。挣脱牢笼，仍无寸土可依，然志向愈坚。颠沛流离间，数载又已成空……',
+  'story.ch2.complete.title': '第二章 · 蛟龙脱困',
+  'story.ch2.complete.body':
+    '你曾寄人篱下，与虎谋皮，青梅煮酒之间几遭窥破，终以韬晦全身。今吕布已诛，牢笼已破，你虽仍无立锥之地，然羽翼渐丰、人心愈附。潜龙未升，风雷已隐隐可闻。（未完待续）',
 
   'title.newGame': '新游戏',
   'title.storyMode': '剧情模式',
@@ -359,4 +367,24 @@ export const zh: MessageCatalog = {
   'choice.s1.xuzhou.accept.desc': '获徐州六城与钱粮，即刻成为一方诸侯；然树大招风，吕布、曹操皆将侧目而视。',
   'choice.s1.xuzhou.decline.label': '辞徐州',
   'choice.s1.xuzhou.decline.desc': '声望大涨，天下归心，日后招贤纳士事半功倍；然仅得小沛一城，基业微薄，前路艰难。',
+
+  // 剧情战役 — 刘备第二章内容（附录 C）
+  'objective.s2.outlastLvbu.title': '周旋吕布',
+  'objective.s2.outlastLvbu.desc': '在吕布反覆无常的威胁下保全部众，待其伏诛。',
+  'objective.s2.shelter.title': '归附许都',
+  'objective.s2.shelter.desc': '投奔曹操，暂借其势以图后计。',
+  'objective.s2.plumWine.title': '煮酒论英雄',
+  'objective.s2.plumWine.desc': '于曹操青梅煮酒之宴上藏锋守拙，择定进退。',
+  'objective.s2.breakFree.title': '脱身立业',
+  'objective.s2.breakFree.desc': '觅得时机，摆脱曹操掌控，另图基业。',
+  'story.s2.shelter.title': '屈身许都',
+  'story.s2.shelter.body':
+    '小沛难守，你束装北上，投于曹操麾下。曹操表你为豫州牧，赠以兵粮，使还小沛以御吕布。程昱进言宜早除之，曹操却笑而不纳：「方今收英雄之时，杀一人而失天下之心，不可。」你谢过而退，心知这虎穴之中，一言一行皆在人耳目之下。',
+  'story.s2.plumwine.title': '青梅煮酒论英雄',
+  'story.s2.plumwine.body':
+    '曹操设宴，青梅煮酒，忽以箸指你与他曰：「今天下英雄，唯使君与操耳。」雷声骤至，你借惊雷失箸，俯身拾之，掩尽锋芒。宴罢，你思忖：是趁袁术北上之机，请兵脱身、自立门户，还是暂作鹰犬、深藏不露？',
+  'choice.s2.plumwine.break.label': '脱身自立',
+  'choice.s2.plumwine.break.desc': '重夺本部兵马，趁势袭取徐州为根基；然自此与曹操决裂，成其心腹之患，追兵将至。',
+  'choice.s2.plumwine.bide.label': '蛰伏许都',
+  'choice.s2.plumwine.bide.desc': '得曹操资粮扶持，实力稳步积累，安全无虞；然久居人下，行止受制，坐失良机则将永为附庸。',
 };
