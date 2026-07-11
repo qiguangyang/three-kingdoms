@@ -323,6 +323,9 @@ export const en: MessageCatalog = {
   'map.legend.city': 'City',
   'map.legend.capital': 'Seat',
 
+  // Story campaign — objectives
+  'objective.completed': 'Objective complete: {title}',
+
   'digest.heading': 'While you were occupied…',
   'digest.dismiss': 'Continue',
 };

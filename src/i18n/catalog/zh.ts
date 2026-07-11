@@ -319,6 +319,9 @@ export const zh: MessageCatalog = {
   'map.legend.city': '城池',
   'map.legend.capital': '治所',
 
+  // Story campaign — objectives
+  'objective.completed': '目标达成：{title}',
+
   'digest.heading': '此间天下事…',
   'digest.dismiss': '继续',
 };

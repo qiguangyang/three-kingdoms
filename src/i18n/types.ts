@@ -357,6 +357,9 @@ export type MessageKey =
   | 'map.legend.city'
   | 'map.legend.capital'
 
+  // Story campaign — objectives
+  | 'objective.completed'
+
   // Between-turn digest
   | 'digest.heading'
   | 'digest.dismiss';
