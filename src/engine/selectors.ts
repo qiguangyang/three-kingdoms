@@ -1,5 +1,16 @@
-import type { City, Faction, GameState, General, GeneralId, FactionId, LocalizedString } from './types.js';
+import type {
+  City,
+  Faction,
+  GameState,
+  General,
+  GeneralId,
+  FactionId,
+  LocalizedString,
+  VictoryCondition,
+} from './types.js';
 import { citiesOf } from './map.js';
+import { SCENARIOS } from '../data/scenarios/index.js';
+import { objectivesFor } from './story/objectives.js';
 
 // Derived queries on GameState. All pure, side-effect free.
 
@@ -51,10 +62,44 @@ export function aliveFactions(state: GameState): Faction[] {
   return Object.values(state.factions).filter(isAlive);
 }
 
+// Victory for `factionId` under the scenario's declared VictoryCondition.
+//   unify    — own every city on the map.
+//   dominate — own >= cityCount cities AND hold all requiredCityIds.
+//   historic — every non-optional objective of the active scenario/storyMode
+//              is 'complete' in state.objectives (the story chapter's win).
+// A scenario missing from the registry falls back to unify.
 export function hasVictory(state: GameState, factionId: FactionId): boolean {
-  const owned = citiesOf(state, factionId).length;
-  const total = Object.keys(state.cities).length;
-  return owned === total;
+  const scenario = SCENARIOS[state.scenarioId];
+  const victory: VictoryCondition = scenario?.victory ?? { kind: 'unify' };
+  const ownedCities = citiesOf(state, factionId);
+  const ownedCount = ownedCities.length;
+
+  switch (victory.kind) {
+    case 'unify': {
+      const total = Object.keys(state.cities).length;
+      return ownedCount === total;
+    }
+    case 'dominate': {
+      const need = victory.cityCount ?? Object.keys(state.cities).length;
+      if (ownedCount < need) return false;
+      const requiredIds = victory.requiredCityIds ?? [];
+      const ownedIds = new Set(ownedCities.map((c) => c.id));
+      return requiredIds.every((id) => ownedIds.has(id));
+    }
+    case 'historic': {
+      // Historic victory is arc-driven, not per-faction: it holds when the
+      // story chapter's terminal objectives are done. factionId is unused here.
+      const required = objectivesFor(state.scenarioId, state.storyMode).filter(
+        (o) => !o.optional,
+      );
+      if (required.length === 0) return false;
+      return required.every((def) =>
+        state.objectives.some((o) => o.id === def.id && o.status === 'complete'),
+      );
+    }
+    default:
+      return false;
+  }
 }
 
 // Composite power score for a faction: troops plus 5000 per city. Used by
