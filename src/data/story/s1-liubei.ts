@@ -10,38 +10,12 @@
 // All identifiers and comments are English; every user-facing string is
 // referenced by MessageKey and resolved against the active locale.
 
-import type { City, FactionId, GameState, General } from '../../engine/types.js';
+import type { GameState } from '../../engine/types.js';
 import type { ObjectiveDef, StoryEvent } from '../../engine/story/types.js';
+import { hasEvent, transferCityWithGenerals } from './helpers.js';
 
 // The three commanderies that make up Xuzhou in Scenario 1 (Tao Qian's seat).
 const XUZHOU_CITY_IDS = ['xiapi', 'pengcheng', 'xiaopei'] as const;
-
-function hasEvent(state: GameState, id: string): boolean {
-  return state.events.some((e) => e.id === id);
-}
-
-// Flip a city to a new owner AND move its stationed generals with it, so the
-// state never strands dead-faction officers inside a city they'd otherwise
-// still defend (resolveQuickBattle reads defenders from city.generals). Pure:
-// mutates only the FRESH cities/generals maps the caller owns (shallow copies
-// of state.cities/state.generals) — the original maps are never touched, and
-// each city/general is replaced by a spread copy. Historically apt: Xuzhou's
-// officers (Mi Zhu, Chen Deng, ...) threw in with whoever held the province.
-function transferCityWithGenerals(
-  cities: Record<string, City>,
-  generals: Record<string, General>,
-  cityId: string,
-  newOwner: FactionId,
-): void {
-  const city = cities[cityId];
-  if (!city) return;
-  cities[cityId] = { ...city, factionId: newOwner };
-  for (const generalId of city.generals) {
-    const g = generals[generalId];
-    // Keep the general at the same city; only its allegiance changes.
-    if (g) generals[generalId] = { ...g, factionId: newOwner };
-  }
-}
 
 function liubeiOwnsXuzhouCity(state: GameState): boolean {
   return XUZHOU_CITY_IDS.some((id) => state.cities[id]?.factionId === 'liubei');

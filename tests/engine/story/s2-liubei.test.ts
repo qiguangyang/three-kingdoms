@@ -5,6 +5,7 @@ import { objectivesFor, seedObjectives } from '../../../src/engine/story/objecti
 import { applyStoryChoice, storyEventsFor } from '../../../src/engine/story/events.js';
 import { buildInitialState } from '../../../src/engine/scenario.js';
 import { SCENARIO_JUNXIONG } from '../../../src/data/scenarios/s2-junxiong.js';
+import { outlastLvbuMet } from '../../../src/data/story/s2-liubei.js';
 import { REF_DATA } from '../../../src/data/index.js';
 
 const LIUBEI_CH2: StoryMode = { protagonistFactionId: 'liubei', chapter: 2 };
@@ -146,7 +147,7 @@ describe('Scenario 2 — Liu Bei Chapter 2 content', () => {
     expect(next.cities['xiaopei'].money).toBe(before.money + 3000);
   });
 
-  it('plum_wine checks true only once Lü Bu is dead, sheltered, and not yet decided', () => {
+  it('plum_wine checks true once Lü Bu is OUTLASTED (dead), sheltered, and not yet decided', () => {
     const plumWine = storyEventsFor('s2-junxiong', LIUBEI_CH2).find((e) => e.id === 'plum_wine')!;
     const base = baseState();
     expect(plumWine.check(base)).toBe(false);
@@ -161,6 +162,51 @@ describe('Scenario 2 — Liu Bei Chapter 2 content', () => {
     // once decided (either branch) → false
     expect(plumWine.check(withEvent(ready, 'plum_wine_broke'))).toBe(false);
     expect(plumWine.check(withEvent(ready, 'plum_wine_bided'))).toBe(false);
+  });
+
+  it('plum_wine fires when Liu Bei OUTLASTS Lü Bu by taking a Lü Bu city while Lü Bu still lives (no soft-stall)', () => {
+    // Regression guard for the Chapter-2 soft-stall: outlastLvbu completes when
+    // Liu Bei takes ONE former Lü Bu city (xiapi/pengcheng) even while Lü Bu
+    // clings to the other. The plum_wine gate must fire on that SAME condition
+    // (given sheltered), or plumWine could never complete and Chapter 2 could
+    // never be won. Lü Bu is deliberately kept alive here.
+    const plumWine = storyEventsFor('s2-junxiong', LIUBEI_CH2).find((e) => e.id === 'plum_wine')!;
+    const base = baseState();
+    expect(base.factions['lvbu']?.alive).toBe(true);
+    // Liu Bei seizes xiapi (Lü Bu still alive, still holds pengcheng) and has sheltered.
+    const seizedXiapi = withEvent(
+      { ...base, cities: { ...base.cities, xiapi: { ...base.cities['xiapi'], factionId: 'liubei' } } },
+      'shelter_xudu',
+    );
+    expect(seizedXiapi.factions['lvbu']?.alive).toBe(true); // Lü Bu still lives
+    expect(plumWine.check(seizedXiapi)).toBe(true);
+    // Symmetric: seizing pengcheng instead also fires the gate.
+    const seizedPengcheng = withEvent(
+      { ...base, cities: { ...base.cities, pengcheng: { ...base.cities['pengcheng'], factionId: 'liubei' } } },
+      'shelter_xudu',
+    );
+    expect(plumWine.check(seizedPengcheng)).toBe(true);
+    // Aligned with the objective predicate: outlastLvbu completes on the same board.
+    const outlast = objectivesFor('s2-junxiong', LIUBEI_CH2).find((d) => d.id === 'outlastLvbu')!;
+    expect(outlast.check(seizedXiapi)).toBe(true);
+    // But NOT before sheltering: holding a Lü Bu city alone is not yet the gate.
+    const notSheltered = {
+      ...base,
+      cities: { ...base.cities, xiapi: { ...base.cities['xiapi'], factionId: 'liubei' as const } },
+    };
+    expect(plumWine.check(notSheltered)).toBe(false);
+  });
+
+  it('outlastLvbuMet predicate matches the outlastLvbu objective check exactly', () => {
+    const outlast = objectivesFor('s2-junxiong', LIUBEI_CH2).find((d) => d.id === 'outlastLvbu')!;
+    const base = baseState();
+    const cases: GameState[] = [
+      base,
+      { ...base, factions: { ...base.factions, lvbu: { ...base.factions['lvbu'], alive: false } } },
+      { ...base, cities: { ...base.cities, xiapi: { ...base.cities['xiapi'], factionId: 'liubei' } } },
+      { ...base, cities: { ...base.cities, pengcheng: { ...base.cities['pengcheng'], factionId: 'liubei' } } },
+    ];
+    for (const s of cases) expect(outlastLvbuMet(s)).toBe(outlast.check(s));
   });
 
   it('break: reclaims troops, records plum_wine_broke, and seizes xiapi when Cao Cao/Lü Bu/none hold it', () => {

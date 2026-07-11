@@ -140,11 +140,13 @@ export const ChapterTransitionScreen: React.FC = () => {
   );
 };
 
-// Terminal celebration shown when a Story-Mode chapter is WON (all objectives
-// complete). Mirrors ChapterTransitionScreen's paper styling but ENDS the run:
-// Continue wipes the continuous autosave and returns to the title, like
-// GameOverScreen's button — Chapter Ⅱ isn't built yet, so there's nothing to
-// transition into. Distinct from the (unrouted) chapterTransition bridge.
+// Terminal celebration shown when the FINAL chapter of a Story-Mode arc is won
+// (all objectives complete AND no next chapter exists). outcomeScreen routes
+// here only when nextChapter() is undefined; a non-final chapter win routes to
+// ChapterTransitionScreen instead. Mirrors that screen's paper styling but ENDS
+// the campaign: Continue wipes the continuous autosave and returns to the title,
+// like GameOverScreen's button. Distinct from ChapterTransitionScreen — the
+// "...years pass" bridge that STARTS the next chapter when one follows.
 export const ChapterCompleteScreen: React.FC = () => {
   useSession(selectLocale);
   const game = useSession(selectGame);

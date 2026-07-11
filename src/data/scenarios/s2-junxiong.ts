@@ -105,7 +105,12 @@ export const SCENARIO_JUNXIONG: Scenario = {
       personality: 'balanced',
       cityIds: ['xiaopei'],
       generalIds: ['liubei', 'guanyu', 'zhangfei', 'zhaoyun', 'jianyong', 'mizhu'],
-      resources: { money: 3000, food: 5000, troops: 2000 },
+      // Minimal survival buff (troops 2000 -> 5000): a lone 2,000-troop Xiaopei
+      // next to Lü Bu's 30k was a death trap — the reachability sim routed Liu
+      // Bei on turn 1. 5,000 lets a committed player outlast Lü Bu (take Xiapi
+      // by ~turn 6 at seed 1) while keeping him the WEAKEST faction of the
+      // twelve (next-lowest is Gongsun Du at 10,000). money/food unchanged.
+      resources: { money: 3000, food: 5000, troops: 5000 },
     },
     {
       id: 'lvbu',

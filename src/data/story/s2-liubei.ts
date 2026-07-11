@@ -12,38 +12,29 @@
 // All identifiers and comments are English; every user-facing string is
 // referenced by MessageKey and resolved against the active locale.
 
-import type { City, FactionId, GameState, General } from '../../engine/types.js';
+import type { GameState } from '../../engine/types.js';
 import type { ObjectiveDef, StoryEvent } from '../../engine/story/types.js';
-
-function hasEvent(state: GameState, id: string): boolean {
-  return state.events.some((e) => e.id === id);
-}
-
-// Flip a city to a new owner AND move its stationed generals with it, so the
-// state never strands dead-faction officers inside a city they'd otherwise
-// still defend. Re-implemented identically to s1-liubei.ts's helper (that module
-// keeps it private). Pure: mutates only the FRESH cities/generals maps the
-// caller owns (shallow copies of state.cities/state.generals) — the original
-// maps are never touched, and each city/general is replaced by a spread copy.
-function transferCityWithGenerals(
-  cities: Record<string, City>,
-  generals: Record<string, General>,
-  cityId: string,
-  newOwner: FactionId,
-): void {
-  const city = cities[cityId];
-  if (!city) return;
-  cities[cityId] = { ...city, factionId: newOwner };
-  for (const generalId of city.generals) {
-    const g = generals[generalId];
-    // Keep the general at the same city; only its allegiance changes.
-    if (g) generals[generalId] = { ...g, factionId: newOwner };
-  }
-}
+import { hasEvent, transferCityWithGenerals } from './helpers.js';
 
 // Has the Plum-Wine reckoning already been resolved (either branch taken)?
 function plumWineDecided(state: GameState): boolean {
   return hasEvent(state, 'plum_wine_broke') || hasEvent(state, 'plum_wine_bided');
+}
+
+// The single source of truth for "Liu Bei has outlasted Lü Bu": either Lü Bu is
+// put down, OR Liu Bei has seized one of Lü Bu's seats (xiapi/pengcheng) — even
+// while Lü Bu still clings to the other. Shared by BOTH the outlastLvbu
+// objective's check AND the plum_wine gate's first clause, so the objective and
+// the gate can never disagree. Aligning them removes the Chapter-2 soft-stall
+// where taking ONE Lü Bu city (Lü Bu alive in the other) completed outlastLvbu
+// but left plum_wine (which formerly required lvbu.alive === false) unable to
+// fire — leaving the gating plumWine objective permanently open. Pure predicate.
+export function outlastLvbuMet(state: GameState): boolean {
+  return (
+    state.factions['lvbu']?.alive === false ||
+    state.cities['xiapi']?.factionId === 'liubei' ||
+    state.cities['pengcheng']?.factionId === 'liubei'
+  );
 }
 
 // Liu Bei — Chapter 2 objective chain (Appendix C). Every check() is a pure
@@ -56,10 +47,7 @@ export const S2_LIUBEI_OBJECTIVES: ObjectiveDef[] = [
     titleKey: 'objective.s2.outlastLvbu.title',
     descKey: 'objective.s2.outlastLvbu.desc',
     // Survive Lü Bu: he is put down, OR Liu Bei seizes one of his seats.
-    check: (state) =>
-      state.factions['lvbu']?.alive === false ||
-      state.cities['xiapi']?.factionId === 'liubei' ||
-      state.cities['pengcheng']?.factionId === 'liubei',
+    check: outlastLvbuMet,
   },
   {
     id: 'shelter',
@@ -112,13 +100,16 @@ const shelterBeat: StoryEvent = {
   },
 };
 
-// The Plum-Wine reckoning (青梅煮酒论英雄). Fires once Lü Bu is dead and Liu Bei
-// has sheltered, and only while the choice is still open. Each branch records its
-// decision flag in state.events, so the event cannot re-fire after a choice.
+// The Plum-Wine reckoning (青梅煮酒论英雄). Fires once Liu Bei has OUTLASTED Lü Bu
+// (outlastLvbuMet: Lü Bu dead OR Liu Bei holds one of his seats) and has
+// sheltered, and only while the choice is still open. Using the shared
+// outlastLvbuMet predicate keeps this gate in lockstep with the outlastLvbu
+// objective, so the chapter can always be won (no soft-stall). Each branch
+// records its decision flag in state.events, so the event cannot re-fire.
 const plumWineEvent: StoryEvent = {
   id: 'plum_wine',
   check: (state) =>
-    state.factions['lvbu']?.alive === false &&
+    outlastLvbuMet(state) &&
     hasEvent(state, 'shelter_xudu') &&
     !plumWineDecided(state),
   titleKey: 'story.s2.plumwine.title',
