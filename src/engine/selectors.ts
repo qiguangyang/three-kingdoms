@@ -62,19 +62,26 @@ export function aliveFactions(state: GameState): Faction[] {
   return Object.values(state.factions).filter(isAlive);
 }
 
-// Victory for `factionId` under the scenario's declared VictoryCondition.
+// Victory for `factionId` under the effective VictoryCondition.
 //   unify    — own every city on the map.
 //   dominate — own >= cityCount cities AND hold all requiredCityIds.
 //   historic — every non-optional objective of the active scenario/storyMode
 //              is 'complete' in state.objectives (the story chapter's win).
 // A scenario missing from the registry falls back to unify.
+//
+// A Story-Mode game (state.storyMode set) ALWAYS wins by its authored objective
+// arc — the "historic route" — regardless of the scenario's declared victory
+// (which governs Free Play). So s1-dongzhuo's declared unify only applies to a
+// Free-Play game; a Story-Mode player wins the moment the chapter's objectives
+// complete, without conquering every city.
 export function hasVictory(state: GameState, factionId: FactionId): boolean {
   const scenario = SCENARIOS[state.scenarioId];
   const victory: VictoryCondition = scenario?.victory ?? { kind: 'unify' };
+  const kind = state.storyMode ? 'historic' : victory.kind;
   const ownedCities = citiesOf(state, factionId);
   const ownedCount = ownedCities.length;
 
-  switch (victory.kind) {
+  switch (kind) {
     case 'unify': {
       const total = Object.keys(state.cities).length;
       return ownedCount === total;

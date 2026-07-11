@@ -7,6 +7,10 @@ import {
   setTestStoryEvents,
   clearTestStoryEvents,
 } from '../../src/engine/story/events.js';
+import {
+  setTestObjectives,
+  clearTestObjectives,
+} from '../../src/engine/story/objectives.js';
 import type { StoryEvent, StoryMode } from '../../src/engine/story/types.js';
 import {
   advanceDays,
@@ -47,6 +51,7 @@ const CHOICE_EVENT: StoryEvent = {
 
 afterEach(() => {
   clearTestStoryEvents();
+  clearTestObjectives();
 });
 
 describe('story store integration', () => {
@@ -132,6 +137,62 @@ describe('story store integration', () => {
     expect(st.ui.screen).toEqual({ kind: 'story', eventId: 'still-pending' });
     expect(st.game!.pendingStoryEvent).toEqual({ eventId: 'still-pending', scenarioId: 's1-dongzhuo' });
     expect(st.game).toBe(beforeGame); // untouched reference
+  });
+
+  it('resolveStoryChoice evaluates objectives immediately (no one-tick lag)', () => {
+    // An objective seeded 'active' whose check passes only once the chosen
+    // branch's apply has run. Because resolveStoryChoice now evaluates
+    // objectives right after applyStoryChoice, the objective must read
+    // 'complete' immediately — with no extra advanceDays tick.
+    setTestObjectives('s1-dongzhuo', [
+      {
+        id: 'obj-after-choice',
+        titleKey: 'app.title',
+        descKey: 'app.subtitle',
+        // Passes once the choice's apply has planted the marker below.
+        check: (state) => state.objectives.some((o) => o.id === 'choice-marker'),
+      },
+    ]);
+    setTestStoryEvents('s1-dongzhuo', [
+      {
+        id: 'marker-event',
+        check: () => true,
+        titleKey: 'app.title',
+        bodyKey: 'app.subtitle',
+        choices: [
+          {
+            id: 'go',
+            labelKey: 'app.confirm',
+            descKey: 'app.continue',
+            apply: (state) => ({
+              ...state,
+              objectives: [
+                ...state.objectives,
+                { id: 'choice-marker', status: 'complete' as const },
+              ],
+            }),
+          },
+        ],
+      },
+    ]);
+
+    newGame(SCENARIO_DONGZHUO, 'liubei', 1);
+    gameStore.setState((s) => ({
+      ...s,
+      game: {
+        ...s.game!,
+        storyMode: STORY_MODE,
+        objectives: [{ id: 'obj-after-choice', status: 'active' as const }],
+        pendingStoryEvent: { eventId: 'marker-event', scenarioId: 's1-dongzhuo' },
+      },
+      ui: { ...s.ui, screen: { kind: 'story', eventId: 'marker-event' } },
+    }));
+
+    resolveStoryChoice('marker-event', 'go');
+
+    const st = gameStore.getState();
+    const objAfter = st.game!.objectives.find((o) => o.id === 'obj-after-choice');
+    expect(objAfter?.status).toBe('complete');
   });
 
   it('loadGame with a pending story event resumes on the story screen', () => {

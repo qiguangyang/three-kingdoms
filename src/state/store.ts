@@ -7,7 +7,7 @@ import type { FactionAgent, GameState, LogEntry, Personality, Scenario, Strategi
 import type { GambitId } from '../engine/battle/types.js';
 import { buildInitialState } from '../engine/scenario.js';
 import { SCENARIO_DONGZHUO } from '../data/scenarios/s1-dongzhuo.js';
-import { seedObjectives } from '../engine/story/objectives.js';
+import { evaluateObjectives, seedObjectives } from '../engine/story/objectives.js';
 import { advanceMonth, applyCommand, checkOutcome } from '../engine/turn.js';
 import { schedulePlayerCommand, tickDays } from '../engine/pendingOp.js';
 import { CONTINUOUS_SLOT, loadFromSlot, saveToSlot } from './persistence.js';
@@ -220,12 +220,16 @@ export function resolveStoryChoice(eventId: string, choiceId: string): void {
   // log a phantom storyChoice command or navigate away while the pause stands.
   // A beat DOES change state (clears pendingStoryEvent) so it isn't skipped.
   if (applied === game) return;
+  // Reflect any objective the choice satisfied (e.g. a chapter's terminal
+  // objective) BEFORE checkOutcome, so a chapter-completing choice wins/routes
+  // in the same beat instead of one tick later.
+  const evaluated = evaluateObjectives(applied);
   const command: StrategicCommand = { kind: 'storyChoice', eventId, choiceId };
   const next: GameState = {
-    ...applied,
+    ...evaluated,
     actionLog: [
-      ...applied.actionLog,
-      { turn: applied.turn, command, factionId: applied.playerFactionId },
+      ...evaluated.actionLog,
+      { turn: evaluated.turn, command, factionId: evaluated.playerFactionId },
     ],
   };
   const outcome = checkOutcome(next);

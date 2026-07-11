@@ -124,4 +124,45 @@ describe('hasVictory — victory conditions', () => {
     };
     expect(hasVictory(pending, 'liubei')).toBe(false);
   });
+
+  it('Story Mode wins by completing objectives even when the scenario declares unify', () => {
+    // s1-dongzhuo declares victory {kind:'unify'}. A Story-Mode game (storyMode set)
+    // with all non-optional objectives complete must win WITHOUT owning every city.
+    const defs: ObjectiveDef[] = [
+      { id: 'a', titleKey: 'app.title', descKey: 'app.subtitle', check: () => true },
+      { id: 'b', titleKey: 'app.title', descKey: 'app.subtitle', check: () => true },
+    ];
+    setTestObjectives('s1-dongzhuo', defs);
+    const base = baseState('liubei');
+    const storyGame: GameState = {
+      ...base,
+      storyMode: { protagonistFactionId: 'liubei', chapter: 1 },
+      objectives: [
+        { id: 'a', status: 'complete' as const },
+        { id: 'b', status: 'complete' as const },
+      ],
+    };
+    expect(hasVictory(storyGame, 'liubei')).toBe(true); // historic, not unify
+    // Same board WITHOUT storyMode = Free Play = unify = not won (Liu Bei owns 1 city).
+    const freePlay: GameState = { ...storyGame, storyMode: undefined };
+    expect(hasVictory(freePlay, 'liubei')).toBe(false);
+  });
+
+  it('Story Mode does NOT win while a non-optional objective is still active', () => {
+    const defs: ObjectiveDef[] = [
+      { id: 'a', titleKey: 'app.title', descKey: 'app.subtitle', check: () => true },
+      { id: 'b', titleKey: 'app.title', descKey: 'app.subtitle', check: () => true },
+    ];
+    setTestObjectives('s1-dongzhuo', defs);
+    const base = baseState('liubei');
+    const g: GameState = {
+      ...base,
+      storyMode: { protagonistFactionId: 'liubei', chapter: 1 },
+      objectives: [
+        { id: 'a', status: 'complete' as const },
+        { id: 'b', status: 'active' as const },
+      ],
+    };
+    expect(hasVictory(g, 'liubei')).toBe(false);
+  });
 });
