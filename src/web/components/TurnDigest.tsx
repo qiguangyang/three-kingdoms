@@ -26,14 +26,28 @@ export const TurnDigest: React.FC<TurnDigestProps> = ({ entries, onDismiss }) =>
       }
     >
       <ul className="flex flex-col gap-1 text-sm text-ink-800">
-        {entries.map((entry, i) => (
-          <li key={`${entry.turn}-${i}`} className="flex gap-2">
-            <span className="font-mono text-[10px] text-ink-500">
-              {entry.year}.{String(entry.month).padStart(2, '0')}
-            </span>
-            <span>{t(entry.key as MessageKey, entry.vars)}</span>
-          </li>
-        ))}
+        {entries.map((entry, i) => {
+          // objective.completed carries its title in vars.title as a MessageKey
+          // (evaluateObjectives logs def.titleKey so the engine stays
+          // locale-agnostic). Resolve that key through t() first, otherwise
+          // {title} would interpolate the literal key string. Guarded to this
+          // one key so every other entry renders exactly as before.
+          const label =
+            entry.key === 'objective.completed' && entry.vars
+              ? t('objective.completed', {
+                  ...entry.vars,
+                  title: t(entry.vars.title as MessageKey),
+                })
+              : t(entry.key as MessageKey, entry.vars);
+          return (
+            <li key={`${entry.turn}-${i}`} className="flex gap-2">
+              <span className="font-mono text-[10px] text-ink-500">
+                {entry.year}.{String(entry.month).padStart(2, '0')}
+              </span>
+              <span>{label}</span>
+            </li>
+          );
+        })}
       </ul>
     </Dialog>
   );

@@ -9,6 +9,7 @@ import { buildInitialState } from '../engine/scenario.js';
 import { advanceMonth, applyCommand, checkOutcome } from '../engine/turn.js';
 import { schedulePlayerCommand, tickDays } from '../engine/pendingOp.js';
 import { CONTINUOUS_SLOT, loadFromSlot, saveToSlot } from './persistence.js';
+import { applyStoryChoice } from '../engine/story/events.js';
 import { REF_DATA } from '../data/index.js';
 import type { Locale } from '../i18n/types.js';
 import { setLocale } from '../i18n/locale.js';
@@ -34,7 +35,10 @@ export type Screen =
   | { kind: 'load' }
   | { kind: 'generals' }
   | { kind: 'gameOver'; outcome: 'victory' | 'defeat' }
-  | { kind: 'about' };
+  | { kind: 'about' }
+  | { kind: 'story'; eventId: string }
+  | { kind: 'briefing' } // Story-Mode opening briefing (reuses the StoryEvent modal in beat mode)
+  | { kind: 'chapterTransition' }; // "...years pass" interstitial
 
 export interface UIState {
   screen: Screen;
@@ -84,6 +88,7 @@ const DIGEST_KEYS = new Set<string>([
   'event.qianduChangan',
   'event.generalDied',
   'event.defected',
+  'objective.completed',
 ]);
 
 // Pure: significant log entries appended at or after `beforeLen`.
@@ -142,6 +147,17 @@ export function advanceDays(days: number): void {
     }));
     return;
   }
+  // A story event fired mid-advance and froze the tick (mirrors pendingBattle).
+  // Commit the frozen state and route to the StoryEvent modal for a decision.
+  if (next.pendingStoryEvent) {
+    const eventId = next.pendingStoryEvent.eventId;
+    gameStore.setState((s) => ({
+      ...s,
+      game: next,
+      ui: { ...s.ui, screen: { kind: 'story', eventId } },
+    }));
+    return;
+  }
   const digest = extractDigest(logLenBefore, next.log);
   const outcome = checkOutcome(next);
   gameStore.setState((s) => ({
@@ -150,6 +166,33 @@ export function advanceDays(days: number): void {
     ui: outcome
       ? { ...s.ui, screen: { kind: 'gameOver', outcome }, turnDigest: digest }
       : { ...s.ui, turnDigest: digest },
+  }));
+}
+
+// Resolve a pending story-event choice. Runs the branch's pure state change
+// via the engine (which also clears pendingStoryEvent), records the decision
+// on actionLog as a { kind:'storyChoice' } command so the branch is replayable
+// and persisted, then returns to the main screen (or game-over if the branch
+// happened to settle the scenario). Called by the StoryEventModal.
+export function resolveStoryChoice(eventId: string, choiceId: string): void {
+  const { game } = gameStore.getState();
+  if (!game) return;
+  const applied = applyStoryChoice(game, eventId, choiceId);
+  const command: StrategicCommand = { kind: 'storyChoice', eventId, choiceId };
+  const next: GameState = {
+    ...applied,
+    actionLog: [
+      ...applied.actionLog,
+      { turn: applied.turn, command, factionId: applied.playerFactionId },
+    ],
+  };
+  const outcome = checkOutcome(next);
+  gameStore.setState((s) => ({
+    ...s,
+    game: next,
+    ui: outcome
+      ? { ...s.ui, screen: { kind: 'gameOver', outcome } }
+      : { ...s.ui, screen: { kind: 'main' } },
   }));
 }
 
@@ -342,8 +385,13 @@ export function loadGame(snapshot: { game: GameState; locale?: Locale }): void {
       locale: snapshot.locale ?? s.ui.locale,
     },
   }));
-  // If the restored game was mid-battle, resume the battle screen.
-  if (gameStore.getState().game?.pendingBattle) enterPendingBattle();
+  // If the restored game was mid-battle or mid-story-event, resume that screen.
+  const restored = gameStore.getState().game;
+  if (restored?.pendingBattle) {
+    enterPendingBattle();
+  } else if (restored?.pendingStoryEvent) {
+    setScreen({ kind: 'story', eventId: restored.pendingStoryEvent.eventId });
+  }
 }
 
 // ----- Continuous autosave -----
