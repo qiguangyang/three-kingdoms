@@ -218,6 +218,7 @@ function summarizeForGeneral(
       return null;
     case 'plunder':
     case 'hireWild':
+    case 'storyChoice':
     case 'endTurn':
       return null;
   }

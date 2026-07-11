@@ -185,6 +185,10 @@ export function schedulePlayerCommand(
       });
     }
     case 'hireWild':
+    // Story choices are applied immediately on the store's command path
+    // (see applyStoryChoice, Task 5); they are never scheduled as a
+    // PendingOp. This no-op keeps the switch exhaustive.
+    case 'storyChoice':
     case 'endTurn':
       return state;
   }

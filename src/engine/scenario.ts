@@ -148,5 +148,7 @@ export function buildInitialState(opts: BuildInitialStateOptions): GameState {
     pendingOps: [],
     nextOpId: 1,
     aiStrategies: {},
+    // Story campaign objectives; seeded later by seedObjectives() (Task 2).
+    objectives: [],
   };
 }

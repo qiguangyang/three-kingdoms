@@ -58,6 +58,12 @@ export function applyCommand(
       });
       return result.state;
     }
+    case 'storyChoice':
+      // Story choices are applied on the store's immediate command path (see
+      // applyStoryChoice, Task 5); they are never scheduled through here. This
+      // no-op keeps the switch exhaustive.
+      // TODO(Task 5): delegate to applyStoryChoice(state, cmd.eventId, cmd.choiceId).
+      return state;
     case 'endTurn':
       return state;
   }
