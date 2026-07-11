@@ -337,4 +337,25 @@ export const en: MessageCatalog = {
 
   'digest.heading': 'While you were occupied…',
   'digest.dismiss': 'Continue',
+
+  // Story campaign — Liu Bei Chapter 1 content (Appendix A)
+  'objective.s1.coalition.title': 'Answer the Call',
+  'objective.s1.coalition.desc':
+    'Join the coalition against Dong Zhuo and take your place among the lords of the realm.',
+  'objective.s1.zhaoyun.title': 'Find the Dragon of Changshan',
+  'objective.s1.zhaoyun.desc': 'Meet Zhao Yun amid the fighting and win a warrior to your cause.',
+  'objective.s1.xuzhouAid.title': "Ride to Xuzhou's Aid",
+  'objective.s1.xuzhouAid.desc':
+    "Answer Tao Qian's plea, break the siege, and let your honor speak for you.",
+  'objective.s1.foundation.title': 'A Foundation Offered',
+  'objective.s1.foundation.desc': 'Decide your answer when Tao Qian offers you his province.',
+  'story.s1.xuzhou.title': 'The Bequest of Xuzhou',
+  'story.s1.xuzhou.body':
+    'Tao Qian lies dying and three times presses Xuzhou upon you. It is rich country — and country every warlord covets. Take it, and overnight you rise from wandering guest to sovereign lord. Refuse it, and your name for righteousness spreads across the land — but you remain a man without a home. Mi Zhu and Chen Deng wait, needing only your word.',
+  'choice.s1.xuzhou.accept.label': 'Accept Xuzhou',
+  'choice.s1.xuzhou.accept.desc':
+    "Gain Xuzhou's cities plus treasury and grain — a true warlord at once; but a tall tree draws the wind, and Lü Bu and Cao Cao now turn their eyes upon you.",
+  'choice.s1.xuzhou.decline.label': 'Decline Xuzhou',
+  'choice.s1.xuzhou.decline.desc':
+    'Renown soars and hearts turn to you — recruiting worthy men grows far easier hereafter; but you hold only Xiaopei, a slender foundation for a hard road.',
 };

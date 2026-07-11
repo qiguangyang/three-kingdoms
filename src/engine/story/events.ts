@@ -1,5 +1,6 @@
 import type { GameState } from '../types.js';
 import type { StoryEvent, StoryMode } from './types.js';
+import { S1_LIUBEI_EVENTS } from '../../data/story/s1-liubei.js';
 
 // Story-event overlay keyed by scenarioId. The authored production table is
 // empty for now; real narrative content is added in a later content task.
@@ -25,9 +26,10 @@ export function clearTestStoryEvents(): void {
 // real Liu Bei content is authored in a later task. The test overlay is merged
 // in so the tick-pause pipeline is drivable in unit tests.
 export function storyEventsFor(scenarioId: string, storyMode?: StoryMode): StoryEvent[] {
-  // storyMode will select protagonist-specific events once content exists.
-  void storyMode;
-  const authored: StoryEvent[] = [];
+  const authored: StoryEvent[] =
+    scenarioId === 's1-dongzhuo' && storyMode?.protagonistFactionId === 'liubei'
+      ? S1_LIUBEI_EVENTS
+      : [];
   const overlay = storyEventOverlay.get(scenarioId) ?? [];
   return [...authored, ...overlay];
 }

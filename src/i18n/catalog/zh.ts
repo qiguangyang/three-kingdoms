@@ -333,4 +333,21 @@ export const zh: MessageCatalog = {
 
   'digest.heading': '此间天下事…',
   'digest.dismiss': '继续',
+
+  // 剧情战役 — 刘备第一章内容（附录 A）
+  'objective.s1.coalition.title': '响应义盟',
+  'objective.s1.coalition.desc': '加入讨董联军，以微薄之力立于天下诸侯之列。',
+  'objective.s1.zhaoyun.title': '三顾常山',
+  'objective.s1.zhaoyun.desc': '于乱军之中结识赵云，广纳英才。',
+  'objective.s1.xuzhouAid.title': '驰援徐州',
+  'objective.s1.xuzhouAid.desc': '应陶谦之请，率军解徐州之围，以信义动人心。',
+  'objective.s1.foundation.title': '抉择基业',
+  'objective.s1.foundation.desc': '面对陶谦让州之请，决定进退。',
+  'story.s1.xuzhou.title': '陶谦让徐州',
+  'story.s1.xuzhou.body':
+    '陶谦病笃，三让徐州于你。徐州乃四战之地，富庶却众目睽睽。取之，则一夕由客将而为诸侯；辞之，则仁名传遍天下，然基业无着。糜竺、陈登拱手相候，只待你一言。',
+  'choice.s1.xuzhou.accept.label': '受徐州',
+  'choice.s1.xuzhou.accept.desc': '获徐州六城与钱粮，即刻成为一方诸侯；然树大招风，吕布、曹操皆将侧目而视。',
+  'choice.s1.xuzhou.decline.label': '辞徐州',
+  'choice.s1.xuzhou.decline.desc': '声望大涨，天下归心，日后招贤纳士事半功倍；然仅得小沛一城，基业微薄，前路艰难。',
 };

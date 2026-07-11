@@ -12,6 +12,7 @@
 
 import type { GameState } from '../types.js';
 import type { ObjectiveDef, StoryMode } from './types.js';
+import { S1_LIUBEI_OBJECTIVES } from '../../data/story/s1-liubei.js';
 
 // TEST-ONLY objective-table overlay keyed by scenarioId. setTestObjectives /
 // clearTestObjectives are TEST ONLY and are never called by production code;
@@ -40,8 +41,9 @@ export function clearTestObjectives(): void {
 export function objectivesFor(scenarioId: string, storyMode?: StoryMode): ObjectiveDef[] {
   const override = testObjectiveOverlay.get(scenarioId);
   if (override) return override;
-  // storyMode will select protagonist-specific objectives once content exists.
-  void storyMode;
+  if (scenarioId === 's1-dongzhuo' && storyMode?.protagonistFactionId === 'liubei') {
+    return S1_LIUBEI_OBJECTIVES;
+  }
   return [];
 }
 

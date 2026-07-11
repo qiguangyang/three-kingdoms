@@ -370,6 +370,22 @@ export type MessageKey =
 
   // Between-turn digest
   | 'digest.heading'
-  | 'digest.dismiss';
+  | 'digest.dismiss'
+
+  // Story campaign — Liu Bei Chapter 1 content (Appendix A)
+  | 'objective.s1.coalition.title'
+  | 'objective.s1.coalition.desc'
+  | 'objective.s1.zhaoyun.title'
+  | 'objective.s1.zhaoyun.desc'
+  | 'objective.s1.xuzhouAid.title'
+  | 'objective.s1.xuzhouAid.desc'
+  | 'objective.s1.foundation.title'
+  | 'objective.s1.foundation.desc'
+  | 'story.s1.xuzhou.title'
+  | 'story.s1.xuzhou.body'
+  | 'choice.s1.xuzhou.accept.label'
+  | 'choice.s1.xuzhou.accept.desc'
+  | 'choice.s1.xuzhou.decline.label'
+  | 'choice.s1.xuzhou.decline.desc';
 
 export type MessageCatalog = Record<MessageKey, string>;
