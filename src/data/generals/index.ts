@@ -204,6 +204,34 @@ const S2_NEW: General[] = [
   g('hanxuan', '韩玄', 'Han Xuan', [55, 45, 58, 50], 45, 'infantry', 80, 'xiliang'),
 ];
 
+// Scenario 3 (赤壁之战, 208 CE) new general records. Same rule as S2_NEW: added to
+// GENERALS so their ids resolve, but deliberately NOT wired into any
+// FACTION_GENERAL_IDS array — Scenario 3 references them via inline generalIds in
+// its scenario file, keeping Scenario 1/2 shared rosters byte-identical. Ownership
+// is assigned by the scenario loader (factionId stays null here). xushu@xuchang and
+// pangtong@chaisang are WILD-style searchers (loyalty 40 + a locationCityId), found
+// in a specific city like the WILD entries above. Shi Xie is intentionally omitted
+// (his faction is dropped in Phase 4).
+const S3_NEW: General[] = [
+  g('zhugeliang', '诸葛亮', 'Zhuge Liang', [30, 100, 92, 95], 27, 'infantry'),
+  g('lusu', '鲁肃', 'Lu Su', [42, 92, 82, 88], 36, 'infantry'),
+  g('lvmeng', '吕蒙', 'Lü Meng', [80, 75, 82, 65], 30, 'navy'),
+  g('luxun', '陆逊', 'Lu Xun', [60, 82, 78, 82], 25, 'navy'),
+  g('ganning', '甘宁', 'Gan Ning', [90, 62, 82, 40], 39, 'navy'),
+  g('lingtong', '凌统', 'Ling Tong', [85, 55, 76, 45], 20, 'navy'),
+  g('jiangqin', '蒋钦', 'Jiang Qin', [80, 58, 76, 52], 35, 'navy'),
+  g('zhangzhao', '张昭', 'Zhang Zhao', [15, 85, 62, 95], 52, 'infantry'),
+  g('zhanghong', '张紘', 'Zhang Hong', [15, 80, 55, 90], 55, 'infantry'),
+  g('guyong', '顾雍', 'Gu Yong', [20, 78, 58, 92], 40, 'infantry'),
+  g('xuhuang', '徐晃', 'Xu Huang', [89, 75, 88, 55], 39, 'infantry'),
+  g('simayi', '司马懿', 'Sima Yi', [45, 92, 82, 88], 29, 'infantry'),
+  g('mifang', '糜芳', 'Mi Fang', [60, 50, 60, 65], 35, 'infantry'),
+  g('sunqian', '孙乾', 'Sun Qian', [25, 72, 45, 78], 45, 'infantry'),
+  g('gongsunkang', '公孙康', 'Gongsun Kang', [72, 60, 70, 58], 35, 'cavalry', 100),
+  g('xushu', '徐庶', 'Xu Shu', [45, 90, 80, 78], 38, 'infantry', 40, 'xuchang'),
+  g('pangtong', '庞统', 'Pang Tong', [40, 96, 85, 75], 29, 'infantry', 40, 'chaisang'),
+];
+
 const ALL = [
   ...DONG,
   ...YUAN_SHAO,
@@ -222,6 +250,7 @@ const ALL = [
   ...GONGSUN_DU,
   ...WILD,
   ...S2_NEW,
+  ...S3_NEW,
 ];
 
 export const GENERALS: Record<GeneralId, General> = Object.fromEntries(

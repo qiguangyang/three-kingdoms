@@ -14,6 +14,7 @@ interface ExpectedGeneral {
   age: number;
   troopType: TroopType;
   locationCityId: string | null; // set only for the two WILD searchers
+  loyalty?: number; // defaults to 80 when omitted
 }
 
 const S2_NEW_EXPECTED: ExpectedGeneral[] = [
@@ -79,6 +80,82 @@ describe('Scenario 2 new general records (Appendix A)', () => {
     for (const [factionId, ids] of Object.entries(FACTION_GENERAL_IDS)) {
       for (const id of ids) {
         expect(newIds.has(id), `s2 general ${id} leaked into FACTION_GENERAL_IDS.${factionId}`).toBe(false);
+      }
+    }
+  });
+});
+
+// Appendix A (Phase 4 plan): the 17 Scenario-3 (赤壁之战, 208 CE) general records.
+// Same rule as S2_NEW — they must resolve in GENERALS but must NOT be added to
+// any FACTION_GENERAL_IDS array (Scenario 3 references them via inline generalIds,
+// keeping Scenario 1/2 rosters byte-identical). xushu@xuchang / pangtong@chaisang
+// are WILD-style (loyalty 40 + a locationCityId); gongsunkang carries loyalty 100.
+const S3_NEW_EXPECTED: ExpectedGeneral[] = [
+  { id: 'zhugeliang', zh: '诸葛亮', en: 'Zhuge Liang', stats: [30, 100, 92, 95], age: 27, troopType: 'infantry', locationCityId: null },
+  { id: 'lusu', zh: '鲁肃', en: 'Lu Su', stats: [42, 92, 82, 88], age: 36, troopType: 'infantry', locationCityId: null },
+  { id: 'lvmeng', zh: '吕蒙', en: 'Lü Meng', stats: [80, 75, 82, 65], age: 30, troopType: 'navy', locationCityId: null },
+  { id: 'luxun', zh: '陆逊', en: 'Lu Xun', stats: [60, 82, 78, 82], age: 25, troopType: 'navy', locationCityId: null },
+  { id: 'ganning', zh: '甘宁', en: 'Gan Ning', stats: [90, 62, 82, 40], age: 39, troopType: 'navy', locationCityId: null },
+  { id: 'lingtong', zh: '凌统', en: 'Ling Tong', stats: [85, 55, 76, 45], age: 20, troopType: 'navy', locationCityId: null },
+  { id: 'jiangqin', zh: '蒋钦', en: 'Jiang Qin', stats: [80, 58, 76, 52], age: 35, troopType: 'navy', locationCityId: null },
+  { id: 'zhangzhao', zh: '张昭', en: 'Zhang Zhao', stats: [15, 85, 62, 95], age: 52, troopType: 'infantry', locationCityId: null },
+  { id: 'zhanghong', zh: '张紘', en: 'Zhang Hong', stats: [15, 80, 55, 90], age: 55, troopType: 'infantry', locationCityId: null },
+  { id: 'guyong', zh: '顾雍', en: 'Gu Yong', stats: [20, 78, 58, 92], age: 40, troopType: 'infantry', locationCityId: null },
+  { id: 'xuhuang', zh: '徐晃', en: 'Xu Huang', stats: [89, 75, 88, 55], age: 39, troopType: 'infantry', locationCityId: null },
+  { id: 'simayi', zh: '司马懿', en: 'Sima Yi', stats: [45, 92, 82, 88], age: 29, troopType: 'infantry', locationCityId: null },
+  { id: 'mifang', zh: '糜芳', en: 'Mi Fang', stats: [60, 50, 60, 65], age: 35, troopType: 'infantry', locationCityId: null },
+  { id: 'sunqian', zh: '孙乾', en: 'Sun Qian', stats: [25, 72, 45, 78], age: 45, troopType: 'infantry', locationCityId: null },
+  { id: 'gongsunkang', zh: '公孙康', en: 'Gongsun Kang', stats: [72, 60, 70, 58], age: 35, troopType: 'cavalry', locationCityId: null, loyalty: 100 },
+  { id: 'xushu', zh: '徐庶', en: 'Xu Shu', stats: [45, 90, 80, 78], age: 38, troopType: 'infantry', locationCityId: 'xuchang', loyalty: 40 },
+  { id: 'pangtong', zh: '庞统', en: 'Pang Tong', stats: [40, 96, 85, 75], age: 29, troopType: 'infantry', locationCityId: 'chaisang', loyalty: 40 },
+];
+
+describe('Scenario 3 new general records (Appendix A)', () => {
+  it('adds exactly 17 records', () => {
+    expect(S3_NEW_EXPECTED).toHaveLength(17);
+  });
+
+  it.each(S3_NEW_EXPECTED)(
+    'general $id resolves in GENERALS with the exact Appendix A stats',
+    (exp) => {
+      const gen = GENERALS[exp.id];
+      expect(gen, `Missing general ${exp.id}`).toBeDefined();
+      expect(gen.name).toEqual({ zh: exp.zh, en: exp.en });
+      expect(gen.stats).toEqual({
+        wu: exp.stats[0],
+        zhi: exp.stats[1],
+        tong: exp.stats[2],
+        zheng: exp.stats[3],
+      });
+      expect(gen.age).toBe(exp.age);
+      expect(gen.troopType).toBe(exp.troopType);
+      expect(gen.locationCityId).toBe(exp.locationCityId);
+      expect(gen.loyalty).toBe(exp.loyalty ?? 80);
+      // Ownership is assigned by the scenario loader, never baked into the record.
+      expect(gen.factionId).toBeNull();
+    },
+  );
+
+  it('makes xushu@xuchang and pangtong@chaisang WILD-style (loyalty 40 + locationCityId)', () => {
+    expect(GENERALS['xushu'].loyalty).toBe(40);
+    expect(GENERALS['xushu'].locationCityId).toBe('xuchang');
+    expect(GENERALS['pangtong'].loyalty).toBe(40);
+    expect(GENERALS['pangtong'].locationCityId).toBe('chaisang');
+  });
+
+  it('does NOT create shixie (his faction is dropped in Phase 4)', () => {
+    expect(GENERALS['shixie']).toBeUndefined();
+  });
+
+  it('does NOT add any of the 17 to Scenario 1/2 rosters (FACTION_GENERAL_IDS unchanged)', () => {
+    const newIds = new Set(S3_NEW_EXPECTED.map((e) => e.id));
+    for (const id of FACTION_GENERAL_IDS.caocao) {
+      expect(newIds.has(id), `s3 general ${id} leaked into FACTION_GENERAL_IDS.caocao`).toBe(false);
+    }
+    // Belt-and-braces: none of the 17 appear in ANY faction roster array.
+    for (const [factionId, ids] of Object.entries(FACTION_GENERAL_IDS)) {
+      for (const id of ids) {
+        expect(newIds.has(id), `s3 general ${id} leaked into FACTION_GENERAL_IDS.${factionId}`).toBe(false);
       }
     }
   });
