@@ -262,10 +262,12 @@ describe('story store integration', () => {
     expect(st.ui.turnDigest.some((e) => e.key === 'objective.completed')).toBe(true);
   });
 
-  it('Story-Mode victory (objectives complete) routes to the Chapter Complete screen', () => {
+  it('Story-Mode Chapter-1 victory routes to the Chapter Transition screen (a next chapter exists)', () => {
     // A single non-optional objective that completes once the chosen branch
     // plants a marker. Because setTestObjectives overrides the objective table
-    // for the scenario, completing it is a full historic (chapter) win.
+    // for the scenario, completing it is a full historic (chapter) win. Chapter 1
+    // has a following chapter (Chapter 2 / s2-junxiong), so the win bridges into
+    // the "...years pass" transition rather than terminating the campaign.
     setTestObjectives('s1-dongzhuo', [
       {
         id: 'chapter-win',
@@ -299,7 +301,7 @@ describe('story store integration', () => {
       ...s,
       game: {
         ...s.game!,
-        storyMode: STORY_MODE,
+        storyMode: STORY_MODE, // chapter 1
         objectives: [{ id: 'chapter-win', status: 'active' as const }],
         pendingStoryEvent: { eventId: 'win-event', scenarioId: 's1-dongzhuo' },
       },
@@ -308,7 +310,57 @@ describe('story store integration', () => {
 
     resolveStoryChoice('win-event', 'seal');
 
-    // Story-Mode victory is a CHAPTER win, not the generic game-over.
+    // A Chapter-1 win bridges into the next chapter, not the terminal complete.
+    expect(gameStore.getState().ui.screen).toEqual({ kind: 'chapterTransition' });
+  });
+
+  it('Story-Mode FINAL-chapter victory routes to the Chapter Complete screen (no next chapter)', () => {
+    // Same win pipeline, but the game is tagged as Chapter 2 — the last chapter
+    // in Liu Bei's arc — so there is no chapter to transition into and the win is
+    // the campaign's terminal celebration.
+    setTestObjectives('s1-dongzhuo', [
+      {
+        id: 'chapter-win',
+        titleKey: 'app.title',
+        descKey: 'app.subtitle',
+        check: (state) => state.objectives.some((o) => o.id === 'win-marker'),
+      },
+    ]);
+    setTestStoryEvents('s1-dongzhuo', [
+      {
+        id: 'win-event',
+        check: () => true,
+        titleKey: 'app.title',
+        bodyKey: 'app.subtitle',
+        choices: [
+          {
+            id: 'seal',
+            labelKey: 'app.confirm',
+            descKey: 'app.continue',
+            apply: (state) => ({
+              ...state,
+              objectives: [...state.objectives, { id: 'win-marker', status: 'complete' as const }],
+            }),
+          },
+        ],
+      },
+    ]);
+
+    newGame(SCENARIO_DONGZHUO, 'liubei', 1);
+    gameStore.setState((s) => ({
+      ...s,
+      game: {
+        ...s.game!,
+        storyMode: { protagonistFactionId: 'liubei', chapter: 2 },
+        objectives: [{ id: 'chapter-win', status: 'active' as const }],
+        pendingStoryEvent: { eventId: 'win-event', scenarioId: 's1-dongzhuo' },
+      },
+      ui: { ...s.ui, screen: { kind: 'story', eventId: 'win-event' } },
+    }));
+
+    resolveStoryChoice('win-event', 'seal');
+
+    // No Chapter 3 exists -> terminal chapter-complete celebration.
     expect(gameStore.getState().ui.screen).toEqual({ kind: 'chapterComplete' });
   });
 

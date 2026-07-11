@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useSession } from '../hooks/useSession.js';
 import { selectGame, selectScreen, selectLocale } from '../../state/selectors.js';
-import { clearContinuousSave, resolveStoryChoice, setScreen } from '../../state/store.js';
+import { clearContinuousSave, resolveStoryChoice, setScreen, startChapter } from '../../state/store.js';
 import { findStoryEvent } from '../../engine/story/events.js';
 import type { StoryChoice } from '../../engine/story/types.js';
 import { t } from '../../i18n/locale.js';
+import type { MessageKey } from '../../i18n/types.js';
 import { useMenuKeys } from '../hooks/useMenuKeys.js';
 
 // Full-screen paper card that renders the pending StoryEvent addressed by the
@@ -78,19 +79,23 @@ export const StoryEventModal: React.FC = () => {
 };
 
 // Story-Mode opening briefing — a narrative beat (single "continue") reading the
-// protagonist chapter's briefing keys, then returns to the campaign map. Phase 1
-// wires Chapter 1 only; later chapters extend the key lookup.
+// active chapter's briefing keys, then returns to the campaign map. Keys resolve
+// by the current storyMode.chapter (default 1), so each chapter shows its own
+// framing. The `as MessageKey` cast lets the lookup compile ahead of a chapter's
+// catalog keys being authored.
 export const BriefingScreen: React.FC = () => {
   useSession(selectLocale);
+  const game = useSession(selectGame);
   const [active, setActive] = useState(0);
+  const n = game?.storyMode?.chapter ?? 1;
   const onContinue = (): void => setScreen({ kind: 'main' });
   useMenuKeys({ count: 1, active, setActive, onSelect: onContinue });
   return (
     <div className="flex h-full w-full items-center justify-center px-6 py-10">
       <div className="panel w-full max-w-2xl p-8">
-        <h2 className="font-serif text-3xl font-bold text-seal-700">{t('story.ch1.title')}</h2>
+        <h2 className="font-serif text-3xl font-bold text-seal-700">{t(`story.ch${n}.title` as MessageKey)}</h2>
         <p className="mt-4 whitespace-pre-line text-base leading-relaxed text-ink-800">
-          {t('story.ch1.briefing')}
+          {t(`story.ch${n}.briefing` as MessageKey)}
         </p>
         <div className="mt-8 flex flex-col gap-3">
           <button className="btn btn-primary py-3" onClick={onContinue}>
@@ -102,19 +107,28 @@ export const BriefingScreen: React.FC = () => {
   );
 };
 
-// "...years pass" interstitial shown after a Story-Mode historic chapter win.
-// Phase 1 wires the minimal version (Continue returns to the campaign map);
-// Phase 3 replaces the action with a clean re-seed of the next chapter.
+// "...years pass" interstitial shown after a Story-Mode chapter win when a next
+// chapter exists. Reads the finished chapter's transition key, and Continue
+// starts the NEXT chapter (a clean re-seed of its scenario) rather than merely
+// returning to the map. Keys resolve by the current storyMode.chapter.
 export const ChapterTransitionScreen: React.FC = () => {
   useSession(selectLocale);
+  const game = useSession(selectGame);
   const [active, setActive] = useState(0);
-  const onContinue = (): void => setScreen({ kind: 'main' });
+  const n = game?.storyMode?.chapter ?? 1;
+  const onContinue = (): void => {
+    if (game?.storyMode) {
+      startChapter(game.storyMode.protagonistFactionId, game.storyMode.chapter + 1);
+    } else {
+      setScreen({ kind: 'main' });
+    }
+  };
   useMenuKeys({ count: 1, active, setActive, onSelect: onContinue });
   return (
     <div className="flex h-full w-full items-center justify-center px-6 py-10">
       <div className="panel w-full max-w-2xl p-8 text-center">
         <p className="whitespace-pre-line text-lg italic leading-relaxed text-ink-700">
-          {t('story.ch1.transition')}
+          {t(`story.ch${n}.transition` as MessageKey)}
         </p>
         <div className="mt-8 flex flex-col gap-3">
           <button className="btn btn-primary py-3" onClick={onContinue}>
@@ -133,7 +147,9 @@ export const ChapterTransitionScreen: React.FC = () => {
 // transition into. Distinct from the (unrouted) chapterTransition bridge.
 export const ChapterCompleteScreen: React.FC = () => {
   useSession(selectLocale);
+  const game = useSession(selectGame);
   const [active, setActive] = useState(0);
+  const n = game?.storyMode?.chapter ?? 1;
   const onDone = (): void => {
     clearContinuousSave();
     setScreen({ kind: 'title' });
@@ -142,9 +158,9 @@ export const ChapterCompleteScreen: React.FC = () => {
   return (
     <div className="flex h-full w-full items-center justify-center px-6 py-10">
       <div className="panel w-full max-w-2xl p-8 text-center">
-        <h2 className="font-serif text-3xl font-bold text-seal-700">{t('story.ch1.complete.title')}</h2>
+        <h2 className="font-serif text-3xl font-bold text-seal-700">{t(`story.ch${n}.complete.title` as MessageKey)}</h2>
         <p className="mt-4 whitespace-pre-line text-base italic leading-relaxed text-ink-700">
-          {t('story.ch1.complete.body')}
+          {t(`story.ch${n}.complete.body` as MessageKey)}
         </p>
         <div className="mt-8 flex flex-col gap-3">
           <button className="btn btn-primary py-3" onClick={onDone}>

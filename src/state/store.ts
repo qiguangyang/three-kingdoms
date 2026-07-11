@@ -1,12 +1,14 @@
 import { createStore } from 'zustand/vanilla';
 import type { StoreApi } from 'zustand/vanilla';
 import { makeDefaultAgent } from '../engine/ai/index.js';
-import type { FactionAgent, GameState, LogEntry, Personality, Scenario, StrategicCommand, TacticalCommand } from '../engine/types.js';
+import type { FactionAgent, FactionId, GameState, LogEntry, Personality, Scenario, StrategicCommand, TacticalCommand } from '../engine/types.js';
 // GambitId lives in the battle-local types module, not the engine barrel
 // (../engine/types.js imports it internally but does not re-export it).
 import type { GambitId } from '../engine/battle/types.js';
 import { buildInitialState } from '../engine/scenario.js';
-import { SCENARIO_DONGZHUO } from '../data/scenarios/s1-dongzhuo.js';
+import { SCENARIOS } from '../data/scenarios/index.js';
+import { chapterScenarioId, nextChapter } from '../engine/story/chapters.js';
+import type { StoryMode } from '../engine/story/types.js';
 import { evaluateObjectives, seedObjectives } from '../engine/story/objectives.js';
 import { advanceMonth, applyCommand, checkOutcome } from '../engine/turn.js';
 import { schedulePlayerCommand, tickDays } from '../engine/pendingOp.js';
@@ -99,12 +101,18 @@ export function extractDigest(beforeLen: number, log: LogEntry[]): LogEntry[] {
   return log.slice(beforeLen).filter((e) => DIGEST_KEYS.has(e.key));
 }
 
-// Shared outcome routing. A Story-Mode victory is a CHAPTER win -> the
-// celebratory chapterComplete screen; every other outcome (a Free-Play win, or
-// any defeat) -> the normal game-over. Used identically by all three
-// checkOutcome callers so routing can't drift between them.
+// Shared outcome routing. A Story-Mode victory is a CHAPTER win: if a NEXT
+// chapter exists in the protagonist's arc it bridges into the "...years pass"
+// chapterTransition; otherwise (the final chapter) it ends on the celebratory
+// chapterComplete. Every other outcome (a Free-Play win, or any defeat) -> the
+// normal game-over. Used identically by all three checkOutcome callers so
+// routing can't drift between them.
 function outcomeScreen(outcome: 'victory' | 'defeat', game: GameState): Screen {
-  if (outcome === 'victory' && game.storyMode) return { kind: 'chapterComplete' };
+  if (outcome === 'victory' && game.storyMode) {
+    return nextChapter(game.storyMode.protagonistFactionId, game.storyMode.chapter)
+      ? { kind: 'chapterTransition' }
+      : { kind: 'chapterComplete' };
+  }
   return { kind: 'gameOver', outcome };
 }
 
@@ -127,28 +135,36 @@ export function newGame(scenario: Scenario, playerFactionId: string, seed: numbe
   });
 }
 
-// Launch the guided Story Mode campaign at Liu Bei's Chapter 1. Builds the
-// Chapter-1 scenario (s1-dongzhuo) with Liu Bei as the player faction, tags
-// the game with storyMode so objective tables / briefings / choice-events
-// become protagonist-specific, seeds the chapter's objectives, wires up AI
-// agents for every other faction, and opens the opening briefing before the
-// campaign map. A fixed seed keeps the launch deterministic.
-export function startStoryMode(): void {
-  const scenario = SCENARIO_DONGZHUO;
+// Launch (or advance) a guided Story-Mode chapter. Looks up the scenario that
+// hosts `chapter` of `protagonistId`'s arc, builds it with the protagonist as
+// the player faction, tags the game with storyMode so objective tables /
+// briefings / choice-events become protagonist- and chapter-specific, seeds the
+// chapter's objectives, wires up AI agents for every OTHER faction, and opens
+// the chapter briefing before the campaign map. A fixed seed keeps the launch
+// deterministic; each chapter is re-seeded fresh (no cross-chapter state carry —
+// continuity is narrative). A no-op if the protagonist/chapter isn't registered.
+export function startChapter(protagonistId: FactionId, chapter: number): void {
+  const scenarioId = chapterScenarioId(protagonistId, chapter);
+  if (!scenarioId) return;
+  const scenario = SCENARIOS[scenarioId];
+  if (!scenario) return;
   const built = buildInitialState({
     scenario,
-    playerFactionId: 'liubei',
+    playerFactionId: protagonistId,
     refData: REF_DATA,
     seed: 1,
   });
   const withStory: GameState = {
     ...built,
-    storyMode: { protagonistFactionId: 'liubei', chapter: 1 },
+    // `chapter` is a plain number at the callsite (e.g. current + 1); narrow it
+    // to StoryMode's literal chapter union. Out-of-arc chapters were already
+    // rejected above (chapterScenarioId returned undefined).
+    storyMode: { protagonistFactionId: protagonistId, chapter: chapter as StoryMode['chapter'] },
   };
   const game = seedObjectives(withStory);
   const agents: Record<string, FactionAgent> = {};
   for (const f of scenario.factions) {
-    if (f.id === 'liubei') continue;
+    if (f.id === protagonistId) continue;
     agents[f.id] = makeDefaultAgent(f.id, f.personality);
   }
   gameStore.setState((s) => ({
@@ -157,6 +173,12 @@ export function startStoryMode(): void {
     agents,
     ui: { ...initialUI, screen: { kind: 'briefing' }, locale: s.ui.locale },
   }));
+}
+
+// Launch the guided Story-Mode campaign at Liu Bei's Chapter 1. Thin wrapper
+// over startChapter so the Title screen still opens the campaign identically.
+export function startStoryMode(): void {
+  startChapter('liubei', 1);
 }
 
 // Legacy: end-turn = advance a full month at once. Retained for callers
