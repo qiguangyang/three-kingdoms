@@ -15,13 +15,14 @@ export interface ChapterDef {
   scenarioId: string;
 }
 
-// Per-protagonist chapter arcs, in play order. Liu Bei's campaign currently runs
-// Chapter 1 (董卓 / s1-dongzhuo) -> Chapter 2 (群雄逐鹿 / s2-junxiong); later
-// phases extend the array with Chapter 3+.
+// Per-protagonist chapter arcs, in play order. Liu Bei's campaign runs
+// Chapter 1 (董卓 / s1-dongzhuo) -> Chapter 2 (群雄逐鹿 / s2-junxiong) ->
+// Chapter 3 (赤壁之战 / s3-chibi); later phases extend the array with Chapter 4+.
 export const CHAPTERS: Record<FactionId, ChapterDef[]> = {
   liubei: [
     { chapter: 1, scenarioId: 's1-dongzhuo' },
     { chapter: 2, scenarioId: 's2-junxiong' },
+    { chapter: 3, scenarioId: 's3-chibi' },
   ],
 };
 

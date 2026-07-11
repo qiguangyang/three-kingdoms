@@ -315,7 +315,7 @@ describe('story store integration', () => {
   });
 
   it('Story-Mode FINAL-chapter victory routes to the Chapter Complete screen (no next chapter)', () => {
-    // Same win pipeline, but the game is tagged as Chapter 2 — the last chapter
+    // Same win pipeline, but the game is tagged as Chapter 3 — the last chapter
     // in Liu Bei's arc — so there is no chapter to transition into and the win is
     // the campaign's terminal celebration.
     setTestObjectives('s1-dongzhuo', [
@@ -351,7 +351,7 @@ describe('story store integration', () => {
       ...s,
       game: {
         ...s.game!,
-        storyMode: { protagonistFactionId: 'liubei', chapter: 2 },
+        storyMode: { protagonistFactionId: 'liubei', chapter: 3 },
         objectives: [{ id: 'chapter-win', status: 'active' as const }],
         pendingStoryEvent: { eventId: 'win-event', scenarioId: 's1-dongzhuo' },
       },
@@ -360,7 +360,7 @@ describe('story store integration', () => {
 
     resolveStoryChoice('win-event', 'seal');
 
-    // No Chapter 3 exists -> terminal chapter-complete celebration.
+    // No Chapter 4 exists -> terminal chapter-complete celebration.
     expect(gameStore.getState().ui.screen).toEqual({ kind: 'chapterComplete' });
   });
 

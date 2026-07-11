@@ -15,21 +15,24 @@ afterEach(() => {
 });
 
 describe('chapter registry', () => {
-  it('registers Liu Bei chapters 1 and 2 with their scenarios', () => {
+  it('registers Liu Bei chapters 1, 2 and 3 with their scenarios', () => {
     expect(CHAPTERS.liubei).toEqual([
       { chapter: 1, scenarioId: 's1-dongzhuo' },
       { chapter: 2, scenarioId: 's2-junxiong' },
+      { chapter: 3, scenarioId: 's3-chibi' },
     ]);
   });
 
   it('chapterScenarioId maps a protagonist + chapter to its scenario id', () => {
     expect(chapterScenarioId('liubei', 1)).toBe('s1-dongzhuo');
     expect(chapterScenarioId('liubei', 2)).toBe('s2-junxiong');
+    expect(chapterScenarioId('liubei', 3)).toBe('s3-chibi');
   });
 
   it('nextChapter returns the following chapter def, or undefined at the end of the arc', () => {
     expect(nextChapter('liubei', 1)).toEqual({ chapter: 2, scenarioId: 's2-junxiong' });
-    expect(nextChapter('liubei', 2)).toBeUndefined();
+    expect(nextChapter('liubei', 2)).toEqual({ chapter: 3, scenarioId: 's3-chibi' });
+    expect(nextChapter('liubei', 3)).toBeUndefined();
   });
 
   it('returns undefined for unknown protagonists / chapters', () => {
