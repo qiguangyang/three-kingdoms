@@ -253,6 +253,25 @@ const ALL = [
   ...S3_NEW,
 ];
 
+// Return the first id that appears more than once, or null if all are unique.
+export function findDuplicateId(records: ReadonlyArray<{ id: GeneralId }>): GeneralId | null {
+  const seen = new Set<GeneralId>();
+  for (const r of records) {
+    if (seen.has(r.id)) return r.id;
+    seen.add(r.id);
+  }
+  return null;
+}
+
+// Guard against a duplicate general id. GENERALS is built by `Object.fromEntries`
+// (last-wins), so a colliding id would SILENTLY overwrite an existing officer's
+// record — changing another scenario's roster (e.g. an s1 general's stats) with
+// no test catching it. As the roster grows across chapters, fail loudly instead.
+{
+  const dup = findDuplicateId(ALL);
+  if (dup) throw new Error(`Duplicate general id in generals data: "${dup}"`);
+}
+
 export const GENERALS: Record<GeneralId, General> = Object.fromEntries(
   ALL.map((gen) => [gen.id, gen]),
 );

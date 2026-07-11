@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FACTION_GENERAL_IDS, GENERALS } from '../../src/data/generals/index.js';
+import { FACTION_GENERAL_IDS, GENERALS, findDuplicateId } from '../../src/data/generals/index.js';
 import type { TroopType } from '../../src/engine/types.js';
 
 // Appendix A (Phase 3 plan): the 19 Scenario-2 general records. These must
@@ -158,5 +158,22 @@ describe('Scenario 3 new general records (Appendix A)', () => {
         expect(newIds.has(id), `s3 general ${id} leaked into FACTION_GENERAL_IDS.${factionId}`).toBe(false);
       }
     }
+  });
+});
+
+// Guard: GENERALS is assembled via Object.fromEntries (last-wins), so a
+// duplicate id would silently overwrite an existing officer and change another
+// scenario's roster undetected. findDuplicateId + a module-init throw prevent it.
+describe('no duplicate general ids', () => {
+  it('findDuplicateId returns the first repeated id, else null', () => {
+    expect(findDuplicateId([{ id: 'a' }, { id: 'b' }, { id: 'a' }])).toBe('a');
+    expect(findDuplicateId([{ id: 'a' }, { id: 'b' }])).toBeNull();
+    expect(findDuplicateId([])).toBeNull();
+  });
+
+  it('the shipped generals data has no duplicate ids', () => {
+    // If a future roster addition collides, the module-init guard throws at
+    // import (failing the whole suite); this asserts the current data is clean.
+    expect(findDuplicateId(Object.values(GENERALS))).toBeNull();
   });
 });
