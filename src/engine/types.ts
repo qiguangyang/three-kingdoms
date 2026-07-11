@@ -284,6 +284,15 @@ export interface Scenario {
   startMonth: number; // 1-12
   factions: FactionSetup[];
   victory: VictoryCondition;
+  // Per-scenario patches to general records, applied to the cloned working
+  // copies at build time (buildInitialState). Lets a later era load an adult
+  // variant of a general (e.g. an aged-up sunce/machao) without mutating the
+  // shared GENERALS base or affecting other scenarios. `stats` is
+  // shallow-merged onto the base; the other fields replace when present.
+  generalOverrides?: Record<
+    GeneralId,
+    Partial<Pick<General, 'stats' | 'age' | 'troopType' | 'loyalty'>>
+  >;
   // Implemented = full data wired up. todo = stub for planning only.
   todo?: boolean;
 }
