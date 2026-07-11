@@ -195,6 +195,121 @@ describe('story store integration', () => {
     expect(objAfter?.status).toBe('complete');
   });
 
+  it('Story-Mode victory (objectives complete) routes to the Chapter Complete screen', () => {
+    // A single non-optional objective that completes once the chosen branch
+    // plants a marker. Because setTestObjectives overrides the objective table
+    // for the scenario, completing it is a full historic (chapter) win.
+    setTestObjectives('s1-dongzhuo', [
+      {
+        id: 'chapter-win',
+        titleKey: 'app.title',
+        descKey: 'app.subtitle',
+        check: (state) => state.objectives.some((o) => o.id === 'win-marker'),
+      },
+    ]);
+    setTestStoryEvents('s1-dongzhuo', [
+      {
+        id: 'win-event',
+        check: () => true,
+        titleKey: 'app.title',
+        bodyKey: 'app.subtitle',
+        choices: [
+          {
+            id: 'seal',
+            labelKey: 'app.confirm',
+            descKey: 'app.continue',
+            apply: (state) => ({
+              ...state,
+              objectives: [...state.objectives, { id: 'win-marker', status: 'complete' as const }],
+            }),
+          },
+        ],
+      },
+    ]);
+
+    newGame(SCENARIO_DONGZHUO, 'liubei', 1);
+    gameStore.setState((s) => ({
+      ...s,
+      game: {
+        ...s.game!,
+        storyMode: STORY_MODE,
+        objectives: [{ id: 'chapter-win', status: 'active' as const }],
+        pendingStoryEvent: { eventId: 'win-event', scenarioId: 's1-dongzhuo' },
+      },
+      ui: { ...s.ui, screen: { kind: 'story', eventId: 'win-event' } },
+    }));
+
+    resolveStoryChoice('win-event', 'seal');
+
+    // Story-Mode victory is a CHAPTER win, not the generic game-over.
+    expect(gameStore.getState().ui.screen).toEqual({ kind: 'chapterComplete' });
+  });
+
+  it('Free-Play victory (no storyMode) routes to the normal game-over, not Chapter Complete', () => {
+    // A no-op story choice on a Free-Play game whose board already meets the
+    // unify condition (player owns every city). Only the routing is under test.
+    setTestStoryEvents('s1-dongzhuo', [
+      {
+        id: 'free-win',
+        check: () => true,
+        titleKey: 'app.title',
+        bodyKey: 'app.subtitle',
+        choices: [{ id: 'go', labelKey: 'app.confirm', descKey: 'app.continue', apply: (s) => s }],
+      },
+    ]);
+
+    newGame(SCENARIO_DONGZHUO, 'liubei', 1); // Free Play: storyMode stays undefined
+    gameStore.setState((s) => {
+      const cities = { ...s.game!.cities };
+      for (const c of Object.values(cities)) cities[c.id] = { ...c, factionId: 'liubei' };
+      return {
+        ...s,
+        game: {
+          ...s.game!,
+          cities,
+          pendingStoryEvent: { eventId: 'free-win', scenarioId: 's1-dongzhuo' },
+        },
+        ui: { ...s.ui, screen: { kind: 'story', eventId: 'free-win' } },
+      };
+    });
+
+    resolveStoryChoice('free-win', 'go');
+
+    expect(gameStore.getState().ui.screen).toEqual({ kind: 'gameOver', outcome: 'victory' });
+  });
+
+  it('Story-Mode defeat routes to the normal game-over (only wins reach Chapter Complete)', () => {
+    setTestStoryEvents('s1-dongzhuo', [
+      {
+        id: 'grim-event',
+        check: () => true,
+        titleKey: 'app.title',
+        bodyKey: 'app.subtitle',
+        choices: [{ id: 'go', labelKey: 'app.confirm', descKey: 'app.continue', apply: (s) => s }],
+      },
+    ]);
+
+    newGame(SCENARIO_DONGZHUO, 'liubei', 1);
+    gameStore.setState((s) => ({
+      ...s,
+      game: {
+        ...s.game!,
+        storyMode: STORY_MODE,
+        // The protagonist faction is gone -> checkOutcome returns 'defeat'.
+        factions: {
+          ...s.game!.factions,
+          liubei: { ...s.game!.factions['liubei']!, alive: false },
+        },
+        pendingStoryEvent: { eventId: 'grim-event', scenarioId: 's1-dongzhuo' },
+      },
+      ui: { ...s.ui, screen: { kind: 'story', eventId: 'grim-event' } },
+    }));
+
+    resolveStoryChoice('grim-event', 'go');
+
+    expect(gameStore.getState().ui.screen).toEqual({ kind: 'gameOver', outcome: 'defeat' });
+  });
+
   it('loadGame with a pending story event resumes on the story screen', () => {
     const base = buildInitialState({
       scenario: SCENARIO_DONGZHUO,

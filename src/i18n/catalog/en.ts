@@ -18,6 +18,9 @@ export const en: MessageCatalog = {
     'You are Liu Bei, magistrate of Pingyuan — one city, and two sworn brothers, Guan Yu and Zhang Fei, at your side. The Han crumbles as the tyrant Dong Zhuo holds the boy-emperor hostage and bleeds the realm. You are a man of humble birth but boundless purpose: in a world turned to chaos, a name built on virtue may yet raise a dynasty.',
   'story.ch1.transition':
     'The warlords rise, and the Han\'s mandate flickers low. From a commoner\'s beginnings you have carved a name into a world of chaos. The winds shift, and the years slip swiftly by…',
+  'story.ch1.complete.title': 'Chapter Ⅰ Complete — A Name Forged in Chaos',
+  'story.ch1.complete.body':
+    'From the magistrate of a single town, your name for honor now carries to the four seas. By faith you have gathered captains, by virtue won hearts, and amid the scramble of warlords you have found firm ground to stand. The Han is not yet restored and your great work has only begun — but the realm will not soon forget the name of Liu Xuande. The dragon has stirred; await the turning of the winds. (To be continued)',
 
   'title.newGame': 'New Game',
   'title.storyMode': 'Story Mode',

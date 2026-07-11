@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useSession } from '../hooks/useSession.js';
 import { selectGame, selectScreen, selectLocale } from '../../state/selectors.js';
-import { resolveStoryChoice, setScreen } from '../../state/store.js';
+import { clearContinuousSave, resolveStoryChoice, setScreen } from '../../state/store.js';
 import { findStoryEvent } from '../../engine/story/events.js';
 import type { StoryChoice } from '../../engine/story/types.js';
 import { t } from '../../i18n/locale.js';
@@ -118,6 +118,36 @@ export const ChapterTransitionScreen: React.FC = () => {
         </p>
         <div className="mt-8 flex flex-col gap-3">
           <button className="btn btn-primary py-3" onClick={onContinue}>
+            {t('app.continue')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Terminal celebration shown when a Story-Mode chapter is WON (all objectives
+// complete). Mirrors ChapterTransitionScreen's paper styling but ENDS the run:
+// Continue wipes the continuous autosave and returns to the title, like
+// GameOverScreen's button — Chapter Ⅱ isn't built yet, so there's nothing to
+// transition into. Distinct from the (unrouted) chapterTransition bridge.
+export const ChapterCompleteScreen: React.FC = () => {
+  useSession(selectLocale);
+  const [active, setActive] = useState(0);
+  const onDone = (): void => {
+    clearContinuousSave();
+    setScreen({ kind: 'title' });
+  };
+  useMenuKeys({ count: 1, active, setActive, onSelect: onDone });
+  return (
+    <div className="flex h-full w-full items-center justify-center px-6 py-10">
+      <div className="panel w-full max-w-2xl p-8 text-center">
+        <h2 className="font-serif text-3xl font-bold text-seal-700">{t('story.ch1.complete.title')}</h2>
+        <p className="mt-4 whitespace-pre-line text-base italic leading-relaxed text-ink-700">
+          {t('story.ch1.complete.body')}
+        </p>
+        <div className="mt-8 flex flex-col gap-3">
+          <button className="btn btn-primary py-3" onClick={onDone}>
             {t('app.continue')}
           </button>
         </div>

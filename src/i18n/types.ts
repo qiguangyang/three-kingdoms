@@ -27,6 +27,8 @@ export type MessageKey =
   | 'story.ch1.title'
   | 'story.ch1.briefing'
   | 'story.ch1.transition'
+  | 'story.ch1.complete.title'
+  | 'story.ch1.complete.body'
 
   // Title screen
   | 'title.newGame'

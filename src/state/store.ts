@@ -40,7 +40,8 @@ export type Screen =
   | { kind: 'about' }
   | { kind: 'story'; eventId: string }
   | { kind: 'briefing' } // Story-Mode opening briefing (reuses the StoryEvent modal in beat mode)
-  | { kind: 'chapterTransition' }; // "...years pass" interstitial
+  | { kind: 'chapterTransition' } // "...years pass" interstitial
+  | { kind: 'chapterComplete' }; // Story-Mode chapter-victory celebration (terminal for now)
 
 export interface UIState {
   screen: Screen;
@@ -96,6 +97,15 @@ const DIGEST_KEYS = new Set<string>([
 // Pure: significant log entries appended at or after `beforeLen`.
 export function extractDigest(beforeLen: number, log: LogEntry[]): LogEntry[] {
   return log.slice(beforeLen).filter((e) => DIGEST_KEYS.has(e.key));
+}
+
+// Shared outcome routing. A Story-Mode victory is a CHAPTER win -> the
+// celebratory chapterComplete screen; every other outcome (a Free-Play win, or
+// any defeat) -> the normal game-over. Used identically by all three
+// checkOutcome callers so routing can't drift between them.
+function outcomeScreen(outcome: 'victory' | 'defeat', game: GameState): Screen {
+  if (outcome === 'victory' && game.storyMode) return { kind: 'chapterComplete' };
+  return { kind: 'gameOver', outcome };
 }
 
 export function newGame(scenario: Scenario, playerFactionId: string, seed: number): void {
@@ -202,7 +212,7 @@ export function advanceDays(days: number): void {
     ...s,
     game: next,
     ui: outcome
-      ? { ...s.ui, screen: { kind: 'gameOver', outcome }, turnDigest: digest }
+      ? { ...s.ui, screen: outcomeScreen(outcome, next), turnDigest: digest }
       : { ...s.ui, turnDigest: digest },
   }));
 }
@@ -237,7 +247,7 @@ export function resolveStoryChoice(eventId: string, choiceId: string): void {
     ...s,
     game: next,
     ui: outcome
-      ? { ...s.ui, screen: { kind: 'gameOver', outcome } }
+      ? { ...s.ui, screen: outcomeScreen(outcome, next) }
       : { ...s.ui, screen: { kind: 'main' } },
   }));
 }
@@ -378,7 +388,7 @@ export function finishBattle(): void {
     ...s,
     game: cleared,
     battle: null,
-    ui: outcome ? { ...s.ui, screen: { kind: 'gameOver', outcome } } : { ...s.ui, screen: { kind: 'main' } },
+    ui: outcome ? { ...s.ui, screen: outcomeScreen(outcome, cleared) } : { ...s.ui, screen: { kind: 'main' } },
   }));
 }
 
