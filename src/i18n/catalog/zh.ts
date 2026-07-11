@@ -327,6 +327,7 @@ export const zh: MessageCatalog = {
 
   // Story campaign — objectives
   'objective.completed': '目标达成：{title}',
+  'objective.heading': '目标',
 
   'digest.heading': '此间天下事…',
   'digest.dismiss': '继续',

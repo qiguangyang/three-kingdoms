@@ -331,6 +331,7 @@ export const en: MessageCatalog = {
 
   // Story campaign — objectives
   'objective.completed': 'Objective complete: {title}',
+  'objective.heading': 'Objectives',
 
   'digest.heading': 'While you were occupied…',
   'digest.dismiss': 'Continue',

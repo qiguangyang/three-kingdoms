@@ -364,6 +364,7 @@ export type MessageKey =
 
   // Story campaign — objectives
   | 'objective.completed'
+  | 'objective.heading'
 
   // Between-turn digest
   | 'digest.heading'

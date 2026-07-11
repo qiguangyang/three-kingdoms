@@ -19,6 +19,7 @@ import { WorldNewsFeed } from '../components/WorldNewsFeed.js';
 import { FactionPanel } from '../components/FactionPanel.js';
 import { TurnDigest } from '../components/TurnDigest.js';
 import { FloatingPanel } from '../components/FloatingPanel.js';
+import { ObjectivesHud } from '../components/ObjectivesHud.js';
 import { factionColor } from '../theme.js';
 import { startMapMusic, stopMapMusic } from '../audio/battle.js';
 import { CommandMenu, type MenuOption } from '../components/CommandMenu.js';
@@ -346,6 +347,10 @@ export const MainScreen: React.FC = () => {
       <FloatingPanel position="right-3 bottom-3" align="right" title={t('faction.rankHeading')} bodyClass="w-80 max-h-[62vh]">
         <FactionPanel game={game} />
       </FloatingPanel>
+
+      {/* Story objectives — the "story-guided" surface. Renders nothing in
+          Free Play, where no objectives are seeded. */}
+      <ObjectivesHud game={game} />
 
       {/* On-map action buttons when a friendly city is selected; otherwise a hint. */}
       {modal.kind === 'none' && selectedCity && selectedCity.factionId === game.playerFactionId && (
