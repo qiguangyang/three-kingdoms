@@ -292,6 +292,17 @@ export type MessageKey =
   | 'battle.troops'
   | 'battle.skipHint'
 
+  // Real-time boss duel (set-piece)
+  | 'duel.hud.hp'
+  | 'duel.hud.stamina'
+  | 'duel.hud.bossHp'
+  | 'duel.boss.lvbu'
+  | 'duel.arena.hulaoguan'
+  | 'duel.result.win'
+  | 'duel.result.lose'
+  | 'duel.hint.controls'
+  | 'duel.autoResolved'
+
   // Pending operations
   | 'op.scheduled'
   | 'op.heading'
@@ -402,6 +413,12 @@ export type MessageKey =
   | 'story.s1.coalition.body'
   | 'story.s1.zhaoyun.title'
   | 'story.s1.zhaoyun.body'
+  | 'story.s1.hulaoguan.title'
+  | 'story.s1.hulaoguan.body'
+  | 'story.s1.hulaoguan.win.title'
+  | 'story.s1.hulaoguan.win.body'
+  | 'story.s1.hulaoguan.lose.title'
+  | 'story.s1.hulaoguan.lose.body'
   | 'story.s1.xuzhou.title'
   | 'story.s1.xuzhou.body'
   | 'choice.s1.xuzhou.accept.label'

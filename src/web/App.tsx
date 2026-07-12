@@ -11,6 +11,7 @@ import { SaveLoadScreen } from './screens/SaveLoadScreen.js';
 import { AboutScreen } from './screens/AboutScreen.js';
 import { GeneralsScreen } from './screens/GeneralsScreen.js';
 import { BattleScreen } from './battle/BattleScreen.js';
+import { DuelScreen } from './duel/DuelScreen.js';
 import { StoryEventModal, BriefingScreen, ChapterTransitionScreen, ChapterCompleteScreen } from './screens/StoryEventModal.js';
 
 export const App: React.FC = () => {
@@ -56,6 +57,9 @@ export const App: React.FC = () => {
       break;
     case 'battle':
       body = <BattleScreen />;
+      break;
+    case 'duel':
+      body = <DuelScreen />;
       break;
     case 'story':
       body = <StoryEventModal />;

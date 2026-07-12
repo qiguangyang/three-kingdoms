@@ -197,6 +197,18 @@ export const en: MessageCatalog = {
   'battle.dayOf': 'Day {day} / {total}',
   'battle.troops': 'Troops',
   'battle.skipHint': 'Esc to skip',
+
+  // Real-time boss duel (set-piece)
+  'duel.hud.hp': 'Health',
+  'duel.hud.stamina': 'Stamina',
+  'duel.hud.bossHp': 'Enemy',
+  'duel.boss.lvbu': 'Lü Bu',
+  'duel.arena.hulaoguan': 'Hulao Pass',
+  'duel.result.win': 'Victory',
+  'duel.result.lose': 'Defeat',
+  'duel.hint.controls': 'WASD move · J light · K heavy · Space dodge · L / Shift guard',
+  'duel.autoResolved': 'The duel is resolved.',
+
   'battle.casualties': 'Casualties',
   'battle.troopsCommitted': 'Troops committed',
   'battle.cityCaptured': '{city} has fallen to your banner.',
@@ -380,6 +392,15 @@ export const en: MessageCatalog = {
   'story.s1.zhaoyun.title': 'The Dragon of Changshan',
   'story.s1.zhaoyun.body':
     'In the churn of battle a young captain in white rides out alone, his spear striking like a dragon as he cuts his lord free from ten thousand blades — Zhao Yun of Changshan, styled Zilong. For now he serves under Gongsun Zan, yet his heart is not bound there. You share a single conversation and it is as though you have always known one another; treat him with sincerity and bind him with honor, and this dragon of Changshan may follow you all your days.',
+  'story.s1.hulaoguan.title': 'The Challenge at Hulao Pass',
+  'story.s1.hulaoguan.body':
+    "The coalition's advance breaks against Hulao Pass, where Lü Bu — mightiest warrior under heaven — rides out on Red Hare and cuts down champion after champion until no lord dares meet him. The allied banners waver. Then you spur forward with Guan Yu and Zhang Fei at your side: three sworn brothers against the invincible one. Steel your heart — this is the field on which the world will first learn your names.",
+  'story.s1.hulaoguan.win.title': 'Lü Bu Driven Off',
+  'story.s1.hulaoguan.win.body':
+    "Three blades whirl as one and even Lü Bu cannot hold — he wheels Red Hare about and flees back through the pass, and the coalition surges after him with a roar. From ten thousand throats a single cry goes up for the three brothers of Zhuo prefecture, and your name rings out across the realm. Whatever befalls hereafter, the world now knows Liu Bei, Guan Yu, and Zhang Fei.",
+  'story.s1.hulaoguan.lose.title': 'Beaten Back at the Pass',
+  'story.s1.hulaoguan.lose.body':
+    "Lü Bu's halberd is a storm none of you can weather; battered and bleeding, the three of you are driven back into the allied lines. Yet Guan and Zhang haul you clear and the coalition's assault rolls on regardless — a single duel lost is not the war. You bind your wounds, regroup among the banners, and turn your eyes once more to the road ahead. Chapter's work is far from done.",
   'story.s1.xuzhou.title': 'The Bequest of Xuzhou',
   'story.s1.xuzhou.body':
     'Tao Qian lies dying and three times presses Xuzhou upon you. It is rich country — and country every warlord covets. Take it, and overnight you rise from wandering guest to sovereign lord. Refuse it, and your name for righteousness spreads across the land — but you remain a man without a home. Mi Zhu and Chen Deng wait, needing only your word.',

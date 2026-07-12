@@ -31,6 +31,7 @@ function makeState(overrides: Partial<GameState> = {}): GameState {
     nextOpId: 1,
     aiStrategies: {},
     objectives: [],
+    duelResults: {},
     ...overrides,
   };
 }
