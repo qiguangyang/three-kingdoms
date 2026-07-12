@@ -383,3 +383,19 @@ describe('Scenario 4 (三国鼎立) roster', () => {
     expect(nextChapter('liubei', 4)).toBeUndefined();
   });
 });
+
+// Guard: a scenario's generalOverrides patches a general by id at build time,
+// but buildInitialState silently ignores an override whose id doesn't resolve
+// (unlike cityIds/generalIds, which throw). So a typo in an override id would
+// vanish undetected. Assert every override id across all scenarios resolves.
+describe('generalOverrides ids resolve', () => {
+  for (const scenario of SCENARIO_LIST) {
+    const overrides = scenario.generalOverrides;
+    if (!overrides) continue;
+    for (const id of Object.keys(overrides)) {
+      it(`${scenario.id}: override "${id}" resolves in GENERALS`, () => {
+        expect(GENERALS[id], `override id "${id}" not found in GENERALS`).toBeDefined();
+      });
+    }
+  }
+});
