@@ -39,6 +39,11 @@ export type MessageKey =
   | 'story.ch3.transition'
   | 'story.ch3.complete.title'
   | 'story.ch3.complete.body'
+  // Chapter 4 is TERMINAL — no story.ch4.transition (nothing follows the finale).
+  | 'story.ch4.title'
+  | 'story.ch4.briefing'
+  | 'story.ch4.complete.title'
+  | 'story.ch4.complete.body'
 
   // Title screen
   | 'title.newGame'
@@ -440,6 +445,24 @@ export type MessageKey =
   | 'choice.s3.borrow.take.label'
   | 'choice.s3.borrow.take.desc'
   | 'choice.s3.borrow.honor.label'
-  | 'choice.s3.borrow.honor.desc';
+  | 'choice.s3.borrow.honor.desc'
+  | 'objective.s4.proclaim.title'
+  | 'objective.s4.proclaim.desc'
+  | 'objective.s4.yiling.title'
+  | 'objective.s4.yiling.desc'
+  | 'objective.s4.northern.title'
+  | 'objective.s4.northern.desc'
+  | 'objective.s4.unify.title'
+  | 'objective.s4.unify.desc'
+  | 'story.s4.proclaim.title'
+  | 'story.s4.proclaim.body'
+  | 'story.s4.yiling.title'
+  | 'story.s4.yiling.body'
+  | 'story.s4.northern.title'
+  | 'story.s4.northern.body'
+  | 'choice.s4.yiling.launch.label'
+  | 'choice.s4.yiling.launch.desc'
+  | 'choice.s4.yiling.restraint.label'
+  | 'choice.s4.yiling.restraint.desc';
 
 export type MessageCatalog = Record<MessageKey, string>;

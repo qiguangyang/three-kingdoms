@@ -3,6 +3,7 @@ import type { StoryEvent, StoryMode } from './types.js';
 import { S1_LIUBEI_EVENTS } from '../../data/story/s1-liubei.js';
 import { S2_LIUBEI_EVENTS } from '../../data/story/s2-liubei.js';
 import { S3_LIUBEI_EVENTS } from '../../data/story/s3-liubei.js';
+import { S4_LIUBEI_EVENTS } from '../../data/story/s4-liubei.js';
 
 // Story-event overlay keyed by scenarioId. The authored production table is
 // empty for now; real narrative content is added in a later content task.
@@ -33,6 +34,7 @@ export function storyEventsFor(scenarioId: string, storyMode?: StoryMode): Story
     if (scenarioId === 's1-dongzhuo') authored = S1_LIUBEI_EVENTS;
     else if (scenarioId === 's2-junxiong') authored = S2_LIUBEI_EVENTS;
     else if (scenarioId === 's3-chibi') authored = S3_LIUBEI_EVENTS;
+    else if (scenarioId === 's4-dingli') authored = S4_LIUBEI_EVENTS;
   }
   const overlay = storyEventOverlay.get(scenarioId) ?? [];
   return [...authored, ...overlay];

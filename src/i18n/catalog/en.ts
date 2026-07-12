@@ -37,6 +37,12 @@ export const en: MessageCatalog = {
   'story.ch3.complete.title': 'Chapter Ⅲ Complete — The Dragon Leaves the Deep',
   'story.ch3.complete.body':
     "One tower of flame, and Cao Cao's eight hundred thousand went up in smoke and ash; the northern host fled home in disarray. From the lone city of Jiangxia you rose — on the Sleeping Dragon's counsel and the Southlands' pact — to wrest from a hopeless corner the ground of Jing you had wandered a lifetime without a home to hold. The realm's division into three now takes shape in shadow; yet Yi Province is untaken and the Han unrestored, and the road runs on. The dragon has left the deep at last, and the thunder stirs — it waits only for its hour to mount the clouds. (To be continued)",
+  'story.ch4.title': 'The Three Kingdoms Stand',
+  'story.ch4.briefing':
+    "Yi Province is settled; you hold Chengdu, seven cities beneath your hand, your foundation laid at last. Cao Pi has deposed the emperor and seized the throne — four centuries of the Han, snuffed out by a traitor's hand. As a scion of the imperial house and heir to its mandate, you must ascend and carry its flame, that the realm may know where right still lives. Yet Jing is lost and Lord Guan is slain, and that debt of blood cries unanswered — to take the throne and restore the dynasty, or to march east and avenge a brother? Empire and grief alike hang upon a single thought.",
+  'story.ch4.complete.title': 'Chapter Ⅳ Complete · Campaign Won — The Han Rekindled, the Oath Fulfilled',
+  'story.ch4.complete.body':
+    "The Han banner flies again over the heartland, and a world split three ways is made one at last. Look back down the road you came — the lone magistracy of Pingyuan, the borrowed walls of Xiaopei, the broken remnant at Jiangxia — and see how far a weaver of mats and seller of sandals has traveled, through exile and want, to found a dynasty. If Yunchang and Yide can hear from below, let them clap and rejoice: the oath sworn in the peach garden — to serve the state above and shelter the people below — is fulfilled at last. The flame of four Han centuries, guttering to its final ember, burns bright again because you lived. The chronicles blaze, your name undimmed, carried down a thousand years — and here the tale of the Three Kingdoms comes to its close. (The End)",
 
   'title.newGame': 'New Game',
   'title.storyMode': 'Story Mode',
@@ -439,4 +445,33 @@ export const en: MessageCatalog = {
   'choice.s3.borrow.honor.label': 'Honor the Terms',
   'choice.s3.borrow.honor.desc':
     'Cement the alliance and raise your renown, securing your flank; but your gains shrink and the road to Yi Province grows steeper.',
+
+  // Story campaign — Liu Bei Chapter 4 content (the finale, Appendix C)
+  'objective.s4.proclaim.title': 'Proclaim Shu-Han',
+  'objective.s4.proclaim.desc':
+    'Take the throne at Chengdu, name your realm "Han," and declare where the true mandate lies.',
+  'objective.s4.yiling.title': 'The Yiling Decision',
+  'objective.s4.yiling.desc':
+    'With Lord Guan unavenged and Jing still lost, decide whether to march on the Southlands.',
+  'objective.s4.northern.title': 'The Northern Expeditions',
+  'objective.s4.northern.desc':
+    'Entrust Zhuge Liang to march again on Qishan and reclaim the heartland.',
+  'objective.s4.unify.title': 'Unify the Realm',
+  'objective.s4.unify.desc':
+    'Cut down every rival, make the realm one, and restore the rivers and mountains of Han.',
+  'story.s4.proclaim.title': 'The Ascension at Chengdu',
+  'story.s4.proclaim.body':
+    'Thrice your ministers press the throne upon you, and the omens are read as favorable. South of Chengdu you raise an altar, make sacrifice to Heaven, and proclaim yourself emperor — heir to the Han\'s line, the reign styled Zhangwu, the realm still named "Han," which the age will call Shu-Han. Ten thousand voices cry your reign, and the sound shakes the land of Shu. The banners of four Han centuries fly again in the west; a weaver of mats and seller of sandals has mounted the highest seat. Yet the heartland is unreclaimed and the traitor\'s Wei still stands — and that burden weighs heavier than any crown.',
+  'story.s4.yiling.title': 'The March to Yiling',
+  'story.s4.yiling.body':
+    "Lord Guan is dead and Jing has fallen, and the grief sits like a barb that gnaws day and night. Your ministers plead: let Sun Quan keep — it is Cao's Wei that usurped the Han, and the sword should point north, not east; Zhao Yun kneels and weeps blood, begging you to weigh the altars of state above a brother's death. But the oath of the peach garden is heavy as a mountain — can it go unanswered? To pour the whole nation's army east against Wu: righteous vengeance and glory won on the rivers of Jing, or a march into ruin, camps strung out and waiting for the flame?",
+  'story.s4.northern.title': 'The Northern Expeditions',
+  'story.s4.northern.body':
+    'At Baidi the dying sovereign gave his orphan into the Chancellor\'s keeping, and Zhuge Kongming took up the charge. He steadied the boy-emperor, governed the state with a whole heart, pacified Meng Huo in the south to make the rear secure, then led the great host out through Qishan — six campaigns against the heartland. "Restore the House of Han; return to the old capital" — every word of his memorial written as if in blood. The banners point north; the grain-carts wind endless along the plank-roads of Jian\'ge. From this day the Han\'s flame is carried on by the Chancellor\'s hand, borne step by step toward Chang\'an.',
+  'choice.s4.yiling.launch.label': 'Launch the Yiling Campaign',
+  'choice.s4.yiling.launch.desc':
+    'The nation marches as one, morale ablaze, and you seize Jiangling, the gate of Jing; but strung out deep in enemy land, Lu Xun looses fire upon Xiaoting — one blaze, and your forward army is ash, your strength gutted, your young dynasty left reeling.',
+  'choice.s4.yiling.restraint.label': 'Restraint',
+  'choice.s4.yiling.restraint.desc':
+    "You master the grief that stabs, stand your men down and rest the people, hold the pact with Wu, store grain and till the fields, and turn your whole strength north toward the heartland; but Lord Guan's death goes unavenged still — a private sorrow swallowed for the greater cause.",
 };
