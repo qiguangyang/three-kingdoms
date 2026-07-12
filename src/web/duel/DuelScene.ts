@@ -64,6 +64,10 @@ function poseProgress(
 
 export interface DuelSceneOptions {
   onOutcome: (outcome: DuelOutcome) => void;
+  // Optional live-state tap: called once per rendered frame with the current
+  // DuelState so a React HUD can mirror HP / stamina without stepping the sim
+  // itself. Kept optional so the scene's headless/unit surfaces are unaffected.
+  onFrame?: (state: DuelState) => void;
 }
 
 // Camera framing constants (world units). Tuned live in Task 17.
@@ -79,6 +83,7 @@ export class DuelScene {
   private readonly boss: CharacterRig;
   private readonly shake = makeShake();
   private readonly onOutcome: (outcome: DuelOutcome) => void;
+  private readonly onFrame?: (state: DuelState) => void;
 
   private state: DuelState = createDuelState();
   private keyState: KeyState | null = null;
@@ -92,6 +97,7 @@ export class DuelScene {
 
   constructor(private readonly canvas: HTMLCanvasElement, opts: DuelSceneOptions) {
     this.onOutcome = opts.onOutcome;
+    this.onFrame = opts.onFrame;
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -216,6 +222,10 @@ export class DuelScene {
       }
       this.acc -= fixed;
     }
+
+    // Live-state tap for the HUD: emit the just-simulated state once per
+    // rendered frame (the sim itself only advances in the fixed steps above).
+    this.onFrame?.(this.state);
 
     // Sync both rigs from the simulation state (facing negated: sim yaw is
     // atan2(z, x) on the ground plane; the mesh rotates about world +y).

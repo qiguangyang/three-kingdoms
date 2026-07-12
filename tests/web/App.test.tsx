@@ -40,6 +40,22 @@ describe('App router', () => {
     expect(screen.getAllByText('曹操').length).toBeGreaterThan(0);
   });
 
+  it('routes screen.kind === "duel" to the DuelScreen, which auto-resolves without WebGL', () => {
+    // Arm a pending duel and route to it. Under jsdom there is no WebGL
+    // context (see tests/setup.ts), so DuelScreen mounts its stat-based
+    // auto-resolve fallback — proof the App route wired DuelScreen — which
+    // clears pendingDuel and routes the campaign onward (never dead-ends).
+    newGame(SCENARIO_DONGZHUO, 'caocao', 7);
+    gameStore.setState((s) => ({
+      ...s,
+      game: { ...s.game!, pendingDuel: { duelId: 'hulaoguan' } },
+      ui: { ...s.ui, screen: { kind: 'duel' } },
+    }));
+    render(<App />);
+    expect(gameStore.getState().game?.pendingDuel).toBeUndefined();
+    expect(gameStore.getState().ui.screen.kind).not.toBe('duel');
+  });
+
   it('toggleLocale: clicking 中/EN flips the language', () => {
     render(<App />);
     expect(screen.getByText('自由模式')).toBeInTheDocument();

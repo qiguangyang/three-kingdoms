@@ -292,6 +292,18 @@ export type MessageKey =
   | 'battle.troops'
   | 'battle.skipHint'
 
+  // Real-time boss duel (set-piece)
+  | 'duel.hud.hp'
+  | 'duel.hud.stamina'
+  | 'duel.hud.bossHp'
+  | 'duel.boss.lvbu'
+  | 'duel.arena.hulaoguan'
+  | 'duel.briefing.hulaoguan'
+  | 'duel.result.win'
+  | 'duel.result.lose'
+  | 'duel.hint.controls'
+  | 'duel.autoResolved'
+
   // Pending operations
   | 'op.scheduled'
   | 'op.heading'

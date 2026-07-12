@@ -193,6 +193,20 @@ export const zh: MessageCatalog = {
   'battle.dayOf': '第 {day} / {total} 日',
   'battle.troops': '兵',
   'battle.skipHint': 'Esc 跳过',
+
+  // Real-time boss duel (set-piece)
+  'duel.hud.hp': '生命',
+  'duel.hud.stamina': '气力',
+  'duel.hud.bossHp': '敌将',
+  'duel.boss.lvbu': '吕布',
+  'duel.arena.hulaoguan': '虎牢关',
+  'duel.briefing.hulaoguan':
+    '虎牢关前,吕布立马横戟,天下第一,诸侯无人敢当。你策马而出,关羽、张飞左右相随——三兄弟同心,共战无敌方天画戟。',
+  'duel.result.win': '得胜',
+  'duel.result.lose': '落败',
+  'duel.hint.controls': 'WASD 移动 · J 轻攻 · K 重攻 · 空格 闪避 · L / Shift 格挡',
+  'duel.autoResolved': '单挑已裁定。',
+
   'battle.casualties': '伤亡',
   'battle.troopsCommitted': '投入兵力',
   'battle.cityCaptured': '{city} 已归我方。',
