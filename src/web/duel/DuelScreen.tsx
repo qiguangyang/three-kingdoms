@@ -85,9 +85,13 @@ export const DuelHud: React.FC<{ state: DuelState; bossNameKey: MessageKey }> = 
 // Full-screen duel set-piece. Reads game.pendingDuel for the active duelId.
 // When WebGL is available it mounts the real-time DuelScene (via DuelCanvas)
 // under a live HUD; when it is not, it resolves the duel with the deterministic
-// stat-based fallback so the campaign stays playable without a GPU. Either way
-// the store's resolveDuel routes back into the campaign once the fight is
-// decided — so the win/lose overlay here is mostly cosmetic.
+// stat-based fallback so the campaign stays playable without a GPU.
+//
+// On the WebGL path the scene NOTIFIES us (onOutcome) the moment the duel is
+// decided but keeps rendering the settled final pose + killing-blow FX — we
+// raise the Victory/Defeat overlay and let the player dismiss it deliberately.
+// resolveDuel (which routes back into the campaign, unmounting the scene) is
+// only issued when they press Continue, so the cinematic finish actually reads.
 export const DuelScreen: React.FC = () => {
   // Re-render when the language toggles.
   useSession(selectLocale);
@@ -104,6 +108,13 @@ export const DuelScreen: React.FC = () => {
   // The HUD mirrors the scene's live state. Seeded with a fresh state so the
   // bars read full before the first frame arrives.
   const [live, setLive] = React.useState<DuelState>(() => createDuelState(DUEL_CONFIG.seed));
+
+  // The decided outcome, raised by the scene's one-shot onOutcome. Drives the
+  // after-action overlay. Kept separate from `live.outcome` so showing the card
+  // is an explicit, deliberate step — NOT a per-frame side effect — and so the
+  // scene keeps rendering the frozen final pose behind it until Continue.
+  const [result, setResult] = React.useState<DuelOutcome | null>(null);
+  const onOutcome = React.useCallback((outcome: DuelOutcome) => setResult(outcome), []);
 
   // Throttle the scene's per-frame taps down to ~15 Hz for React — smooth
   // enough for bars, far cheaper than a setState every rendered frame. The
@@ -141,7 +152,7 @@ export const DuelScreen: React.FC = () => {
   return (
     <div className="relative h-full w-full overflow-hidden" style={{ background: '#0a0d12', fontFamily: "'Noto Sans TC', system-ui, sans-serif" }}>
       <div className="absolute inset-0">
-        <DuelCanvas onFrame={onFrame} />
+        <DuelCanvas onFrame={onFrame} onOutcome={onOutcome} />
       </div>
 
       {/* Arena label — top-left. */}
@@ -153,15 +164,17 @@ export const DuelScreen: React.FC = () => {
 
       <DuelHud state={live} bossNameKey={bossNameKey} />
 
-      {live.outcome && <DuelResult outcome={live.outcome} />}
+      {result && <DuelResult outcome={result} />}
     </div>
   );
 };
 
-// After-action overlay. resolveDuel (fired by the scene's onOutcome) has already
-// routed the campaign on, so this is a brief cosmetic flourish; the Continue
-// button re-issues resolveDuel harmlessly (a no-op once pendingDuel is cleared).
-const DuelResult: React.FC<{ outcome: DuelOutcome }> = ({ outcome }) => {
+// After-action overlay, raised once the scene reports the outcome. The duel is
+// decided but NOT yet resolved into the campaign: the scene is still rendering
+// the settled final pose behind this card. Pressing Continue calls resolveDuel,
+// which clears game.pendingDuel and routes back — unmounting DuelScreen (and the
+// scene) — so the cinematic finish plays out before the player leaves it.
+export const DuelResult: React.FC<{ outcome: DuelOutcome }> = ({ outcome }) => {
   const won = outcome === 'win';
   return (
     <div className="absolute inset-0 grid place-items-center" style={{ background: 'rgba(5,7,10,.62)' }}>

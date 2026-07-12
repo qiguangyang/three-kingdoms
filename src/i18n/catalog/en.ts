@@ -204,8 +204,6 @@ export const en: MessageCatalog = {
   'duel.hud.bossHp': 'Enemy',
   'duel.boss.lvbu': 'Lü Bu',
   'duel.arena.hulaoguan': 'Hulao Pass',
-  'duel.briefing.hulaoguan':
-    'Before the gate of Hulao Pass stands Lü Bu, mightiest warrior of the age, and none of the coalition dares face him. You spur your horse forward, Guan Yu and Zhang Fei at your flanks — three sworn brothers against the invincible halberd.',
   'duel.result.win': 'Victory',
   'duel.result.lose': 'Defeat',
   'duel.hint.controls': 'WASD move · J light · K heavy · Space dodge · L / Shift guard',

@@ -298,7 +298,6 @@ export type MessageKey =
   | 'duel.hud.bossHp'
   | 'duel.boss.lvbu'
   | 'duel.arena.hulaoguan'
-  | 'duel.briefing.hulaoguan'
   | 'duel.result.win'
   | 'duel.result.lose'
   | 'duel.hint.controls'

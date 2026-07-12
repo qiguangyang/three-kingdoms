@@ -10,7 +10,6 @@ export interface DuelSetpiece {
   bossId: string; // GeneralId of the boss
   playerHeroId: string; // GeneralId of the player hero
   arenaKey: MessageKey;
-  briefingKey: MessageKey;
   onWin: (state: GameState) => GameState;
   onLose: (state: GameState) => GameState;
 }
@@ -22,11 +21,7 @@ export const DUEL_SETPIECES: Record<string, DuelSetpiece> = {
     // src/data/generals/index.ts), not `lubu`.
     bossId: 'lvbu',
     playerHeroId: 'liubei',
-    // MessageKeys authored later (Task 15). Cast via the codebase's existing
-    // pattern for not-yet-catalogued keys so the strict MessageKey union and
-    // the i18n parity test stay untouched until the catalog entries land.
-    arenaKey: 'duel.arena.hulaoguan' as MessageKey,
-    briefingKey: 'duel.briefing.hulaoguan' as MessageKey,
+    arenaKey: 'duel.arena.hulaoguan',
     onWin: (s) => s,
     onLose: (s) => s,
   },

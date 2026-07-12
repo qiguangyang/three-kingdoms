@@ -2,24 +2,30 @@ import React from 'react';
 import { DuelScene } from './DuelScene.js';
 import type { KeyState } from './input.js';
 import { hasWebGL } from '../gfx/hasWebGL.js';
-import { resolveDuel } from '../../state/store.js';
-import type { DuelState } from '../../duel/types.js';
+import type { DuelOutcome, DuelState } from '../../duel/types.js';
 
 // React <-> DuelScene bridge for the real-time boss duel. Mounts a <canvas>,
 // builds the Three.js scene once (only when WebGL is available), and:
 //   - feeds a live KeyState from window keydown/keyup (held + edge-triggered
 //     pressed sets, lowercased; the SCENE clears `pressed` each fixed sim step),
-//   - hands the scene `onOutcome` -> resolveDuel (routes back into the campaign),
+//   - forwards `onOutcome` up so the parent can raise the result overlay (the
+//     scene keeps rendering the settled final pose; the parent routes back into
+//     the campaign only when the player presses Continue),
 //   - forwards `onFrame` up so the parent can drive the HUD's live DuelState.
 // The sim is stepped entirely inside DuelScene at a fixed timestep; React never
 // steps it. Any WebGL construction failure is swallowed (belt-and-suspenders
 // beyond DuelScreen's hasWebGL() gate) so the surrounding HUD still renders.
-export const DuelCanvas: React.FC<{ onFrame: (state: DuelState) => void }> = ({ onFrame }) => {
+export const DuelCanvas: React.FC<{
+  onFrame: (state: DuelState) => void;
+  onOutcome: (outcome: DuelOutcome) => void;
+}> = ({ onFrame, onOutcome }) => {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
-  // Keep the latest onFrame without re-running the mount effect (which would
-  // tear down and rebuild the scene). The scene always calls the current one.
+  // Keep the latest callbacks without re-running the mount effect (which would
+  // tear down and rebuild the scene). The scene always calls the current ones.
   const onFrameRef = React.useRef(onFrame);
   onFrameRef.current = onFrame;
+  const onOutcomeRef = React.useRef(onOutcome);
+  onOutcomeRef.current = onOutcome;
 
   React.useEffect(() => {
     const canvas = canvasRef.current;
@@ -42,7 +48,7 @@ export const DuelCanvas: React.FC<{ onFrame: (state: DuelState) => void }> = ({ 
     let scene: DuelScene | null = null;
     try {
       scene = new DuelScene(canvas, {
-        onOutcome: resolveDuel,
+        onOutcome: (outcome) => onOutcomeRef.current(outcome),
         onFrame: (state) => onFrameRef.current(state),
       });
       scene.setKeyState(keys);

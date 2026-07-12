@@ -125,6 +125,12 @@ function poseProgress(
 }
 
 export interface DuelSceneOptions {
+  // Fired EXACTLY ONCE when the duel is decided, purely to NOTIFY the screen the
+  // fight is over (so it can raise the Victory/Defeat overlay). It must NOT be
+  // assumed to tear the scene down: the RAF keeps rendering the settled final
+  // pose + killing-blow FX afterwards, and the scene is stopped later via stop()
+  // when the screen unmounts (the player pressed Continue → resolveDuel routed
+  // back into the campaign). See the loop's outcome tail.
   onOutcome: (outcome: DuelOutcome) => void;
   // Optional live-state tap: called once per rendered frame with the current
   // DuelState so a React HUD can mirror HP / stamina without stepping the sim
@@ -378,10 +384,18 @@ export class DuelScene {
 
     this.renderer.render(this.scene, this.camera);
 
+    // The duel is decided. Notify the screen EXACTLY ONCE (the `fired` guard) so
+    // it can raise the Victory/Defeat overlay — but do NOT stop() or route here.
+    // The sim already froze (stepDuel early-returns once `outcome` is set), so we
+    // keep the RAF running purely to RENDER: the killing-blow spark burst and
+    // camera shake bleed out over the settled final pose, giving the set-piece
+    // its payoff instead of flashing past in a single frame. `this.state` is a
+    // stable reference from here on (stepDuel returns it unchanged), so the HUD's
+    // per-frame tap idles cheaply. The scene is torn down later, in stop(), when
+    // the screen unmounts after the player presses Continue.
     if (this.state.outcome && !this.fired) {
       this.fired = true;
       this.onOutcome(this.state.outcome);
-      this.stop();
     }
   };
 }
