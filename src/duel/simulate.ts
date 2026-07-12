@@ -1,4 +1,5 @@
 import { DUEL_CONFIG } from './config.js';
+import { inAttackArc } from './hitbox.js';
 import type { BossState, DuelEvent, DuelInput, DuelState, PlayerState, Vec2 } from './types.js';
 
 const C = DUEL_CONFIG;
@@ -50,29 +51,91 @@ function faceToward(from: Vec2, to: Vec2, fallback: number): number {
   return Math.atan2(dz, dx);
 }
 
-// Advances the player's locomotion + stamina for this tick and returns the new
-// player state. Attacks/dodge/guard are handled in later tasks; while the player
-// is mid-action (action !== 'idle'/'move') this still lets timers run but that
-// is wired in Task 4/6 — here the player is always idle/move.
-function stepPlayerMovement(p: PlayerState, input: DuelInput, boss: BossState, dtMs: number): PlayerState {
+type PlayerStep = { player: PlayerState; boss: BossState; events: DuelEvent[] };
+
+function playerAttackDef(action: PlayerState['action']) {
+  return action === 'heavyAttack' ? C.player.heavy : C.player.light;
+}
+
+// Advances the player's action for this tick: resolves an in-progress attack
+// (windup→active→recovery, dealing boss damage once per swing when the boss is
+// inside the arc during `active`), starts a new light/heavy attack on input
+// (gated by stamina, chaining the light combo within the combo window), or
+// falls through to locomotion + stamina regen (Task 3 behavior). Pure: reads
+// the input player/boss, returns fresh state and the events emitted.
+function stepPlayer(p0: PlayerState, input: DuelInput, boss0: BossState, dtMs: number): PlayerStep {
+  const events: DuelEvent[] = [];
   const dtSec = dtMs / 1000;
+  let p = { ...p0 };
+  let boss = boss0;
+
+  // 1) Resolve an in-progress attack.
+  if (p.attackPhase !== null && (p.action === 'lightAttack' || p.action === 'heavyAttack')) {
+    const def = playerAttackDef(p.action);
+    p.actionTimer += dtMs;
+    p.facing = faceToward(p.pos, boss.pos, p.facing);
+    if (p.attackPhase === 'windup' && p.actionTimer >= def.windupMs) {
+      p.attackPhase = 'active';
+      p.actionTimer = 0;
+    } else if (p.attackPhase === 'active') {
+      if (!p.hitThisSwing && inAttackArc(p.pos, p.facing, boss.pos, def.range, def.arc)) {
+        p.hitThisSwing = true;
+        boss = { ...boss, hp: Math.max(0, boss.hp - def.dmg) };
+        events.push({ kind: 'playerHit', at: boss.pos, amount: def.dmg });
+        if (p.action === 'lightAttack') p.comboWindow = C.player.comboWindowMs;
+      }
+      if (p.actionTimer >= def.activeMs) {
+        p.attackPhase = 'recovery';
+        p.actionTimer = 0;
+      }
+    } else if (p.attackPhase === 'recovery' && p.actionTimer >= def.recoveryMs) {
+      p.attackPhase = null;
+      p.action = 'idle';
+      p.actionTimer = 0;
+    }
+    p.comboWindow = Math.max(0, p.comboWindow - dtMs);
+    p.staminaIdle += dtMs;
+    return { player: p, boss, events };
+  }
+
+  // 2) Start a new attack.
+  const wantHeavy = input.heavy;
+  const wantLight = input.light;
+  if (wantHeavy || wantLight) {
+    const def = wantHeavy ? C.player.heavy : C.player.light;
+    if (p.stamina < def.stamina) {
+      events.push({ kind: 'staminaEmpty', at: p.pos });
+    } else {
+      p.stamina -= def.stamina;
+      p.staminaIdle = 0;
+      p.action = wantHeavy ? 'heavyAttack' : 'lightAttack';
+      p.attackPhase = 'windup';
+      p.actionTimer = 0;
+      p.hitThisSwing = false;
+      p.comboIndex = wantLight && p.comboWindow > 0 ? (p.comboIndex + 1) % C.player.comboHits : 0;
+      p.facing = faceToward(p.pos, boss.pos, p.facing);
+      events.push({ kind: 'playerSwing', at: p.pos });
+      return { player: p, boss, events };
+    }
+  }
+
+  // 3) Locomotion + stamina regen (Task 3 behavior).
   let pos = p.pos;
   let action: PlayerState['action'] = 'idle';
   const mag = Math.hypot(input.move.x, input.move.z);
   if (mag > 1e-4) {
-    const nx = input.move.x / mag;
-    const nz = input.move.z / mag;
-    pos = clampToArena({ x: p.pos.x + nx * C.player.moveSpeed * dtSec, z: p.pos.z + nz * C.player.moveSpeed * dtSec });
+    pos = clampToArena({ x: p.pos.x + (input.move.x / mag) * C.player.moveSpeed * dtSec, z: p.pos.z + (input.move.z / mag) * C.player.moveSpeed * dtSec });
     action = 'move';
   }
-  // Stamina: count idle time; regen once past the delay.
-  let staminaIdle = p.staminaIdle + dtMs;
-  let stamina = p.stamina;
-  if (staminaIdle >= C.player.staminaRegenDelayMs) {
-    stamina = Math.min(p.maxStamina, stamina + C.player.staminaRegenPerSec * dtSec);
+  p.staminaIdle += dtMs;
+  if (p.staminaIdle >= C.player.staminaRegenDelayMs) {
+    p.stamina = Math.min(p.maxStamina, p.stamina + C.player.staminaRegenPerSec * dtSec);
   }
-  const facing = faceToward(pos, boss.pos, p.facing);
-  return { ...p, pos, action, facing, stamina, staminaIdle };
+  p.comboWindow = Math.max(0, p.comboWindow - dtMs);
+  p.pos = pos;
+  p.action = action;
+  p.facing = faceToward(pos, boss.pos, p.facing);
+  return { player: p, boss, events };
 }
 
 export function stepDuel(state: DuelState, input: DuelInput, dtMs: number): { state: DuelState; events: DuelEvent[] } {
@@ -84,12 +147,7 @@ export function stepDuel(state: DuelState, input: DuelInput, dtMs: number): { st
     return { state: { ...state, hitStop: Math.max(0, state.hitStop - dtMs) }, events };
   }
 
-  const player = stepPlayerMovement(state.player, input, state.boss, dtMs);
-  // Boss is inert until Task 5.
-  const boss = state.boss;
-
-  return {
-    state: { ...state, player, boss, elapsed: state.elapsed + dtMs },
-    events,
-  };
+  const { player, boss, events: pEvents } = stepPlayer(state.player, input, state.boss, dtMs);
+  events.push(...pEvents);
+  return { state: { ...state, player, boss, elapsed: state.elapsed + dtMs }, events };
 }
