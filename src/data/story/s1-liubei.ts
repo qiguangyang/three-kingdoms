@@ -82,13 +82,57 @@ const zhaoyunBeat: StoryEvent = {
   choices: [],
 };
 
+// The Hulao Pass challenge — once the coalition has formed, Lü Bu bars the pass
+// and the three sworn brothers ride out to face him. Fires once (the framework
+// records the id when it fires; the explicit !hasEvent guard also keeps a direct
+// check() idempotent). Its apply() arms pendingDuel, and the store routes the
+// resolved beat into the real-time duel (setpiece 'hulaoguan').
+const hulaoguanChallenge: StoryEvent = {
+  id: 'ch1_hulaoguan_challenge',
+  check: (state) =>
+    hasEvent(state, 'guandong_coalition') && !hasEvent(state, 'ch1_hulaoguan_challenge'),
+  titleKey: 'story.s1.hulaoguan.title',
+  bodyKey: 'story.s1.hulaoguan.body',
+  choices: [],
+  // Continuing the beat queues the duel; the store freezes the tick and routes
+  // to the real-time duel screen (mirrors pendingStoryEvent).
+  apply: (state) => ({ ...state, pendingDuel: { duelId: 'hulaoguan' } }),
+};
+
+// Aftermath — Lü Bu driven back. Gates on the recorded duel result; optional
+// chaining so a legacy save with duelResults === undefined never throws. Fires
+// once. Purely narrative (choices: []) — Chapter 1 continues.
+const hulaoguanWin: StoryEvent = {
+  id: 'ch1_hulaoguan_win',
+  check: (state) => state.duelResults?.hulaoguan === 'win' && !hasEvent(state, 'ch1_hulaoguan_win'),
+  titleKey: 'story.s1.hulaoguan.win.title',
+  bodyKey: 'story.s1.hulaoguan.win.body',
+  choices: [],
+};
+
+// Aftermath — the brothers are beaten back and wounded, but the coalition's
+// assault presses on and Liu Bei regroups. Deliberately NOT a dead-end: a loss
+// costs pride, not the campaign. Same defensive duelResults?. access; fires once.
+const hulaoguanLose: StoryEvent = {
+  id: 'ch1_hulaoguan_lose',
+  check: (state) =>
+    state.duelResults?.hulaoguan === 'lose' && !hasEvent(state, 'ch1_hulaoguan_lose'),
+  titleKey: 'story.s1.hulaoguan.lose.title',
+  bodyKey: 'story.s1.hulaoguan.lose.body',
+  choices: [],
+};
+
 // Liu Bei — Chapter 1 story events (Appendix A). Two narrative beats deepen the
-// chapter (the coalition forming, the Dragon of Changshan), then the single
-// fateful choice of the vertical slice: Tao Qian's bequest of Xuzhou. First
-// eligible per tick fires, so beats precede the bequest in array order.
+// chapter (the coalition forming, the Dragon of Changshan), then the Hulao Pass
+// duel (challenge → win/lose aftermath), then the single fateful choice of the
+// vertical slice: Tao Qian's bequest of Xuzhou. First eligible per tick fires,
+// so the coalition-era beats precede the (much later) bequest in array order.
 export const S1_LIUBEI_EVENTS: StoryEvent[] = [
   coalitionBeat,
   zhaoyunBeat,
+  hulaoguanChallenge,
+  hulaoguanWin,
+  hulaoguanLose,
   {
     id: 'xuzhou_bequest',
     // Fires once Liu Bei has aided Xuzhou (holds a city there) and has not yet
