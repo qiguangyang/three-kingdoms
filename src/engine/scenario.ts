@@ -169,5 +169,7 @@ export function buildInitialState(opts: BuildInitialStateOptions): GameState {
     aiStrategies: {},
     // Story campaign objectives; seeded later by seedObjectives() (Task 2).
     objectives: [],
+    // Resolved duel outcomes; populated by resolveDuel as duels are fought.
+    duelResults: {},
   };
 }

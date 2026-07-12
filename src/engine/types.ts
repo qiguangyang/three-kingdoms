@@ -12,6 +12,7 @@ import type {
   GambitId,
 } from './battle/types.js';
 import type { ObjectiveState, PendingStoryEvent, StoryMode } from './story/types.js';
+import type { DuelOutcome } from '../duel/types.js'; // type-only; erased at runtime
 
 export type LocalizedString = { zh: string; en: string };
 
@@ -297,6 +298,12 @@ export interface Scenario {
   todo?: boolean;
 }
 
+// Freezes the strategic tick and routes to the real-time duel screen, exactly
+// like PendingStoryEvent. duelId indexes DUEL_SETPIECES.
+export interface PendingDuel {
+  duelId: string;
+}
+
 export interface GameState {
   scenarioId: string;
   year: number;
@@ -334,6 +341,12 @@ export interface GameState {
   // When set, time-advance is frozen until the player resolves the story
   // event (mirrors pendingBattle). Absent outside Story-Mode beats.
   pendingStoryEvent?: PendingStoryEvent;
+  // When set, time-advance is frozen until the player resolves the duel
+  // (mirrors pendingStoryEvent). duelId indexes DUEL_SETPIECES. Absent
+  // outside a scripted duel beat.
+  pendingDuel?: PendingDuel;
+  // Resolved duel outcomes keyed by duelId, for aftermath branching.
+  duelResults: Record<string, DuelOutcome>;
   // Present => Story Mode (protagonist arc); absent => Free Play.
   storyMode?: StoryMode;
 }
