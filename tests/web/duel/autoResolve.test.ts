@@ -11,8 +11,18 @@ describe('autoResolveDuel', () => {
   it('loses on an unknown duel id', () => {
     expect(autoResolveDuel('nope', 1)).toBe('lose');
   });
-  it('the brothers bias makes a win reachable across seeds', () => {
-    const outcomes = new Set(Array.from({ length: 20 }, (_, i) => autoResolveDuel('hulaoguan', i + 1)));
+  it('produces both wins and losses across seeds (a real roll, not a fixed result)', () => {
+    const outcomes = new Set(Array.from({ length: 400 }, (_, i) => autoResolveDuel('hulaoguan', i + 1)));
     expect(outcomes.has('win')).toBe(true);
+    expect(outcomes.has('lose')).toBe(true);
+  });
+  it('is a favorite but not guaranteed (~0.6–0.8 win rate over many seeds)', () => {
+    const n = 2000;
+    const wins = Array.from({ length: n }, (_, i) => autoResolveDuel('hulaoguan', i + 1)).filter(
+      (o) => o === 'win',
+    ).length;
+    const rate = wins / n;
+    expect(rate).toBeGreaterThan(0.55);
+    expect(rate).toBeLessThan(0.85);
   });
 });
