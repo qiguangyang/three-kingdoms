@@ -1,3 +1,4 @@
+import { stepBoss } from './boss.js';
 import { DUEL_CONFIG } from './config.js';
 import { inAttackArc } from './hitbox.js';
 import type { BossState, DuelEvent, DuelInput, DuelState, PlayerState, Vec2 } from './types.js';
@@ -68,6 +69,58 @@ function stepPlayer(p0: PlayerState, input: DuelInput, boss0: BossState, dtMs: n
   const dtSec = dtMs / 1000;
   let p = { ...p0 };
   let boss = boss0;
+
+  // I-frames tick down every frame (floor at 0). A dodge started this frame
+  // re-arms them below, so this decrement only bleeds an in-progress dodge.
+  p.iframes = Math.max(0, p.iframes - dtMs);
+
+  // 0) Dodge: highest-priority reaction. Cannot dodge-cancel the active frames
+  // of one's own swing; costs stamina; grants i-frames plus a directional lunge
+  // (along the move stick, or straight away from the boss when the stick is
+  // neutral).
+  const dodge = C.player.dodge;
+  if (input.dodge && p.attackPhase !== 'active' && p.stamina >= dodge.stamina) {
+    const moveMag = Math.hypot(input.move.x, input.move.z);
+    let dir: Vec2;
+    if (moveMag > 1e-4) {
+      dir = { x: input.move.x / moveMag, z: input.move.z / moveMag };
+    } else {
+      const dx = p.pos.x - boss.pos.x;
+      const dz = p.pos.z - boss.pos.z;
+      const m = Math.hypot(dx, dz) || 1;
+      dir = { x: dx / m, z: dz / m };
+    }
+    p.action = 'dodge';
+    p.attackPhase = null;
+    p.iframes = dodge.iframeMs;
+    p.actionTimer = 0;
+    p.stamina -= dodge.stamina;
+    p.staminaIdle = 0;
+    p.pos = clampToArena({ x: p.pos.x + dir.x * dodge.distance, z: p.pos.z + dir.z * dodge.distance });
+    p.comboWindow = Math.max(0, p.comboWindow - dtMs);
+    p.facing = faceToward(p.pos, boss.pos, p.facing);
+    events.push({ kind: 'dodge', at: p.pos });
+    return { player: p, boss, events };
+  }
+
+  // 0b) Advance an in-progress dodge/stagger back toward idle. I-frames were
+  // already ticked above, so this only runs the recovery timer + stamina regen.
+  if (p.action === 'dodge' || p.action === 'stagger') {
+    p.actionTimer += dtMs;
+    const durationMs = p.action === 'dodge' ? dodge.durationMs : C.player.staggerMs;
+    if (p.actionTimer >= durationMs) {
+      p.action = 'idle';
+      p.attackPhase = null;
+      p.actionTimer = 0;
+    }
+    p.comboWindow = Math.max(0, p.comboWindow - dtMs);
+    p.staminaIdle += dtMs;
+    if (p.staminaIdle >= C.player.staminaRegenDelayMs) {
+      p.stamina = Math.min(p.maxStamina, p.stamina + C.player.staminaRegenPerSec * dtSec);
+    }
+    p.facing = faceToward(p.pos, boss.pos, p.facing);
+    return { player: p, boss, events };
+  }
 
   // 1) Resolve an in-progress attack.
   if (p.attackPhase !== null && (p.action === 'lightAttack' || p.action === 'heavyAttack')) {
@@ -147,7 +200,47 @@ export function stepDuel(state: DuelState, input: DuelInput, dtMs: number): { st
     return { state: { ...state, hitStop: Math.max(0, state.hitStop - dtMs) }, events };
   }
 
-  const { player, boss, events: pEvents } = stepPlayer(state.player, input, state.boss, dtMs);
-  events.push(...pEvents);
-  return { state: { ...state, player, boss, elapsed: state.elapsed + dtMs }, events };
+  const { player: pAfter, boss: bMid, events: pEvents } = stepPlayer(state.player, input, state.boss, dtMs);
+  const { boss: bAfter, events: bEvents } = stepBoss(bMid, pAfter, dtMs);
+  let player = pAfter;
+  let boss = bAfter;
+  const outEvents: DuelEvent[] = [...pEvents, ...bEvents];
+
+  // Resolve the boss's active hitbox against the player (once per swing): i-frames
+  // negate it, a guard chips + spends stamina, otherwise a full hit + stagger.
+  if (boss.attackPhase === 'active' && !boss.hitThisSwing) {
+    const atk = C.boss.attacks[boss.action as keyof typeof C.boss.attacks];
+    if (atk && inAttackArc(boss.pos, boss.facing, player.pos, atk.range, atk.arc)) {
+      boss = { ...boss, hitThisSwing: true };
+      if (player.iframes > 0) {
+        // Avoided by dodge i-frames — no damage (the dodge event already fired).
+      } else if (input.guard && player.stamina >= C.player.guard.staminaPerHit) {
+        const chip = atk.dmg * C.player.guard.chipMul;
+        player = { ...player, hp: Math.max(0, player.hp - chip), stamina: player.stamina - C.player.guard.staminaPerHit, staminaIdle: 0 };
+        outEvents.push({ kind: 'guardDeflect', at: player.pos, amount: chip });
+      } else {
+        player = { ...player, hp: Math.max(0, player.hp - atk.dmg), action: 'stagger', attackPhase: null, actionTimer: 0 };
+        outEvents.push({ kind: 'bossHitPlayer', at: player.pos, amount: atk.dmg });
+      }
+    }
+  }
+
+  // Decisive blow: end the duel and arm the slow-mo flourish. `state.outcome`
+  // is narrowed to `null` by the guard above, so annotate to keep it assignable.
+  let outcome: DuelState['outcome'] = state.outcome;
+  let slowMo = Math.max(0, state.slowMo - dtMs);
+  if (!outcome && boss.hp <= 0) {
+    outcome = 'win';
+    slowMo = C.juice.slowMoMs;
+    outEvents.push({ kind: 'win', at: boss.pos });
+  } else if (!outcome && player.hp <= 0) {
+    outcome = 'lose';
+    slowMo = C.juice.slowMoMs;
+    outEvents.push({ kind: 'lose', at: player.pos });
+  }
+
+  return {
+    state: { ...state, player, boss, elapsed: state.elapsed + dtMs, outcome, slowMo, hitStop: state.hitStop },
+    events: outEvents,
+  };
 }
