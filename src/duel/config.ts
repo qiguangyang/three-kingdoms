@@ -7,7 +7,7 @@ export const DUEL_CONFIG = {
   player: {
     maxHp: 100,
     maxStamina: 100,
-    staminaRegenPerSec: 24,
+    staminaRegenPerSec: 28,
     staminaRegenDelayMs: 450, // no regen until this long after spending
     moveSpeed: 4.4,
     light: { dmg: 7, stamina: 12, windupMs: 90, activeMs: 90, recoveryMs: 170, range: 1.9, arc: 1.2 },
