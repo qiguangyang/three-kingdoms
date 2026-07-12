@@ -8,10 +8,19 @@
 import * as THREE from 'three';
 import { DUEL_CONFIG } from '../../duel/config.js';
 import { createDuelState, stepDuel } from '../../duel/simulate.js';
-import type { AttackPhase, DuelInput, DuelOutcome, DuelState, Vec2 } from '../../duel/types.js';
+import type { AttackPhase, DuelEvent, DuelInput, DuelOutcome, DuelState, Vec2 } from '../../duel/types.js';
 import { buildBossRig, buildHeroRig, type CharacterRig } from './characterRig.js';
 import { inputFromKeys, type KeyState } from './input.js';
 import { makeShake } from '../three/cameraShake.js';
+import {
+  playCharge,
+  playClash,
+  playDayTick,
+  playDefeatTheme,
+  playGong,
+  playRout,
+  playVictoryTheme,
+} from '../audio/battle.js';
 
 // Over-the-shoulder framing: look at a point 35% from player toward boss; the
 // camera yaw follows the player→boss vector so the boss stays framed ahead.
@@ -22,6 +31,59 @@ export function followCamTarget(playerPos: Vec2, bossPos: Vec2): { look: Vec2; c
   };
   const camOffsetYaw = Math.atan2(bossPos.z - playerPos.z, bossPos.x - playerPos.x);
   return { look, camOffsetYaw };
+}
+
+// The juice surface the event dispatcher drives. The scene supplies a real sink
+// (camera shake / Web-Audio SFX / particle burst); tests supply a spy sink.
+export interface DuelFxSink {
+  shake(intensity: number): void;
+  sfx(kind: string): void;
+  spark(at: Vec2): void;
+}
+
+// PURE event -> FX dispatcher. Maps each DuelEvent emitted by stepDuel to sink
+// calls; it performs NO side effects of its own (every effect goes through the
+// injected sink), so it is unit-testable with a spy sink and reused with the
+// scene's real sink. FX are read-only consumers of sim events — nothing here
+// feeds back into the simulation, so determinism is unaffected.
+export function applyDuelEventFx(events: DuelEvent[], sink: DuelFxSink): void {
+  for (const e of events) {
+    switch (e.kind) {
+      case 'playerHit': // the boss took damage
+        sink.shake(0.25);
+        sink.sfx('clash');
+        sink.spark(e.at);
+        break;
+      case 'bossHitPlayer': // the player took damage — hit harder
+        sink.shake(0.45);
+        sink.sfx('clash');
+        sink.spark(e.at);
+        break;
+      case 'dodge': // an airy whoosh as the hero rolls clear
+        sink.sfx('dodge');
+        break;
+      case 'guardDeflect': // a metallic clang + a shower of sparks off the guard
+        sink.sfx('guard');
+        sink.spark(e.at);
+        break;
+      case 'phaseChange': // the boss powers up: a roar and a big shake
+        sink.sfx('phase');
+        sink.shake(0.6);
+        break;
+      case 'bossTell': // subtle telegraph cue before a big swing
+        sink.sfx('tell');
+        break;
+      case 'win':
+        sink.sfx('win');
+        break;
+      case 'lose':
+        sink.sfx('lose');
+        break;
+      case 'playerSwing': // swing whoosh / empty-stamina thunk are tuned live
+      case 'staminaEmpty':
+        break;
+    }
+  }
 }
 
 const clamp01 = (t: number): number => (t < 0 ? 0 : t > 1 ? 1 : t);
@@ -82,8 +144,18 @@ export class DuelScene {
   private readonly hero: CharacterRig;
   private readonly boss: CharacterRig;
   private readonly shake = makeShake();
+  private readonly effects: DuelEffect[] = [];
   private readonly onOutcome: (outcome: DuelOutcome) => void;
   private readonly onFrame?: (state: DuelState) => void;
+
+  // Real FX sink handed to applyDuelEventFx: camera shake, procedural SFX, and a
+  // spark burst at the event position. Arrow methods so `this` binds to the
+  // scene; they only touch the renderer/audio, never the simulation.
+  private readonly fxSink: DuelFxSink = {
+    shake: (intensity) => this.shake.add(intensity),
+    sfx: (kind) => this.playSfx(kind),
+    spark: (at) => this.spawnSparks(at),
+  };
 
   private state: DuelState = createDuelState();
   private keyState: KeyState | null = null;
@@ -197,6 +269,49 @@ export class DuelScene {
     this.renderer.dispose();
   }
 
+  // Map an abstract SFX kind (from applyDuelEventFx) to a procedural battle cue.
+  // Every helper below already no-ops when audio is muted / unavailable, so this
+  // never introduces a new failure mode.
+  private playSfx(kind: string): void {
+    switch (kind) {
+      case 'clash': playClash(); break; // steel-on-steel on a landed blow
+      case 'dodge': playRout(); break; // short falling whoosh as the hero rolls
+      case 'guard': playGong(); break; // metallic clang off a raised guard
+      case 'phase': playCharge(); break; // rising rush as the boss powers up
+      case 'tell': playDayTick(); break; // subtle telegraph tick
+      case 'win': playVictoryTheme(); break;
+      case 'lose': playDefeatTheme(); break;
+      default: break;
+    }
+  }
+
+  // A short burst of bright sparks at a world-plane hit point (chest height),
+  // following the BattleScene particle idiom (additive Points + gravity + fade).
+  private spawnSparks(at: Vec2): void {
+    const N = 14;
+    const P = makeParticles(N, 0xffe3a0, 0.16);
+    for (let i = 0; i < N; i++) {
+      P.pos[i * 3] = at.x;
+      P.pos[i * 3 + 1] = 1.1; // impact roughly at torso height
+      P.pos[i * 3 + 2] = at.z;
+      const ang = fxRand() * Math.PI * 2;
+      const sp = 1.6 + fxRand() * 3.4;
+      P.vel[i * 3] = Math.cos(ang) * sp;
+      P.vel[i * 3 + 1] = 1.4 + fxRand() * 3;
+      P.vel[i * 3 + 2] = Math.sin(ang) * sp;
+    }
+    this.spawnEffect(P.points, 420, (age, dt) => {
+      advanceParticles(P, dt / 1000, 12);
+      (P.points.material as THREE.PointsMaterial).opacity = 1 - age;
+    });
+  }
+
+  private spawnEffect(obj: THREE.Object3D, life: number, update: DuelEffect['update']): void {
+    obj.frustumCulled = false;
+    this.scene.add(obj);
+    this.effects.push({ obj, born: nowMs(), life, update });
+  }
+
   private readonly loop = (now: number): void => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
@@ -216,10 +331,9 @@ export class DuelScene {
       // Edge-triggered keys (attack/dodge) fire once: clear after each fixed
       // step so a held key doesn't re-trigger on the next step this frame.
       this.keyState?.pressed.clear();
-      for (const e of events) {
-        if (e.kind === 'playerHit') this.shake.add(0.25);
-        else if (e.kind === 'bossHitPlayer') this.shake.add(0.45);
-      }
+      // Juice: shake / SFX / sparks off this substep's events. Read-only side
+      // effects — nothing here feeds back into the sim, so it stays deterministic.
+      applyDuelEventFx(events, this.fxSink);
       this.acc -= fixed;
     }
 
@@ -249,6 +363,19 @@ export class DuelScene {
     );
     this.camera.lookAt(look.x, LOOK_HEIGHT, look.z);
 
+    // Age + integrate live spark bursts; retire (and dispose) the expired ones.
+    for (let i = this.effects.length - 1; i >= 0; i--) {
+      const fx = this.effects[i]!;
+      const age = (now - fx.born) / fx.life;
+      if (age >= 1) {
+        this.scene.remove(fx.obj);
+        disposeEffect(fx.obj);
+        this.effects.splice(i, 1);
+      } else {
+        fx.update(age, dt);
+      }
+    }
+
     this.renderer.render(this.scene, this.camera);
 
     if (this.state.outcome && !this.fired) {
@@ -257,4 +384,74 @@ export class DuelScene {
       this.stop();
     }
   };
+}
+
+// ── Spark FX helpers (self-contained port of the BattleScene particle idiom) ──
+// A transient visual effect owned by the scene: an Object3D that is aged from
+// `born` to `born + life` and advanced each frame until it retires.
+interface DuelEffect {
+  obj: THREE.Object3D;
+  born: number;
+  life: number;
+  update: (age01: number, dtMs: number) => void;
+}
+
+interface Particles {
+  points: THREE.Points;
+  pos: Float32Array;
+  vel: Float32Array;
+}
+
+// An additive-blended point cloud whose position buffer is integrated by
+// advanceParticles. Kept tiny (no textures) so a burst is cheap to spawn.
+function makeParticles(count: number, color: number, size: number): Particles {
+  const pos = new Float32Array(count * 3);
+  const vel = new Float32Array(count * 3);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const material = new THREE.PointsMaterial({
+    color,
+    size,
+    transparent: true,
+    opacity: 1,
+    depthWrite: false,
+    sizeAttenuation: true,
+    blending: THREE.AdditiveBlending,
+  });
+  return { points: new THREE.Points(g, material), pos, vel };
+}
+
+// Integrate velocity (with gravity) into position and flag the buffer upload.
+function advanceParticles(p: Particles, dtSec: number, gravity: number): void {
+  const n = p.pos.length;
+  for (let i = 0; i < n; i += 3) {
+    p.vel[i + 1] = p.vel[i + 1]! - gravity * dtSec;
+    p.pos[i] = p.pos[i]! + p.vel[i]! * dtSec;
+    p.pos[i + 1] = p.pos[i + 1]! + p.vel[i + 1]! * dtSec;
+    p.pos[i + 2] = p.pos[i + 2]! + p.vel[i + 2]! * dtSec;
+  }
+  p.points.geometry.attributes.position!.needsUpdate = true;
+}
+
+// Free a retired effect's GPU resources (geometry + material).
+function disposeEffect(o: THREE.Object3D): void {
+  const mesh = o as THREE.Mesh;
+  if (mesh.geometry) mesh.geometry.dispose();
+  const mat = mesh.material;
+  if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+  else if (mat) (mat as THREE.Material).dispose();
+}
+
+function nowMs(): number {
+  return typeof performance !== 'undefined' ? performance.now() : 0;
+}
+
+// Cheap module-local PRNG for spark scatter. Entirely visual — it never touches
+// the simulation's seeded rngState, so the fight stays deterministic.
+let fxSeed = 0x2f6e2b1;
+function fxRand(): number {
+  fxSeed = (fxSeed + 0x6d2b79f5) | 0;
+  let t = Math.imul(fxSeed ^ (fxSeed >>> 15), 1 | fxSeed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
