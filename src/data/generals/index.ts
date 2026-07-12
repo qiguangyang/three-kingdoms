@@ -232,6 +232,54 @@ const S3_NEW: General[] = [
   g('pangtong', '庞统', 'Pang Tong', [40, 96, 85, 75], 29, 'infantry', 40, 'chaisang'),
 ];
 
+// Scenario 4 (三国鼎立, 220 CE) new general records. Same rule as S2_NEW/S3_NEW:
+// added to GENERALS so their ids resolve, but deliberately NOT wired into any
+// FACTION_GENERAL_IDS array — Scenario 4 references them via inline generalIds in
+// its scenario file, keeping Scenario 1/2/3 shared rosters byte-identical.
+// Ownership is assigned by the scenario loader (factionId stays null here).
+// dengai@xiangping and zhonghui@luoyang are WILD-style searchers (loyalty 40 + a
+// locationCityId), found in a specific city like the WILD entries above. The lords
+// caopi and gongsunyuan carry loyalty 100; jiangwei carries loyalty 60 (Wei assigns
+// it inline in Task 2). Guan Yu is intentionally omitted (dead 219).
+const S4_NEW: General[] = [
+  // Wei
+  g('caopi', '曹丕', 'Cao Pi', [60, 82, 80, 88], 33, 'cavalry', 100),
+  g('caozhen', '曹真', 'Cao Zhen', [85, 78, 88, 65], 35, 'cavalry'),
+  g('caoxiu', '曹休', 'Cao Xiu', [84, 70, 84, 60], 42, 'cavalry'),
+  g('simashi', '司马师', 'Sima Shi', [60, 72, 68, 62], 12, 'infantry'),
+  g('simazhao', '司马昭', 'Sima Zhao', [55, 66, 62, 60], 9, 'infantry'),
+  g('manchong', '满宠', 'Man Chong', [75, 82, 85, 80], 58, 'infantry'),
+  g('tianyu', '田豫', 'Tian Yu', [80, 80, 85, 70], 50, 'cavalry'),
+  g('qianzhao', '牵招', 'Qian Zhao', [80, 76, 82, 68], 50, 'cavalry'),
+  g('zhongyao', '钟繇', 'Zhong Yao', [25, 85, 70, 92], 69, 'infantry'),
+  g('huaxin', '华歆', 'Hua Xin', [20, 80, 55, 90], 63, 'infantry'),
+  g('wanglang', '王朗', 'Wang Lang', [25, 78, 55, 88], 64, 'infantry'),
+  g('jiangwei', '姜维', 'Jiang Wei', [88, 90, 90, 70], 18, 'cavalry', 60),
+  g('dengai', '邓艾', 'Deng Ai', [84, 90, 90, 78], 23, 'infantry', 40, 'xiangping'),
+  g('zhonghui', '钟会', 'Zhong Hui', [75, 90, 85, 80], 15, 'infantry', 40, 'luoyang'),
+  // Shu
+  g('huangzhong', '黄忠', 'Huang Zhong', [92, 60, 82, 45], 72, 'archer'),
+  g('weiyan', '魏延', 'Wei Yan', [90, 76, 88, 50], 42, 'infantry'),
+  g('jiangwan', '蒋琬', 'Jiang Wan', [20, 84, 75, 92], 36, 'infantry'),
+  g('feiyi', '费祎', 'Fei Yi', [25, 85, 70, 90], 25, 'infantry'),
+  g('dongyun', '董允', 'Dong Yun', [20, 80, 55, 88], 26, 'infantry'),
+  g('maliang', '马良', 'Ma Liang', [25, 88, 70, 85], 33, 'infantry'),
+  g('masu', '马谡', 'Ma Su', [40, 82, 68, 72], 30, 'infantry'),
+  g('wangping', '王平', 'Wang Ping', [80, 70, 84, 50], 28, 'infantry'),
+  g('zhangni', '张嶷', 'Zhang Ni', [78, 75, 80, 65], 28, 'infantry'),
+  g('liaohua', '廖化', 'Liao Hua', [77, 62, 72, 48], 30, 'infantry'),
+  g('guanxing', '关兴', 'Guan Xing', [85, 65, 78, 55], 20, 'cavalry'),
+  g('zhangbao', '张苞', 'Zhang Bao', [86, 45, 72, 40], 20, 'cavalry'),
+  // Wu
+  g('xusheng', '徐盛', 'Xu Sheng', [82, 72, 82, 55], 40, 'navy'),
+  g('dingfeng', '丁奉', 'Ding Feng', [85, 68, 80, 45], 24, 'navy'),
+  g('panzhang', '潘璋', 'Pan Zhang', [84, 55, 76, 40], 45, 'navy'),
+  g('zhugejin', '诸葛瑾', 'Zhuge Jin', [25, 82, 72, 85], 46, 'infantry'),
+  g('buzhi', '步骘', 'Bu Zhi', [30, 80, 70, 85], 44, 'infantry'),
+  // Liaodong
+  g('gongsunyuan', '公孙渊', 'Gongsun Yuan', [68, 62, 70, 60], 25, 'cavalry', 100),
+];
+
 const ALL = [
   ...DONG,
   ...YUAN_SHAO,
@@ -251,6 +299,7 @@ const ALL = [
   ...WILD,
   ...S2_NEW,
   ...S3_NEW,
+  ...S4_NEW,
 ];
 
 // Return the first id that appears more than once, or null if all are unique.

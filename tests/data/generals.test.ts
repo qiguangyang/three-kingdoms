@@ -161,6 +161,106 @@ describe('Scenario 3 new general records (Appendix A)', () => {
   });
 });
 
+// Appendix A (Phase 5 plan): the 32 Scenario-4 (三国鼎立, 220 CE) general records.
+// Same rule as S2_NEW/S3_NEW — they must resolve in GENERALS but must NOT be added
+// to any FACTION_GENERAL_IDS array (Scenario 4 references them via inline
+// generalIds, keeping Scenario 1/2/3 rosters byte-identical). Ownership is assigned
+// by the scenario loader (factionId stays null here). dengai@xiangping and
+// zhonghui@luoyang are WILD-style (loyalty 40 + a locationCityId); the lords caopi
+// and gongsunyuan carry loyalty 100; jiangwei carries loyalty 60 (Wei assigns it
+// inline in Task 2).
+const S4_NEW_EXPECTED: ExpectedGeneral[] = [
+  // Wei
+  { id: 'caopi', zh: '曹丕', en: 'Cao Pi', stats: [60, 82, 80, 88], age: 33, troopType: 'cavalry', locationCityId: null, loyalty: 100 },
+  { id: 'caozhen', zh: '曹真', en: 'Cao Zhen', stats: [85, 78, 88, 65], age: 35, troopType: 'cavalry', locationCityId: null },
+  { id: 'caoxiu', zh: '曹休', en: 'Cao Xiu', stats: [84, 70, 84, 60], age: 42, troopType: 'cavalry', locationCityId: null },
+  { id: 'simashi', zh: '司马师', en: 'Sima Shi', stats: [60, 72, 68, 62], age: 12, troopType: 'infantry', locationCityId: null },
+  { id: 'simazhao', zh: '司马昭', en: 'Sima Zhao', stats: [55, 66, 62, 60], age: 9, troopType: 'infantry', locationCityId: null },
+  { id: 'manchong', zh: '满宠', en: 'Man Chong', stats: [75, 82, 85, 80], age: 58, troopType: 'infantry', locationCityId: null },
+  { id: 'tianyu', zh: '田豫', en: 'Tian Yu', stats: [80, 80, 85, 70], age: 50, troopType: 'cavalry', locationCityId: null },
+  { id: 'qianzhao', zh: '牵招', en: 'Qian Zhao', stats: [80, 76, 82, 68], age: 50, troopType: 'cavalry', locationCityId: null },
+  { id: 'zhongyao', zh: '钟繇', en: 'Zhong Yao', stats: [25, 85, 70, 92], age: 69, troopType: 'infantry', locationCityId: null },
+  { id: 'huaxin', zh: '华歆', en: 'Hua Xin', stats: [20, 80, 55, 90], age: 63, troopType: 'infantry', locationCityId: null },
+  { id: 'wanglang', zh: '王朗', en: 'Wang Lang', stats: [25, 78, 55, 88], age: 64, troopType: 'infantry', locationCityId: null },
+  { id: 'jiangwei', zh: '姜维', en: 'Jiang Wei', stats: [88, 90, 90, 70], age: 18, troopType: 'cavalry', locationCityId: null, loyalty: 60 },
+  { id: 'dengai', zh: '邓艾', en: 'Deng Ai', stats: [84, 90, 90, 78], age: 23, troopType: 'infantry', locationCityId: 'xiangping', loyalty: 40 },
+  { id: 'zhonghui', zh: '钟会', en: 'Zhong Hui', stats: [75, 90, 85, 80], age: 15, troopType: 'infantry', locationCityId: 'luoyang', loyalty: 40 },
+  // Shu
+  { id: 'huangzhong', zh: '黄忠', en: 'Huang Zhong', stats: [92, 60, 82, 45], age: 72, troopType: 'archer', locationCityId: null },
+  { id: 'weiyan', zh: '魏延', en: 'Wei Yan', stats: [90, 76, 88, 50], age: 42, troopType: 'infantry', locationCityId: null },
+  { id: 'jiangwan', zh: '蒋琬', en: 'Jiang Wan', stats: [20, 84, 75, 92], age: 36, troopType: 'infantry', locationCityId: null },
+  { id: 'feiyi', zh: '费祎', en: 'Fei Yi', stats: [25, 85, 70, 90], age: 25, troopType: 'infantry', locationCityId: null },
+  { id: 'dongyun', zh: '董允', en: 'Dong Yun', stats: [20, 80, 55, 88], age: 26, troopType: 'infantry', locationCityId: null },
+  { id: 'maliang', zh: '马良', en: 'Ma Liang', stats: [25, 88, 70, 85], age: 33, troopType: 'infantry', locationCityId: null },
+  { id: 'masu', zh: '马谡', en: 'Ma Su', stats: [40, 82, 68, 72], age: 30, troopType: 'infantry', locationCityId: null },
+  { id: 'wangping', zh: '王平', en: 'Wang Ping', stats: [80, 70, 84, 50], age: 28, troopType: 'infantry', locationCityId: null },
+  { id: 'zhangni', zh: '张嶷', en: 'Zhang Ni', stats: [78, 75, 80, 65], age: 28, troopType: 'infantry', locationCityId: null },
+  { id: 'liaohua', zh: '廖化', en: 'Liao Hua', stats: [77, 62, 72, 48], age: 30, troopType: 'infantry', locationCityId: null },
+  { id: 'guanxing', zh: '关兴', en: 'Guan Xing', stats: [85, 65, 78, 55], age: 20, troopType: 'cavalry', locationCityId: null },
+  { id: 'zhangbao', zh: '张苞', en: 'Zhang Bao', stats: [86, 45, 72, 40], age: 20, troopType: 'cavalry', locationCityId: null },
+  // Wu
+  { id: 'xusheng', zh: '徐盛', en: 'Xu Sheng', stats: [82, 72, 82, 55], age: 40, troopType: 'navy', locationCityId: null },
+  { id: 'dingfeng', zh: '丁奉', en: 'Ding Feng', stats: [85, 68, 80, 45], age: 24, troopType: 'navy', locationCityId: null },
+  { id: 'panzhang', zh: '潘璋', en: 'Pan Zhang', stats: [84, 55, 76, 40], age: 45, troopType: 'navy', locationCityId: null },
+  { id: 'zhugejin', zh: '诸葛瑾', en: 'Zhuge Jin', stats: [25, 82, 72, 85], age: 46, troopType: 'infantry', locationCityId: null },
+  { id: 'buzhi', zh: '步骘', en: 'Bu Zhi', stats: [30, 80, 70, 85], age: 44, troopType: 'infantry', locationCityId: null },
+  // Liaodong
+  { id: 'gongsunyuan', zh: '公孙渊', en: 'Gongsun Yuan', stats: [68, 62, 70, 60], age: 25, troopType: 'cavalry', locationCityId: null, loyalty: 100 },
+];
+
+describe('Scenario 4 new general records (Appendix A)', () => {
+  it('adds exactly 32 records', () => {
+    expect(S4_NEW_EXPECTED).toHaveLength(32);
+  });
+
+  it.each(S4_NEW_EXPECTED)(
+    'general $id resolves in GENERALS with the exact Appendix A stats',
+    (exp) => {
+      const gen = GENERALS[exp.id];
+      expect(gen, `Missing general ${exp.id}`).toBeDefined();
+      expect(gen.name).toEqual({ zh: exp.zh, en: exp.en });
+      expect(gen.stats).toEqual({
+        wu: exp.stats[0],
+        zhi: exp.stats[1],
+        tong: exp.stats[2],
+        zheng: exp.stats[3],
+      });
+      expect(gen.age).toBe(exp.age);
+      expect(gen.troopType).toBe(exp.troopType);
+      expect(gen.locationCityId).toBe(exp.locationCityId);
+      expect(gen.loyalty).toBe(exp.loyalty ?? 80);
+      // Ownership is assigned by the scenario loader, never baked into the record.
+      expect(gen.factionId).toBeNull();
+    },
+  );
+
+  it('makes dengai@xiangping and zhonghui@luoyang WILD-style (loyalty 40 + locationCityId)', () => {
+    expect(GENERALS['dengai'].loyalty).toBe(40);
+    expect(GENERALS['dengai'].locationCityId).toBe('xiangping');
+    expect(GENERALS['zhonghui'].loyalty).toBe(40);
+    expect(GENERALS['zhonghui'].locationCityId).toBe('luoyang');
+  });
+
+  it('makes the lords caopi and gongsunyuan loyalty 100, and jiangwei loyalty 60', () => {
+    expect(GENERALS['caopi'].loyalty).toBe(100);
+    expect(GENERALS['gongsunyuan'].loyalty).toBe(100);
+    expect(GENERALS['jiangwei'].loyalty).toBe(60);
+  });
+
+  it('does NOT add any of the 32 to Scenario 1/2/3 rosters (FACTION_GENERAL_IDS unchanged)', () => {
+    const newIds = new Set(S4_NEW_EXPECTED.map((e) => e.id));
+    for (const id of FACTION_GENERAL_IDS.caocao) {
+      expect(newIds.has(id), `s4 general ${id} leaked into FACTION_GENERAL_IDS.caocao`).toBe(false);
+    }
+    // Belt-and-braces: none of the 32 appear in ANY faction roster array.
+    for (const [factionId, ids] of Object.entries(FACTION_GENERAL_IDS)) {
+      for (const id of ids) {
+        expect(newIds.has(id), `s4 general ${id} leaked into FACTION_GENERAL_IDS.${factionId}`).toBe(false);
+      }
+    }
+  });
+});
+
 // Guard: GENERALS is assembled via Object.fromEntries (last-wins), so a
 // duplicate id would silently overwrite an existing officer and change another
 // scenario's roster undetected. findDuplicateId + a module-init throw prevent it.
