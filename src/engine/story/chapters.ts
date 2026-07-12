@@ -17,12 +17,15 @@ export interface ChapterDef {
 
 // Per-protagonist chapter arcs, in play order. Liu Bei's campaign runs
 // Chapter 1 (董卓 / s1-dongzhuo) -> Chapter 2 (群雄逐鹿 / s2-junxiong) ->
-// Chapter 3 (赤壁之战 / s3-chibi); later phases extend the array with Chapter 4+.
+// Chapter 3 (赤壁之战 / s3-chibi) -> Chapter 4 (三国鼎立 / s4-dingli), the
+// finale and terminal chapter. Registering Chapter 4 flips a Chapter-3 win from
+// terminal (chapterComplete) to a bridge (chapterTransition) into the finale.
 export const CHAPTERS: Record<FactionId, ChapterDef[]> = {
   liubei: [
     { chapter: 1, scenarioId: 's1-dongzhuo' },
     { chapter: 2, scenarioId: 's2-junxiong' },
     { chapter: 3, scenarioId: 's3-chibi' },
+    { chapter: 4, scenarioId: 's4-dingli' },
   ],
 };
 

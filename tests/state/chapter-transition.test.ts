@@ -15,11 +15,12 @@ afterEach(() => {
 });
 
 describe('chapter registry', () => {
-  it('registers Liu Bei chapters 1, 2 and 3 with their scenarios', () => {
+  it('registers Liu Bei chapters 1, 2, 3 and 4 (the finale) with their scenarios', () => {
     expect(CHAPTERS.liubei).toEqual([
       { chapter: 1, scenarioId: 's1-dongzhuo' },
       { chapter: 2, scenarioId: 's2-junxiong' },
       { chapter: 3, scenarioId: 's3-chibi' },
+      { chapter: 4, scenarioId: 's4-dingli' },
     ]);
   });
 
@@ -27,12 +28,15 @@ describe('chapter registry', () => {
     expect(chapterScenarioId('liubei', 1)).toBe('s1-dongzhuo');
     expect(chapterScenarioId('liubei', 2)).toBe('s2-junxiong');
     expect(chapterScenarioId('liubei', 3)).toBe('s3-chibi');
+    expect(chapterScenarioId('liubei', 4)).toBe('s4-dingli');
   });
 
   it('nextChapter returns the following chapter def, or undefined at the end of the arc', () => {
     expect(nextChapter('liubei', 1)).toEqual({ chapter: 2, scenarioId: 's2-junxiong' });
     expect(nextChapter('liubei', 2)).toEqual({ chapter: 3, scenarioId: 's3-chibi' });
-    expect(nextChapter('liubei', 3)).toBeUndefined();
+    expect(nextChapter('liubei', 3)).toEqual({ chapter: 4, scenarioId: 's4-dingli' });
+    // Chapter 4 is the finale — the terminal chapter, with nothing after it.
+    expect(nextChapter('liubei', 4)).toBeUndefined();
   });
 
   it('returns undefined for unknown protagonists / chapters', () => {
