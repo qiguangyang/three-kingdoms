@@ -67,9 +67,8 @@ describe('ObjectivesHud', () => {
     const game: GameState = { ...base, scenarioId: SCENARIO_DONGZHUO.id, storyMode, objectives };
 
     render(<ObjectivesHud game={game} />);
-    // The panel is a collapsed pill (FloatingPanel) — its only button is the
-    // toggle. Expand it to reveal the objective list.
-    fireEvent.click(screen.getByRole('button'));
+    // The story guide is expanded by default (see the dedicated test below), so
+    // the objective list is visible without interaction.
 
     // Both active objectives are listed by title, with no completion check.
     const firstTitle = screen.getByText(t(first.titleKey));
@@ -86,5 +85,30 @@ describe('ObjectivesHud', () => {
 
     // The pill header shows a 1/3 completed-of-total count (hidden excluded).
     expect(screen.getByText('1/3')).toBeInTheDocument();
+  });
+
+  // Regression: the objectives HUD is the Story-Mode "guide". It must be visible
+  // the moment the campaign map opens — not hidden behind a collapsed pill the
+  // player has to discover and click. It stays user-collapsible.
+  it('shows the objective list expanded by default, and stays collapsible', () => {
+    newGame(SCENARIO_DONGZHUO, 'liubei', 1);
+    const base = gameStore.getState().game as GameState;
+    setTestObjectives(SCENARIO_DONGZHUO.id, [
+      { id: 'obj-a', titleKey: 'menu.internalAffairs', descKey: 'menu.develop', check: () => false },
+    ]);
+    const storyMode: StoryMode = { protagonistFactionId: 'liubei', chapter: 1 };
+    const objectives: ObjectiveState[] = [{ id: 'obj-a', status: 'active' }];
+    const game: GameState = { ...base, scenarioId: SCENARIO_DONGZHUO.id, storyMode, objectives };
+
+    render(<ObjectivesHud game={game} />);
+
+    // No click needed: the objective title is on screen and the toggle reads open.
+    expect(screen.getByText(t('menu.internalAffairs'))).toBeInTheDocument();
+    expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'true');
+
+    // The player can still collapse it to clear the map.
+    fireEvent.click(screen.getByRole('button'));
+    expect(screen.queryByText(t('menu.internalAffairs'))).toBeNull();
+    expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'false');
   });
 });

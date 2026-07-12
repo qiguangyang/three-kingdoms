@@ -33,6 +33,10 @@ export const ObjectivesHud: React.FC<{ game: GameState }> = ({ game }) => {
   const done = items.filter((it) => it.state.status === 'complete').length;
   return (
     <FloatingPanel
+      // The objectives HUD is the Story-Mode guide — it only renders when there
+      // are objectives (never in Free Play), so open it by default. The player
+      // sees their goals the moment the map opens, and can still collapse it.
+      defaultOpen
       position="left-1/2 top-3 -translate-x-1/2"
       bodyClass="w-80 max-h-[46vh]"
       title={
