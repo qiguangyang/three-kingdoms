@@ -185,6 +185,10 @@ export function schedulePlayerCommand(
       });
     }
     case 'hireWild':
+    // Story choices are applied immediately on the store's command path
+    // (see applyStoryChoice, Task 5); they are never scheduled as a
+    // PendingOp. This no-op keeps the switch exhaustive.
+    case 'storyChoice':
     case 'endTurn':
       return state;
   }
@@ -211,6 +215,13 @@ export function tickDays(
   let next = state;
   for (let i = 0; i < daysToAdvance; i++) {
     if (next.pendingBattle) break; // a player battle is owed; stop advancing
+    // A story decision is owed; stop advancing. INTENTIONALLY taken at the
+    // MONTH BOUNDARY (non-atomic, unlike pendingBattle's mid-day deferral):
+    // runScenarioEvents sets pendingStoryEvent during the month rollover, so
+    // that firing month's settlement/AI/turn all complete exactly once before
+    // we freeze here on the NEXT loop iteration. Do NOT "fix" this to freeze
+    // earlier — the month must settle once, not be re-run on resume.
+    if (next.pendingStoryEvent) break;
     next = tickOneDay(next, agents, options);
   }
   return next;

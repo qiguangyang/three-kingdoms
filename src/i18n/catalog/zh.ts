@@ -3,7 +3,7 @@ import type { MessageCatalog } from '../types.js';
 // Chinese UI strings. {var} placeholders are interpolated by t(key, vars).
 export const zh: MessageCatalog = {
   'app.title': '三国',
-  'app.subtitle': '终端战棋策略 · 致敬《三国霸业》',
+  'app.subtitle': '群雄逐鹿 · 谋定天下',
   'app.pressKey': '按任意键继续',
   'app.confirm': '确认',
   'app.cancel': '取消',
@@ -13,7 +13,40 @@ export const zh: MessageCatalog = {
   'app.continue': '继续',
   'app.quitConfirm': '确认退出?',
 
+  'story.ch1.title': '董卓弄权',
+  'story.ch1.briefing':
+    '你是平原县令刘备，坐拥一城，身边只有关羽、张飞两位结义兄弟。汉室倾颓，董卓挟天子以令诸侯，暴虐四海。你出身寒微，却胸怀匡扶社稷之志——乱世将起，正是仁义立名之时。',
+  'story.ch1.transition':
+    '群雄纷起，汉祚将倾。你以一介布衣立身乱世，名已初显。风云变幻，数载春秋倏忽而过……',
+  'story.ch1.complete.title': '第一章 · 义名初立',
+  'story.ch1.complete.body':
+    '从平原一城之令，到义名传于四海——你以信义聚将，以仁德收心，于群雄割据之间立稳了脚跟。汉室未复，霸业方兴，然天下已然记住"刘玄德"三字。潜龙已动，且待风云再起。（未完待续）',
+  'story.ch2.title': '群雄逐鹿',
+  'story.ch2.briefing':
+    '吕布背信夺城，你痛失徐州，寄身小沛，进退失据。北有曹操虎视，东有吕布反覆，你如浮萍飘摇于群雄之间。然大丈夫能屈能伸——潜龙在渊，静待腾云之时。',
+  'story.ch2.transition':
+    '猛虎之侧，你终未沦为鹰犬。挣脱牢笼，仍无寸土可依，然志向愈坚。颠沛流离间，数载又已成空……',
+  'story.ch2.complete.title': '第二章 · 蛟龙脱困',
+  'story.ch2.complete.body':
+    '你曾寄人篱下，与虎谋皮，青梅煮酒之间几遭窥破，终以韬晦全身。今吕布已诛，牢笼已破，你虽仍无立锥之地，然羽翼渐丰、人心愈附。潜龙未升，风雷已隐隐可闻。（未完待续）',
+  'story.ch3.title': '火烧赤壁',
+  'story.ch3.briefing':
+    '三顾茅庐，你终得卧龙诸葛亮辅佐，如鱼得水。然曹操已挥师南下，八十万大军压境，荆州震动。孤军难支，唯有东联孙权、共抗强曹，方能于绝境中觅得生机——成败在此一举。',
+  'story.ch3.transition':
+    '赤壁一炬，曹操北归，天下三分之势已成。你终有荆州立足，龙已离渊。风云际会，数载光阴转瞬即逝……',
+  'story.ch3.complete.title': '第三章 完 — 龙已离渊',
+  'story.ch3.complete.body':
+    '一炬冲天，八十万曹军樯橹灰飞，北师仓皇遁归。你自江夏孤城而起，赖卧龙之谋、东吴之盟，终于绝境之中夺得荆州立足之地——飘泊半生，今始有寸土可守。天下三分之势已隐然成形，然益州未取、汉室未兴，前路犹长。潜龙已离深渊，云雷方动，只待乘时而上……（未完待续）',
+  'story.ch4.title': '三国鼎立',
+  'story.ch4.briefing':
+    '益州已定，你坐镇成都，七城尽归麾下，基业初成。曹丕废帝篡位，汉祚断绝，四百年社稷竟亡于逆臣之手。你身负中山靖王之后、汉室正统，当继大位、承汉家之火，以正天下视听。然荆州已失，云长殒身，血仇未雪——是登基兴复、还于旧都，还是提兵东下、为兄弟雪恨？王业与私情，皆系于你一念之间。',
+  'story.ch4.complete.title': '第四章 完 · 战役达成 — 汉祚重光，桃园圆梦',
+  'story.ch4.complete.body':
+    '汉旗重扬于中原，三分之世终归一统。回望来路——平原一令、小沛孤城、江夏残兵，你自织席贩履之微，历尽颠沛流离，终成一代开国之君。云长、翼德泉下有知，当拊掌相庆：桃园结义之誓，「上报国家，下安黎庶」，今日终得圆满。汉室四百年之火，几灭而复燃，皆赖有此身。青史煌煌，英名不朽，永载千秋——三国的故事，至此落幕。（全剧终）',
+
   'title.newGame': '新游戏',
+  'title.storyMode': '剧情模式',
+  'title.freePlay': '自由模式',
   'title.loadGame': '读取存档',
   'title.about': '关于',
   'title.quit': '退出',
@@ -319,6 +352,102 @@ export const zh: MessageCatalog = {
   'map.legend.city': '城池',
   'map.legend.capital': '治所',
 
+  // Story campaign — objectives
+  'objective.completed': '目标达成：{title}',
+  'objective.heading': '目标',
+
   'digest.heading': '此间天下事…',
   'digest.dismiss': '继续',
+
+  // 剧情战役 — 刘备第一章内容（附录 A）
+  'objective.s1.coalition.title': '响应义盟',
+  'objective.s1.coalition.desc': '加入讨董联军，以微薄之力立于天下诸侯之列。',
+  'objective.s1.zhaoyun.title': '三顾常山',
+  'objective.s1.zhaoyun.desc': '于乱军之中结识赵云，广纳英才。',
+  'objective.s1.xuzhouAid.title': '驰援徐州',
+  'objective.s1.xuzhouAid.desc': '应陶谦之请，率军解徐州之围，以信义动人心。',
+  'objective.s1.foundation.title': '抉择基业',
+  'objective.s1.foundation.desc': '面对陶谦让州之请，决定进退。',
+  'story.s1.coalition.title': '关东义盟',
+  'story.s1.coalition.body':
+    '董卓废立天子、鸩杀太后，四海共愤。关东十八路诸侯歃血为盟，共推袁绍为盟主，旌旗蔽野，同讨国贼。你率关、张二弟，引数百乡勇，随公孙瓒之军奔赴盟坛——势虽单薄，亦誓要在这讨逆的洪流中留下名姓。',
+  'story.s1.zhaoyun.title': '常山赵子龙',
+  'story.s1.zhaoyun.body':
+    '乱军之中，一员白袍小将单枪匹马，枪出如龙，于万军之内救主而还——常山赵云，字子龙。他此时寄身公孙瓒麾下，然其志不在于此。你与他一席倾谈，恍如故交；若能以诚相待、以义相结，这条常山之龙，或将随你一世。',
+  'story.s1.xuzhou.title': '陶谦让徐州',
+  'story.s1.xuzhou.body':
+    '陶谦病笃，三让徐州于你。徐州乃四战之地，富庶却众目睽睽。取之，则一夕由客将而为诸侯；辞之，则仁名传遍天下，然基业无着。糜竺、陈登拱手相候，只待你一言。',
+  'choice.s1.xuzhou.accept.label': '受徐州',
+  'choice.s1.xuzhou.accept.desc': '获徐州六城与钱粮，即刻成为一方诸侯；然树大招风，吕布、曹操皆将侧目而视。',
+  'choice.s1.xuzhou.decline.label': '辞徐州',
+  'choice.s1.xuzhou.decline.desc': '声望大涨，天下归心，日后招贤纳士事半功倍；然仅得小沛一城，基业微薄，前路艰难。',
+
+  // 剧情战役 — 刘备第二章内容（附录 C）
+  'objective.s2.outlastLvbu.title': '周旋吕布',
+  'objective.s2.outlastLvbu.desc': '在吕布反覆无常的威胁下保全部众，待其伏诛。',
+  'objective.s2.shelter.title': '归附许都',
+  'objective.s2.shelter.desc': '投奔曹操，暂借其势以图后计。',
+  'objective.s2.plumWine.title': '煮酒论英雄',
+  'objective.s2.plumWine.desc': '于曹操青梅煮酒之宴上藏锋守拙，择定进退。',
+  'objective.s2.breakFree.title': '脱身立业',
+  'objective.s2.breakFree.desc': '觅得时机，摆脱曹操掌控，另图基业。',
+  'story.s2.shelter.title': '屈身许都',
+  'story.s2.shelter.body':
+    '小沛难守，你束装北上，投于曹操麾下。曹操表你为豫州牧，赠以兵粮，使还小沛以御吕布。程昱进言宜早除之，曹操却笑而不纳：「方今收英雄之时，杀一人而失天下之心，不可。」你谢过而退，心知这虎穴之中，一言一行皆在人耳目之下。',
+  'story.s2.plumwine.title': '青梅煮酒论英雄',
+  'story.s2.plumwine.body':
+    '曹操设宴，青梅煮酒，忽以箸指你与他曰：「今天下英雄，唯使君与操耳。」雷声骤至，你借惊雷失箸，俯身拾之，掩尽锋芒。宴罢，你思忖：是趁袁术北上之机，请兵脱身、自立门户，还是暂作鹰犬、深藏不露？',
+  'choice.s2.plumwine.break.label': '脱身自立',
+  'choice.s2.plumwine.break.desc': '重夺本部兵马，趁势袭取徐州为根基；然自此与曹操决裂，成其心腹之患，追兵将至。',
+  'choice.s2.plumwine.bide.label': '蛰伏许都',
+  'choice.s2.plumwine.bide.desc': '得曹操资粮扶持，实力稳步积累，安全无虞；然久居人下，行止受制，坐失良机则将永为附庸。',
+
+  // 剧情战役 — 刘备第三章内容（附录 C）
+  'objective.s3.longzhong.title': '隆中定策',
+  'objective.s3.longzhong.desc': '采纳诸葛亮「跨有荆益、三分天下」之大略。',
+  'objective.s3.alliance.title': '联吴抗曹',
+  'objective.s3.alliance.desc': '遣诸葛亮出使江东，促成孙刘联盟。',
+  'objective.s3.burnFleet.title': '火烧赤壁',
+  'objective.s3.burnFleet.desc': '借东风之利，以火攻大破曹军水寨。',
+  'objective.s3.claimJing.title': '略定荆州',
+  'objective.s3.claimJing.desc': '趁曹操败退，抉择如何取得荆州之地。',
+  'story.s3.longzhong.title': '隆中对策',
+  'story.s3.longzhong.body':
+    '草庐之中，诸葛亮为你铺开天下大势：「曹操拥百万之众，挟天子以令诸侯，此诚不可与争锋；孙权据有江东，可为援而不可图。唯荆、益二州沃野千里，可跨而有之——西和诸戎，南抚夷越，外结孙权，内修政理，则霸业可成，汉室可兴。」一席之言，如拨云见日。你离席长揖：先生之言，孤如鱼得水。',
+  'story.s3.alliance.title': '孙刘联盟',
+  'story.s3.alliance.body':
+    '诸葛亮孤身过江，舌战群儒，激孙权、说周瑜。江东主战主和，争论不休；终是鲁肃力主抗曹，周瑜慷慨请缨，孙权拔剑斫案：「敢再言降曹者，与此案同！」孙刘之盟遂成。周瑜起三万水军溯江而上，与你会师夏口，共御北来之众——绝境之中，终有并肩之人。',
+  'story.s3.eastwind.title': '借东风',
+  'story.s3.eastwind.body':
+    '隆冬之月，江上尽刮西北风，火攻无从借力。诸葛亮筑坛作法，披发仗剑——三更时分，风向骤转东南。黄盖诈降，以蒙冲斗舰十艘满载薪草膏油，乘风纵火，直扑曹军连环船阵。顷刻烈焰腾空，火借风势，樯橹相连尽成焦土；曹军人马烧溺，死者无数。八十万大军，一夕而溃。赤壁之下，火光烛天。',
+  'story.s3.borrow.title': '借荆州',
+  'story.s3.borrow.body':
+    '赤壁功成，荆州空虚。诸葛亮献计：可向东吴「借」荆州以为根本，名为暂借，实则难还。鲁肃诚意相商，孙权势大难违。取之则据战略要地、进可图益州；然背信之名一旦坐实，孙刘联盟恐生裂痕。',
+  'choice.s3.borrow.take.label': '借荆州',
+  'choice.s3.borrow.take.desc': '立得荆州数郡为立业根基，兵精粮足、进取有路；然埋下东吴索还之患，日后同盟离心，恐招兵祸。',
+  'choice.s3.borrow.honor.label': '守盟约',
+  'choice.s3.borrow.honor.desc': '巩固孙刘联盟，声望大增，东南无后顾之忧；然所得之地大减，扩张受限，图取益州之路更为艰难。',
+
+  // 剧情战役 — 刘备第四章内容（终章，附录 C）
+  'objective.s4.proclaim.title': '继统称帝',
+  'objective.s4.proclaim.desc': '于成都即皇帝位，立国号「汉」，昭告天下正统所在。',
+  'objective.s4.yiling.title': '夷陵抉择',
+  'objective.s4.yiling.desc': '云长之仇未报、荆州之失犹痛，决意是否兴兵伐吴。',
+  'objective.s4.northern.title': '北伐中原',
+  'objective.s4.northern.desc': '委诸葛亮六出祁山，兴师北向，图复中原。',
+  'objective.s4.unify.title': '一统山河',
+  'objective.s4.unify.desc': '剪灭群雄，混一宇内，重整汉家河山。',
+  'story.s4.proclaim.title': '登基称帝',
+  'story.s4.proclaim.body':
+    '群臣三劝，谶纬呈瑞。你于成都武担之南筑坛告天，称帝续统，改元章武，国号仍称「汉」——世谓之蜀汉。文武山呼，声震巴蜀。四百年汉家旌旗，今日重扬于西土；织席贩履之身，终登九五之位。然中原未复、逆魏犹存，这一副担子，比帝冕更沉。',
+  'story.s4.yiling.title': '夷陵之征',
+  'story.s4.yiling.body':
+    '云长败亡、荆州陷落，此仇如刺，昼夜噬心。群臣力谏：孙权可缓，曹魏乃篡汉国贼，当北伐而非东征；赵云叩首泣血，愿陛下以社稷为重。然桃园一诺，义重如山，岂容坐视不报？倾举国之师东下伐吴——是快意恩仇、扬威荆楚，还是自蹈险地、连营待焚？',
+  'story.s4.northern.title': '六出祁山',
+  'story.s4.northern.body':
+    '白帝托孤，丞相受命。诸葛孔明抚孤主、总国政，励精图治，南征孟获而后方遂安，乃率大军出祁山，六伐中原。「兴复汉室，还于旧都」——出师一表，字字泣血。旌旗指北，粮车络绎于剑阁栈道之间。汉家的火种，自此由丞相之手，向着长安一路擎去。',
+  'choice.s4.yiling.launch.label': '兴兵伐吴',
+  'choice.s4.yiling.launch.desc': '举国同仇，士气如虹，长驱直取荆州门户江陵；然孤军深入、连营数百里，陆逊纵火猇亭，一炬之下前军尽墨，国力大损、社稷动摇。',
+  'choice.s4.yiling.restraint.label': '隐忍图强',
+  'choice.s4.yiling.restraint.desc': '强忍锥心之痛，罢兵息民，固盟东吴、积粮劝农，倾力北向以图中原；然云长之仇终未得雪，君臣抱恨，唯以大局隐忍私情。',
 };

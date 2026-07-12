@@ -3,7 +3,7 @@ import type { MessageCatalog } from '../types.js';
 // English UI strings. {var} placeholders are interpolated by t(key, vars).
 export const en: MessageCatalog = {
   'app.title': 'Three Kingdoms',
-  'app.subtitle': 'A TUI strategy game — tribute to Three Kingdoms Hegemony',
+  'app.subtitle': 'Warlords clash — strategize to rule the realm',
   'app.pressKey': 'Press any key to continue',
   'app.confirm': 'Confirm',
   'app.cancel': 'Cancel',
@@ -13,7 +13,40 @@ export const en: MessageCatalog = {
   'app.continue': 'Continue',
   'app.quitConfirm': 'Quit the game?',
 
+  'story.ch1.title': 'The Tyrant\'s Shadow',
+  'story.ch1.briefing':
+    'You are Liu Bei, magistrate of Pingyuan — one city, and two sworn brothers, Guan Yu and Zhang Fei, at your side. The Han crumbles as the tyrant Dong Zhuo holds the boy-emperor hostage and bleeds the realm. You are a man of humble birth but boundless purpose: in a world turned to chaos, a name built on virtue may yet raise a dynasty.',
+  'story.ch1.transition':
+    'The warlords rise, and the Han\'s mandate flickers low. From a commoner\'s beginnings you have carved a name into a world of chaos. The winds shift, and the years slip swiftly by…',
+  'story.ch1.complete.title': 'Chapter Ⅰ Complete — A Name Forged in Chaos',
+  'story.ch1.complete.body':
+    'From the magistrate of a single town, your name for honor now carries to the four seas. By faith you have gathered captains, by virtue won hearts, and amid the scramble of warlords you have found firm ground to stand. The Han is not yet restored and your great work has only begun — but the realm will not soon forget the name of Liu Xuande. The dragon has stirred; await the turning of the winds. (To be continued)',
+  'story.ch2.title': 'Among Wolves',
+  'story.ch2.briefing':
+    "Lü Bu has betrayed you and seized your seat; Xuzhou is lost, and you shelter in Xiaopei with nowhere firm to stand. Cao Cao watches from the north like a tiger; Lü Bu turns his coat again to the east. You drift like duckweed among the mighty. Yet a great man bends before he rises — the dragon waits in the deep for the hour to mount the clouds.",
+  'story.ch2.transition':
+    'Beside the tiger, you never became its hound. You have slipped the cage — landless still, but harder of purpose than before. Through wandering and want, the years fall away once more…',
+  'story.ch2.complete.title': 'Chapter Ⅱ Complete — The Dragon Slips the Snare',
+  'story.ch2.complete.body':
+    "You lived under another's roof and bargained with a tiger; over plums and warm wine your heart was nearly read, yet you veiled it and came through whole. Lü Bu is dead now and the snare is broken, and though you still hold no ground to call your own, your wings have thickened and hearts turn ever more to you. The dragon has not yet risen — but thunder is already faint on the wind. (To be continued)",
+  'story.ch3.title': 'The Fires of Red Cliffs',
+  'story.ch3.briefing':
+    'After three visits to his thatched hut, you have won Zhuge Liang, the Sleeping Dragon — a fish that has found its water at last. But Cao Cao marches south with a host said to number eight hundred thousand, and Jing Province trembles. Alone you cannot stand; only by binding an alliance with Sun Quan can you find life in a hopeless place. All hangs on this single stroke.',
+  'story.ch3.transition':
+    "One blaze at Red Cliffs sent Cao Cao north, and the realm's division into three is sealed. Jing Province is yours to stand upon at last — the dragon has left the deep. Fortune gathers, and a few short years race past…",
+  'story.ch3.complete.title': 'Chapter Ⅲ Complete — The Dragon Leaves the Deep',
+  'story.ch3.complete.body':
+    "One tower of flame, and Cao Cao's eight hundred thousand went up in smoke and ash; the northern host fled home in disarray. From the lone city of Jiangxia you rose — on the Sleeping Dragon's counsel and the Southlands' pact — to wrest from a hopeless corner the ground of Jing you had wandered a lifetime without a home to hold. The realm's division into three now takes shape in shadow; yet Yi Province is untaken and the Han unrestored, and the road runs on. The dragon has left the deep at last, and the thunder stirs — it waits only for its hour to mount the clouds. (To be continued)",
+  'story.ch4.title': 'The Three Kingdoms Stand',
+  'story.ch4.briefing':
+    "Yi Province is settled; you hold Chengdu, seven cities beneath your hand, your foundation laid at last. Cao Pi has deposed the emperor and seized the throne — four centuries of the Han, snuffed out by a traitor's hand. As a scion of the imperial house and heir to its mandate, you must ascend and carry its flame, that the realm may know where right still lives. Yet Jing is lost and Lord Guan is slain, and that debt of blood cries unanswered — to take the throne and restore the dynasty, or to march east and avenge a brother? Empire and grief alike hang upon a single thought.",
+  'story.ch4.complete.title': 'Chapter Ⅳ Complete · Campaign Won — The Han Rekindled, the Oath Fulfilled',
+  'story.ch4.complete.body':
+    "The Han banner flies again over the heartland, and a world split three ways is made one at last. Look back down the road you came — the lone magistracy of Pingyuan, the borrowed walls of Xiaopei, the broken remnant at Jiangxia — and see how far a weaver of mats and seller of sandals has traveled, through exile and want, to found a dynasty. If Yunchang and Yide can hear from below, let them clap and rejoice: the oath sworn in the peach garden — to serve the state above and shelter the people below — is fulfilled at last. The flame of four Han centuries, guttering to its final ember, burns bright again because you lived. The chronicles blaze, your name undimmed, carried down a thousand years — and here the tale of the Three Kingdoms comes to its close. (The End)",
+
   'title.newGame': 'New Game',
+  'title.storyMode': 'Story Mode',
+  'title.freePlay': 'Free Play',
   'title.loadGame': 'Load Save',
   'title.about': 'About',
   'title.quit': 'Quit',
@@ -323,6 +356,122 @@ export const en: MessageCatalog = {
   'map.legend.city': 'City',
   'map.legend.capital': 'Seat',
 
+  // Story campaign — objectives
+  'objective.completed': 'Objective complete: {title}',
+  'objective.heading': 'Objectives',
+
   'digest.heading': 'While you were occupied…',
   'digest.dismiss': 'Continue',
+
+  // Story campaign — Liu Bei Chapter 1 content (Appendix A)
+  'objective.s1.coalition.title': 'Answer the Call',
+  'objective.s1.coalition.desc':
+    'Join the coalition against Dong Zhuo and take your place among the lords of the realm.',
+  'objective.s1.zhaoyun.title': 'Find the Dragon of Changshan',
+  'objective.s1.zhaoyun.desc': 'Meet Zhao Yun amid the fighting and win a warrior to your cause.',
+  'objective.s1.xuzhouAid.title': "Ride to Xuzhou's Aid",
+  'objective.s1.xuzhouAid.desc':
+    "Answer Tao Qian's plea, break the siege, and let your honor speak for you.",
+  'objective.s1.foundation.title': 'A Foundation Offered',
+  'objective.s1.foundation.desc': 'Decide your answer when Tao Qian offers you his province.',
+  'story.s1.coalition.title': 'The Guandong Coalition',
+  'story.s1.coalition.body':
+    "Dong Zhuo has cast down one emperor to enthrone a puppet and poisoned the dowager — and the realm rises in fury. Across the eastern passes eighteen lords swear a blood-oath and raise Yuan Shao as their chief; their banners darken the fields as they march upon the traitor. You bring your sworn brothers Guan and Zhang and a few hundred village men, riding under Gongsun Zan's colors to the muster — small among the mighty, yet resolved that your name, too, shall be written into this reckoning.",
+  'story.s1.zhaoyun.title': 'The Dragon of Changshan',
+  'story.s1.zhaoyun.body':
+    'In the churn of battle a young captain in white rides out alone, his spear striking like a dragon as he cuts his lord free from ten thousand blades — Zhao Yun of Changshan, styled Zilong. For now he serves under Gongsun Zan, yet his heart is not bound there. You share a single conversation and it is as though you have always known one another; treat him with sincerity and bind him with honor, and this dragon of Changshan may follow you all your days.',
+  'story.s1.xuzhou.title': 'The Bequest of Xuzhou',
+  'story.s1.xuzhou.body':
+    'Tao Qian lies dying and three times presses Xuzhou upon you. It is rich country — and country every warlord covets. Take it, and overnight you rise from wandering guest to sovereign lord. Refuse it, and your name for righteousness spreads across the land — but you remain a man without a home. Mi Zhu and Chen Deng wait, needing only your word.',
+  'choice.s1.xuzhou.accept.label': 'Accept Xuzhou',
+  'choice.s1.xuzhou.accept.desc':
+    "Gain Xuzhou's cities plus treasury and grain — a true warlord at once; but a tall tree draws the wind, and Lü Bu and Cao Cao now turn their eyes upon you.",
+  'choice.s1.xuzhou.decline.label': 'Decline Xuzhou',
+  'choice.s1.xuzhou.decline.desc':
+    'Renown soars and hearts turn to you — recruiting worthy men grows far easier hereafter; but you hold only Xiaopei, a slender foundation for a hard road.',
+
+  // Story campaign — Liu Bei Chapter 2 content (Appendix C)
+  'objective.s2.outlastLvbu.title': 'Outlast Lü Bu',
+  'objective.s2.outlastLvbu.desc':
+    "Keep your people whole under the treacherous warlord's shadow until the wolf is put down.",
+  'objective.s2.shelter.title': 'Shelter in Xudu',
+  'objective.s2.shelter.desc': 'Take refuge with Cao Cao and borrow his strength while you plan.',
+  'objective.s2.plumWine.title': 'The Plum-Wine Reckoning',
+  'objective.s2.plumWine.desc':
+    "At Cao Cao's table, hide your ambition, play the harmless man, and choose your course.",
+  'objective.s2.breakFree.title': 'Break the Leash',
+  'objective.s2.breakFree.desc':
+    "Seize the moment to slip Cao Cao's grasp and win a base to fight from.",
+  'story.s2.shelter.title': 'Under the Roof at Xudu',
+  'story.s2.shelter.body':
+    'Xiaopei cannot hold, so you gather your baggage, ride north, and place yourself under Cao Cao. He names you Governor of Yu Province, grants you soldiers and grain, and sends you back to Xiaopei to bar Lü Bu\'s road. Cheng Yu urges him to cut you down early; Cao Cao only laughs it off — "This is the hour to gather heroes; to kill one man and lose the realm\'s heart will not do." You bow your thanks and withdraw, knowing that in this tiger\'s den every word and glance is watched.',
+  'story.s2.plumwine.title': 'Green Plums and Warm Wine',
+  'story.s2.plumwine.body':
+    'Cao Cao lays out green plums and warm wine, then points his chopsticks from himself to you: "The only heroes in this realm today are you and I." Thunder cracks — you let your chopsticks fall as if startled, stoop to gather them, and bury your fear beneath the storm. When the cup is set down you weigh it: seize on Yuan Shu\'s northward flight to beg an army and break away on your own — or bide as his hound a while longer, your claws sheathed?',
+  'choice.s2.plumwine.break.label': 'Break Free',
+  'choice.s2.plumwine.break.desc':
+    'Reclaim your own troops and snatch Xuzhou for a foothold; but you break with Cao Cao for good — you become the thorn in his side, and his pursuers will come.',
+  'choice.s2.plumwine.bide.label': 'Bide Your Time',
+  'choice.s2.plumwine.bide.desc':
+    "Cao Cao's grain and gold let your strength grow in safety; but under another's roof, linger too long and you may remain a vassal forever.",
+
+  // Story campaign — Liu Bei Chapter 3 content (Appendix C)
+  'objective.s3.longzhong.title': 'The Longzhong Plan',
+  'objective.s3.longzhong.desc':
+    "Embrace Zhuge Liang's grand design — hold Jing and Yi, and split the realm in three.",
+  'objective.s3.alliance.title': 'Forge the Alliance',
+  'objective.s3.alliance.desc':
+    'Send Zhuge Liang to the Southlands and bind Sun and Liu against Cao Cao.',
+  'objective.s3.burnFleet.title': 'Burn the Fleet',
+  'objective.s3.burnFleet.desc':
+    "Ride the east wind and shatter Cao Cao's chained ships with fire.",
+  'objective.s3.claimJing.title': 'Claim Jing Province',
+  'objective.s3.claimJing.desc': 'As Cao Cao reels, decide how you take the land of Jing.',
+  'story.s3.longzhong.title': 'The Longzhong Reply',
+  'story.s3.longzhong.body':
+    'In the thatched hut Zhuge Liang unrolls the shape of the age before you: "Cao Cao commands a host of a million and holds the Son of Heaven to command the lords — him you cannot meet head-on. Sun Quan is dug into the Southlands, an ally to lean on, not a prize to seize. But Jing and Yi are a thousand li of rich earth, and both may be yours to hold — make peace westward, soothe the tribes of the south, bind Sun Quan without and order your rule within, and a hegemon\'s work is done, the Han may yet be raised." The words part cloud from sun. You rise and bow low: With you, Master, I am a fish that has found its water.',
+  'story.s3.alliance.title': 'The Southlands Pact',
+  'story.s3.alliance.body':
+    'Zhuge Liang crosses the river alone, matching wits against a hall of scholars, goading Sun Quan and swaying Zhou Yu. The Southlands quarrel without end, surrender against war — until Lu Su holds firm for resistance, Zhou Yu begs the command, and Sun Quan hacks the corner from his desk: "The next man to speak of yielding to Cao ends as this table does!" So the pact of Sun and Liu is sealed. Zhou Yu raises thirty thousand marines and sails upriver to join you at Xiakou, one front against the north — in a hopeless hour, shoulders at last beside your own.',
+  'story.s3.eastwind.title': 'The East Wind',
+  'story.s3.eastwind.body':
+    "Deep in winter the river wind blew only from the northwest, and fire had nothing to ride. Zhuge Liang raised an altar and worked his rites, hair loose and sword in hand — and at the third watch the wind wheeled hard to the southeast. Huang Gai feigned surrender, ran ten fire-ships heaped with brushwood and oil before the wind, and drove them into Cao Cao's chained fleet. In a breath the flames leapt sky-high; wind fed fire, and the linked hulls burned to a single field of ash; Cao's men and horses were consumed or drowned past counting. Eight hundred thousand, undone in a night. Beneath the Red Cliffs, the fire lit the heavens.",
+  'story.s3.borrow.title': 'The Borrowing of Jing',
+  'story.s3.borrow.body':
+    'Red Cliffs is won, and Jing Province lies open. Zhuge Liang counsels: "borrow" Jing from the Southlands as your foothold — lent in name, but hard ever to return. Lu Su bargains in good faith, and Sun Quan is too strong to cross lightly. Take it, and you hold the strategic key to advancing on Yi Province; but let the name of oath-breaker stick, and the alliance may crack.',
+  'choice.s3.borrow.take.label': 'Borrow Jingzhou',
+  'choice.s3.borrow.take.desc':
+    "Win several commanderies of Jing as the base you have long lacked; but plant the seed of the Southlands' resentment — a fractured alliance may one day bring war.",
+  'choice.s3.borrow.honor.label': 'Honor the Terms',
+  'choice.s3.borrow.honor.desc':
+    'Cement the alliance and raise your renown, securing your flank; but your gains shrink and the road to Yi Province grows steeper.',
+
+  // Story campaign — Liu Bei Chapter 4 content (the finale, Appendix C)
+  'objective.s4.proclaim.title': 'Proclaim Shu-Han',
+  'objective.s4.proclaim.desc':
+    'Take the throne at Chengdu, name your realm "Han," and declare where the true mandate lies.',
+  'objective.s4.yiling.title': 'The Yiling Decision',
+  'objective.s4.yiling.desc':
+    'With Lord Guan unavenged and Jing still lost, decide whether to march on the Southlands.',
+  'objective.s4.northern.title': 'The Northern Expeditions',
+  'objective.s4.northern.desc':
+    'Entrust Zhuge Liang to march again on Qishan and reclaim the heartland.',
+  'objective.s4.unify.title': 'Unify the Realm',
+  'objective.s4.unify.desc':
+    'Cut down every rival, make the realm one, and restore the rivers and mountains of Han.',
+  'story.s4.proclaim.title': 'The Ascension at Chengdu',
+  'story.s4.proclaim.body':
+    'Thrice your ministers press the throne upon you, and the omens are read as favorable. South of Chengdu you raise an altar, make sacrifice to Heaven, and proclaim yourself emperor — heir to the Han\'s line, the reign styled Zhangwu, the realm still named "Han," which the age will call Shu-Han. Ten thousand voices cry your reign, and the sound shakes the land of Shu. The banners of four Han centuries fly again in the west; a weaver of mats and seller of sandals has mounted the highest seat. Yet the heartland is unreclaimed and the traitor\'s Wei still stands — and that burden weighs heavier than any crown.',
+  'story.s4.yiling.title': 'The March to Yiling',
+  'story.s4.yiling.body':
+    "Lord Guan is dead and Jing has fallen, and the grief sits like a barb that gnaws day and night. Your ministers plead: let Sun Quan keep — it is Cao's Wei that usurped the Han, and the sword should point north, not east; Zhao Yun kneels and weeps blood, begging you to weigh the altars of state above a brother's death. But the oath of the peach garden is heavy as a mountain — can it go unanswered? To pour the whole nation's army east against Wu: righteous vengeance and glory won on the rivers of Jing, or a march into ruin, camps strung out and waiting for the flame?",
+  'story.s4.northern.title': 'The Northern Expeditions',
+  'story.s4.northern.body':
+    'At Baidi the dying sovereign gave his orphan into the Chancellor\'s keeping, and Zhuge Kongming took up the charge. He steadied the boy-emperor, governed the state with a whole heart, pacified Meng Huo in the south to make the rear secure, then led the great host out through Qishan — six campaigns against the heartland. "Restore the House of Han; return to the old capital" — every word of his memorial written as if in blood. The banners point north; the grain-carts wind endless along the plank-roads of Jian\'ge. From this day the Han\'s flame is carried on by the Chancellor\'s hand, borne step by step toward Chang\'an.',
+  'choice.s4.yiling.launch.label': 'Launch the Yiling Campaign',
+  'choice.s4.yiling.launch.desc':
+    'The nation marches as one, morale ablaze, and you seize Jiangling, the gate of Jing; but strung out deep in enemy land, Lu Xun looses fire upon Xiaoting — one blaze, and your forward army is ash, your strength gutted, your young dynasty left reeling.',
+  'choice.s4.yiling.restraint.label': 'Restraint',
+  'choice.s4.yiling.restraint.desc':
+    "You master the grief that stabs, stand your men down and rest the people, hold the pact with Wu, store grain and till the fields, and turn your whole strength north toward the heartland; but Lord Guan's death goes unavenged still — a private sorrow swallowed for the greater cause.",
 };

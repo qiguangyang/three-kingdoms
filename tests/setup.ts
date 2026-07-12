@@ -17,6 +17,16 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     } as unknown as typeof ResizeObserver;
 }
 
+// jsdom does not implement Element.scrollIntoView. Several list screens
+// auto-scroll the active item into view via useEffect; provide a no-op shim
+// so those effects don't throw under test.
+if (
+  typeof Element !== 'undefined' &&
+  typeof Element.prototype.scrollIntoView !== 'function'
+) {
+  Element.prototype.scrollIntoView = function scrollIntoView() {};
+}
+
 // jsdom does not implement canvas getContext (it throws a noisy "Not
 // implemented" error). Stub it to return null so WebGL-capability detection
 // (hasWebGL) resolves cleanly to "unavailable" and the battle view falls back

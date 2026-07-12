@@ -54,6 +54,72 @@ describe('scenario s1-dongzhuo', () => {
     expect(state.cities['pingyuan']!.generals).toContain('liubei');
   });
 
+  it('applies generalOverrides (era-variant stats) at build time', () => {
+    // sunce is a teenager in the base GENERALS table; scenario-level
+    // overrides let a later era load an adult variant without mutating the
+    // shared base or Scenario 1.
+    const base = buildInitialState({
+      scenario: SCENARIO_DONGZHUO,
+      playerFactionId: 'dongzhuo',
+      refData: REF_DATA,
+      seed: 1,
+    });
+    const baseSunce = base.generals['sunce']!;
+    // Sanity: the base record is the teenaged version.
+    expect(baseSunce.age).toBe(13);
+
+    const overridden = buildInitialState({
+      scenario: {
+        ...SCENARIO_DONGZHUO,
+        generalOverrides: {
+          sunce: {
+            stats: { wu: 92, zhi: 75, tong: 88, zheng: 70 },
+            age: 21,
+          },
+        },
+      },
+      playerFactionId: 'dongzhuo',
+      refData: REF_DATA,
+      seed: 1,
+    });
+    const sunce = overridden.generals['sunce']!;
+    expect(sunce.stats.wu).toBe(92);
+    expect(sunce.age).toBe(21);
+
+    // A build WITHOUT the override is left untouched (Scenario 1 unaffected)
+    // and the base GENERALS table was not mutated.
+    expect(base.generals['sunce']!.stats.wu).toBe(baseSunce.stats.wu);
+    expect(base.generals['sunce']!.age).toBe(13);
+  });
+
+  it('shallow-merges a partial stats override, keeping other dims', () => {
+    const base = buildInitialState({
+      scenario: SCENARIO_DONGZHUO,
+      playerFactionId: 'dongzhuo',
+      refData: REF_DATA,
+      seed: 1,
+    });
+    const baseSunce = base.generals['sunce']!;
+
+    const overridden = buildInitialState({
+      scenario: {
+        ...SCENARIO_DONGZHUO,
+        generalOverrides: { sunce: { stats: { wu: 99 } } },
+      },
+      playerFactionId: 'dongzhuo',
+      refData: REF_DATA,
+      seed: 1,
+    });
+    const sunce = overridden.generals['sunce']!;
+    // Overridden dimension replaced; the rest come from the base record.
+    expect(sunce.stats.wu).toBe(99);
+    expect(sunce.stats.zhi).toBe(baseSunce.stats.zhi);
+    expect(sunce.stats.tong).toBe(baseSunce.stats.tong);
+    expect(sunce.stats.zheng).toBe(baseSunce.stats.zheng);
+    // Fields not present in the patch are unchanged.
+    expect(sunce.age).toBe(baseSunce.age);
+  });
+
   it('refuses to build a todo (stub) scenario', () => {
     expect(() =>
       buildInitialState({

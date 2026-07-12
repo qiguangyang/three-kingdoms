@@ -1,5 +1,16 @@
-import type { City, Faction, GameState, General, GeneralId, FactionId, LocalizedString } from './types.js';
+import type {
+  City,
+  Faction,
+  GameState,
+  General,
+  GeneralId,
+  FactionId,
+  LocalizedString,
+  VictoryCondition,
+} from './types.js';
 import { citiesOf } from './map.js';
+import { SCENARIOS } from '../data/scenarios/index.js';
+import { objectivesFor } from './story/objectives.js';
 
 // Derived queries on GameState. All pure, side-effect free.
 
@@ -51,10 +62,55 @@ export function aliveFactions(state: GameState): Faction[] {
   return Object.values(state.factions).filter(isAlive);
 }
 
+// Victory for `factionId` under the effective VictoryCondition.
+//   unify    — own every city on the map.
+//   dominate — own >= cityCount cities AND hold all requiredCityIds.
+//   historic — every non-optional objective of the active scenario/storyMode
+//              is 'complete' in state.objectives (the story chapter's win).
+// A scenario missing from the registry falls back to unify.
+//
+// A Story-Mode game (state.storyMode set) ALWAYS wins by its authored objective
+// arc — the "historic route" — regardless of the scenario's declared victory
+// (which governs Free Play). So s1-dongzhuo's declared unify only applies to a
+// Free-Play game; a Story-Mode player wins the moment the chapter's objectives
+// complete, without conquering every city.
 export function hasVictory(state: GameState, factionId: FactionId): boolean {
-  const owned = citiesOf(state, factionId).length;
-  const total = Object.keys(state.cities).length;
-  return owned === total;
+  const scenario = SCENARIOS[state.scenarioId];
+  const victory: VictoryCondition = scenario?.victory ?? { kind: 'unify' };
+  const kind = state.storyMode ? 'historic' : victory.kind;
+  const ownedCities = citiesOf(state, factionId);
+  const ownedCount = ownedCities.length;
+
+  switch (kind) {
+    case 'unify': {
+      const total = Object.keys(state.cities).length;
+      return ownedCount === total;
+    }
+    case 'dominate': {
+      const need = victory.cityCount ?? Object.keys(state.cities).length;
+      if (ownedCount < need) return false;
+      const requiredIds = victory.requiredCityIds ?? [];
+      const ownedIds = new Set(ownedCities.map((c) => c.id));
+      return requiredIds.every((id) => ownedIds.has(id));
+    }
+    case 'historic': {
+      // Historic victory is arc-driven, not per-faction: it holds when the
+      // story chapter's terminal objectives are done. factionId is unused here.
+      const required = objectivesFor(state.scenarioId, state.storyMode).filter(
+        (o) => !o.optional,
+      );
+      // Deliberate — and a latent trap: with zero non-optional objectives a
+      // Story-Mode game can NEVER win (storyMode also forecloses the
+      // unify/dominate fallback above), so every chapter author MUST give a
+      // chapter at least one non-optional objective.
+      if (required.length === 0) return false;
+      return required.every((def) =>
+        state.objectives.some((o) => o.id === def.id && o.status === 'complete'),
+      );
+    }
+    default:
+      return false;
+  }
 }
 
 // Composite power score for a faction: troops plus 5000 per city. Used by

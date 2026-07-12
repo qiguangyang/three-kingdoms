@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { setScreen, toggleLocale } from '../../state/store.js';
+import { setScreen, startStoryMode, toggleLocale } from '../../state/store.js';
 import { t } from '../../i18n/locale.js';
 import { useSession } from '../hooks/useSession.js';
 import { selectLocale } from '../../state/selectors.js';
 import { useMenuKeys } from '../hooks/useMenuKeys.js';
 
 interface Option {
-  id: 'new' | 'load' | 'about';
-  key: 'title.newGame' | 'title.loadGame' | 'title.about';
+  id: 'story' | 'new' | 'load' | 'about';
+  key: 'title.storyMode' | 'title.freePlay' | 'title.loadGame' | 'title.about';
   action: () => void;
 }
 
@@ -16,7 +16,8 @@ export const TitleScreen: React.FC = () => {
   const [active, setActive] = useState(0);
 
   const options: Option[] = [
-    { id: 'new', key: 'title.newGame', action: () => setScreen({ kind: 'scenarioSelect' }) },
+    { id: 'story', key: 'title.storyMode', action: () => startStoryMode() },
+    { id: 'new', key: 'title.freePlay', action: () => setScreen({ kind: 'scenarioSelect' }) },
     { id: 'load', key: 'title.loadGame', action: () => setScreen({ kind: 'load' }) },
     { id: 'about', key: 'title.about', action: () => setScreen({ kind: 'about' }) },
   ];
@@ -60,7 +61,7 @@ export const TitleScreen: React.FC = () => {
           <button
             key={opt.id}
             className={`btn py-2 ${
-              i === active ? (opt.id === 'new' ? 'btn-primary' : 'ring-2 ring-seal-500/50') : ''
+              i === active ? (opt.id === 'story' ? 'btn-primary' : 'ring-2 ring-seal-500/50') : ''
             }`}
             onClick={() => {
               setActive(i);

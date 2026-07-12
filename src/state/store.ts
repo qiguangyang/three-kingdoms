@@ -1,14 +1,19 @@
 import { createStore } from 'zustand/vanilla';
 import type { StoreApi } from 'zustand/vanilla';
 import { makeDefaultAgent } from '../engine/ai/index.js';
-import type { FactionAgent, GameState, LogEntry, Personality, Scenario, StrategicCommand, TacticalCommand } from '../engine/types.js';
+import type { FactionAgent, FactionId, GameState, LogEntry, Personality, Scenario, StrategicCommand, TacticalCommand } from '../engine/types.js';
 // GambitId lives in the battle-local types module, not the engine barrel
 // (../engine/types.js imports it internally but does not re-export it).
 import type { GambitId } from '../engine/battle/types.js';
 import { buildInitialState } from '../engine/scenario.js';
+import { SCENARIOS } from '../data/scenarios/index.js';
+import { chapterScenarioId, nextChapter } from '../engine/story/chapters.js';
+import type { StoryMode } from '../engine/story/types.js';
+import { evaluateObjectives, seedObjectives } from '../engine/story/objectives.js';
 import { advanceMonth, applyCommand, checkOutcome } from '../engine/turn.js';
 import { schedulePlayerCommand, tickDays } from '../engine/pendingOp.js';
 import { CONTINUOUS_SLOT, loadFromSlot, saveToSlot } from './persistence.js';
+import { applyStoryChoice } from '../engine/story/events.js';
 import { REF_DATA } from '../data/index.js';
 import type { Locale } from '../i18n/types.js';
 import { setLocale } from '../i18n/locale.js';
@@ -34,7 +39,11 @@ export type Screen =
   | { kind: 'load' }
   | { kind: 'generals' }
   | { kind: 'gameOver'; outcome: 'victory' | 'defeat' }
-  | { kind: 'about' };
+  | { kind: 'about' }
+  | { kind: 'story'; eventId: string }
+  | { kind: 'briefing' } // Story-Mode opening briefing (reuses the StoryEvent modal in beat mode)
+  | { kind: 'chapterTransition' } // "...years pass" interstitial
+  | { kind: 'chapterComplete' }; // Story-Mode chapter-victory celebration (terminal for now)
 
 export interface UIState {
   screen: Screen;
@@ -84,11 +93,27 @@ const DIGEST_KEYS = new Set<string>([
   'event.qianduChangan',
   'event.generalDied',
   'event.defected',
+  'objective.completed',
 ]);
 
 // Pure: significant log entries appended at or after `beforeLen`.
 export function extractDigest(beforeLen: number, log: LogEntry[]): LogEntry[] {
   return log.slice(beforeLen).filter((e) => DIGEST_KEYS.has(e.key));
+}
+
+// Shared outcome routing. A Story-Mode victory is a CHAPTER win: if a NEXT
+// chapter exists in the protagonist's arc it bridges into the "...years pass"
+// chapterTransition; otherwise (the final chapter) it ends on the celebratory
+// chapterComplete. Every other outcome (a Free-Play win, or any defeat) -> the
+// normal game-over. Used identically by all three checkOutcome callers so
+// routing can't drift between them.
+function outcomeScreen(outcome: 'victory' | 'defeat', game: GameState): Screen {
+  if (outcome === 'victory' && game.storyMode) {
+    return nextChapter(game.storyMode.protagonistFactionId, game.storyMode.chapter)
+      ? { kind: 'chapterTransition' }
+      : { kind: 'chapterComplete' };
+  }
+  return { kind: 'gameOver', outcome };
 }
 
 export function newGame(scenario: Scenario, playerFactionId: string, seed: number): void {
@@ -108,6 +133,52 @@ export function newGame(scenario: Scenario, playerFactionId: string, seed: numbe
     agents,
     ui: { ...initialUI, screen: { kind: 'main' }, locale: gameStore.getState().ui.locale },
   });
+}
+
+// Launch (or advance) a guided Story-Mode chapter. Looks up the scenario that
+// hosts `chapter` of `protagonistId`'s arc, builds it with the protagonist as
+// the player faction, tags the game with storyMode so objective tables /
+// briefings / choice-events become protagonist- and chapter-specific, seeds the
+// chapter's objectives, wires up AI agents for every OTHER faction, and opens
+// the chapter briefing before the campaign map. A fixed seed keeps the launch
+// deterministic; each chapter is re-seeded fresh (no cross-chapter state carry —
+// continuity is narrative). A no-op if the protagonist/chapter isn't registered.
+export function startChapter(protagonistId: FactionId, chapter: number): void {
+  const scenarioId = chapterScenarioId(protagonistId, chapter);
+  if (!scenarioId) return;
+  const scenario = SCENARIOS[scenarioId];
+  if (!scenario) return;
+  const built = buildInitialState({
+    scenario,
+    playerFactionId: protagonistId,
+    refData: REF_DATA,
+    seed: 1,
+  });
+  const withStory: GameState = {
+    ...built,
+    // `chapter` is a plain number at the callsite (e.g. current + 1); narrow it
+    // to StoryMode's literal chapter union. Out-of-arc chapters were already
+    // rejected above (chapterScenarioId returned undefined).
+    storyMode: { protagonistFactionId: protagonistId, chapter: chapter as StoryMode['chapter'] },
+  };
+  const game = seedObjectives(withStory);
+  const agents: Record<string, FactionAgent> = {};
+  for (const f of scenario.factions) {
+    if (f.id === protagonistId) continue;
+    agents[f.id] = makeDefaultAgent(f.id, f.personality);
+  }
+  gameStore.setState((s) => ({
+    ...s,
+    game,
+    agents,
+    ui: { ...initialUI, screen: { kind: 'briefing' }, locale: s.ui.locale },
+  }));
+}
+
+// Launch the guided Story-Mode campaign at Liu Bei's Chapter 1. Thin wrapper
+// over startChapter so the Title screen still opens the campaign identically.
+export function startStoryMode(): void {
+  startChapter('liubei', 1);
 }
 
 // Legacy: end-turn = advance a full month at once. Retained for callers
@@ -142,14 +213,71 @@ export function advanceDays(days: number): void {
     }));
     return;
   }
+  // A story event fired mid-advance and froze the tick (mirrors pendingBattle).
+  // Commit the frozen state and route to the StoryEvent modal for a decision.
+  // The pause is INTENTIONALLY taken at the MONTH BOUNDARY (non-atomic vs.
+  // pendingBattle): the firing month's settlement/AI/turn have already
+  // completed exactly once inside tickDays before the freeze — do NOT try to
+  // freeze earlier, or that month would be re-run when the player resumes.
+  if (next.pendingStoryEvent) {
+    const eventId = next.pendingStoryEvent.eventId;
+    gameStore.setState((s) => ({
+      ...s,
+      game: next,
+      ui: { ...s.ui, screen: { kind: 'story', eventId } },
+    }));
+    return;
+  }
   const digest = extractDigest(logLenBefore, next.log);
   const outcome = checkOutcome(next);
   gameStore.setState((s) => ({
     ...s,
     game: next,
     ui: outcome
-      ? { ...s.ui, screen: { kind: 'gameOver', outcome }, turnDigest: digest }
+      ? { ...s.ui, screen: outcomeScreen(outcome, next), turnDigest: digest }
       : { ...s.ui, turnDigest: digest },
+  }));
+}
+
+// Resolve a pending story-event choice. Runs the branch's pure state change
+// via the engine (which also clears pendingStoryEvent), records the decision
+// on actionLog as a { kind:'storyChoice' } command so the branch is replayable
+// and persisted, then returns to the main screen (or game-over if the branch
+// happened to settle the scenario). Called by the StoryEventModal.
+export function resolveStoryChoice(eventId: string, choiceId: string): void {
+  const { game } = gameStore.getState();
+  if (!game) return;
+  const applied = applyStoryChoice(game, eventId, choiceId);
+  // An identity no-op (unknown event/invalid choice) changed nothing: don't
+  // log a phantom storyChoice command or navigate away while the pause stands.
+  // A beat DOES change state (clears pendingStoryEvent) so it isn't skipped.
+  if (applied === game) return;
+  // Snapshot the log length BEFORE objective evaluation so an
+  // 'objective.completed' entry logged by this choice falls inside the digest
+  // slice (mirrors advanceDays' logLenBefore handling).
+  const logLenBefore = applied.log.length;
+  // Reflect any objective the choice satisfied (e.g. a chapter's terminal
+  // objective) BEFORE checkOutcome, so a chapter-completing choice wins/routes
+  // in the same beat instead of one tick later.
+  const evaluated = evaluateObjectives(applied);
+  const command: StrategicCommand = { kind: 'storyChoice', eventId, choiceId };
+  const next: GameState = {
+    ...evaluated,
+    actionLog: [
+      ...evaluated.actionLog,
+      { turn: evaluated.turn, command, factionId: evaluated.playerFactionId },
+    ],
+  };
+  const digest = extractDigest(logLenBefore, next.log);
+  const outcome = checkOutcome(next);
+  gameStore.setState((s) => ({
+    ...s,
+    game: next,
+    // Only the main-screen branch carries the turn digest: a chapterComplete /
+    // gameOver outcome supersedes the "Objective complete" toast.
+    ui: outcome
+      ? { ...s.ui, screen: outcomeScreen(outcome, next) }
+      : { ...s.ui, screen: { kind: 'main' }, turnDigest: digest },
   }));
 }
 
@@ -289,7 +417,7 @@ export function finishBattle(): void {
     ...s,
     game: cleared,
     battle: null,
-    ui: outcome ? { ...s.ui, screen: { kind: 'gameOver', outcome } } : { ...s.ui, screen: { kind: 'main' } },
+    ui: outcome ? { ...s.ui, screen: outcomeScreen(outcome, cleared) } : { ...s.ui, screen: { kind: 'main' } },
   }));
 }
 
@@ -342,8 +470,13 @@ export function loadGame(snapshot: { game: GameState; locale?: Locale }): void {
       locale: snapshot.locale ?? s.ui.locale,
     },
   }));
-  // If the restored game was mid-battle, resume the battle screen.
-  if (gameStore.getState().game?.pendingBattle) enterPendingBattle();
+  // If the restored game was mid-battle or mid-story-event, resume that screen.
+  const restored = gameStore.getState().game;
+  if (restored?.pendingBattle) {
+    enterPendingBattle();
+  } else if (restored?.pendingStoryEvent) {
+    setScreen({ kind: 'story', eventId: restored.pendingStoryEvent.eventId });
+  }
 }
 
 // ----- Continuous autosave -----

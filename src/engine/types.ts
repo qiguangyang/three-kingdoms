@@ -11,6 +11,7 @@ import type {
   FormationRole,
   GambitId,
 } from './battle/types.js';
+import type { ObjectiveState, PendingStoryEvent, StoryMode } from './story/types.js';
 
 export type LocalizedString = { zh: string; en: string };
 
@@ -206,6 +207,9 @@ export type StrategicCommand =
       targetGeneralId: GeneralId;
       gold: number; // amount offered; must be >= defectionCost(target)
     }
+  // Story-mode branch pick. Applied IMMEDIATELY (never scheduled as a
+  // PendingOp) — see turn.ts applyCommand / applyStoryChoice (Task 5).
+  | { kind: 'storyChoice'; eventId: string; choiceId: string }
   | { kind: 'endTurn' };
 
 // Commands emitted at the tactical (battlefield) layer.
@@ -280,6 +284,15 @@ export interface Scenario {
   startMonth: number; // 1-12
   factions: FactionSetup[];
   victory: VictoryCondition;
+  // Per-scenario patches to general records, applied to the cloned working
+  // copies at build time (buildInitialState). Lets a later era load an adult
+  // variant of a general (e.g. an aged-up sunce/machao) without mutating the
+  // shared GENERALS base or affecting other scenarios. `stats` is
+  // shallow-merged onto the base; the other fields replace when present.
+  generalOverrides?: Record<
+    GeneralId,
+    Partial<Pick<General, 'stats' | 'age' | 'troopType' | 'loyalty'>>
+  >;
   // Implemented = full data wired up. todo = stub for planning only.
   todo?: boolean;
 }
@@ -315,6 +328,14 @@ export interface GameState {
   // entry. Empty at scenario start; populated by the turn loop's
   // reassess step. See engine/ai/strategy.ts.
   aiStrategies: Record<FactionId, FactionStrategy>;
+  // Story campaign: active objectives. Always present ([] in Free Play and
+  // until seedObjectives() runs). Populated in Task 2.
+  objectives: ObjectiveState[];
+  // When set, time-advance is frozen until the player resolves the story
+  // event (mirrors pendingBattle). Absent outside Story-Mode beats.
+  pendingStoryEvent?: PendingStoryEvent;
+  // Present => Story Mode (protagonist arc); absent => Free Play.
+  storyMode?: StoryMode;
 }
 
 // ----- Persistent-game operations -----

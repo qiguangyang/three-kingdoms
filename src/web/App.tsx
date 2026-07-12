@@ -11,6 +11,7 @@ import { SaveLoadScreen } from './screens/SaveLoadScreen.js';
 import { AboutScreen } from './screens/AboutScreen.js';
 import { GeneralsScreen } from './screens/GeneralsScreen.js';
 import { BattleScreen } from './battle/BattleScreen.js';
+import { StoryEventModal, BriefingScreen, ChapterTransitionScreen, ChapterCompleteScreen } from './screens/StoryEventModal.js';
 
 export const App: React.FC = () => {
   // On first mount, try to restore the continuous autosave so a browser
@@ -55,6 +56,18 @@ export const App: React.FC = () => {
       break;
     case 'battle':
       body = <BattleScreen />;
+      break;
+    case 'story':
+      body = <StoryEventModal />;
+      break;
+    case 'briefing':
+      body = <BriefingScreen />;
+      break;
+    case 'chapterTransition':
+      body = <ChapterTransitionScreen />;
+      break;
+    case 'chapterComplete':
+      body = <ChapterCompleteScreen />;
       break;
     default:
       body = null;

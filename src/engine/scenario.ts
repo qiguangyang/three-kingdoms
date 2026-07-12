@@ -55,6 +55,25 @@ export function buildInitialState(opts: BuildInitialStateOptions): GameState {
     items[it.id] = { ...it };
   }
 
+  // Apply per-scenario general overrides (era-variant stats) onto the cloned
+  // working copies, before faction assignment. Immutable: each patched general
+  // is replaced with a merged copy (stats shallow-merged; age/troopType/loyalty
+  // replace when present), leaving the base GENERALS untouched. Absent for
+  // Scenario 1, so this is a no-op there.
+  if (scenario.generalOverrides) {
+    for (const [id, patch] of Object.entries(scenario.generalOverrides)) {
+      const g = generals[id];
+      if (!g) continue;
+      generals[id] = {
+        ...g,
+        ...(patch.stats ? { stats: { ...g.stats, ...patch.stats } } : {}),
+        ...(patch.age !== undefined ? { age: patch.age } : {}),
+        ...(patch.troopType !== undefined ? { troopType: patch.troopType } : {}),
+        ...(patch.loyalty !== undefined ? { loyalty: patch.loyalty } : {}),
+      };
+    }
+  }
+
   // Stamp scenario faction setups onto the cloned data.
   const factions: Record<string, Faction> = {};
   for (const setup of scenario.factions) {
@@ -148,5 +167,7 @@ export function buildInitialState(opts: BuildInitialStateOptions): GameState {
     pendingOps: [],
     nextOpId: 1,
     aiStrategies: {},
+    // Story campaign objectives; seeded later by seedObjectives() (Task 2).
+    objectives: [],
   };
 }
