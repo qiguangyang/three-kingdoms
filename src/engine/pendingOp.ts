@@ -222,6 +222,11 @@ export function tickDays(
     // we freeze here on the NEXT loop iteration. Do NOT "fix" this to freeze
     // earlier — the month must settle once, not be re-run on resume.
     if (next.pendingStoryEvent) break;
+    // A duel set-piece is owed; stop advancing. Same freeze as
+    // pendingStoryEvent — the strategic tick resumes only after resolveDuel
+    // clears pendingDuel. THE SEAM is untouched: this only ADDS a halt
+    // condition; no op resolution or battle handling changes.
+    if (next.pendingDuel) break;
     next = tickOneDay(next, agents, options);
   }
   return next;

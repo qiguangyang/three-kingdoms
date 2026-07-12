@@ -14,6 +14,8 @@ import { advanceMonth, applyCommand, checkOutcome } from '../engine/turn.js';
 import { schedulePlayerCommand, tickDays } from '../engine/pendingOp.js';
 import { CONTINUOUS_SLOT, loadFromSlot, saveToSlot } from './persistence.js';
 import { applyStoryChoice } from '../engine/story/events.js';
+import { findSetpiece } from '../engine/duel/setpieces.js';
+import type { DuelOutcome } from '../duel/types.js';
 import { REF_DATA } from '../data/index.js';
 import type { Locale } from '../i18n/types.js';
 import { setLocale } from '../i18n/locale.js';
@@ -41,6 +43,7 @@ export type Screen =
   | { kind: 'gameOver'; outcome: 'victory' | 'defeat' }
   | { kind: 'about' }
   | { kind: 'story'; eventId: string }
+  | { kind: 'duel' } // real-time duel set-piece (reads game.pendingDuel)
   | { kind: 'briefing' } // Story-Mode opening briefing (reuses the StoryEvent modal in beat mode)
   | { kind: 'chapterTransition' } // "...years pass" interstitial
   | { kind: 'chapterComplete' }; // Story-Mode chapter-victory celebration (terminal for now)
@@ -114,6 +117,24 @@ function outcomeScreen(outcome: 'victory' | 'defeat', game: GameState): Screen {
       : { kind: 'chapterComplete' };
   }
   return { kind: 'gameOver', outcome };
+}
+
+// Shared post-resolution routing. After a story choice or a duel resolves and
+// its pure state change is committed, this decides the next screen with a
+// single priority order so the two paths can't drift:
+//   1. a newly-pending story event (a choice/duel-branch armed the next beat)
+//   2. a newly-pending duel (a story event's `apply` armed a set-piece)
+//   3. the scenario outcome (chapter transition / complete / game-over)
+//   4. otherwise the campaign map.
+// Extracted from resolveStoryChoice's inlined tail (which only ran steps 3-4);
+// steps 1-2 are inert on the existing story path because applyStoryChoice
+// always clears pendingStoryEvent and no story choice arms a duel, so this is
+// a behavior-preserving refactor there while giving resolveDuel the same tail.
+function routeAfterResolution(next: GameState): Screen {
+  if (next.pendingStoryEvent) return { kind: 'story', eventId: next.pendingStoryEvent.eventId };
+  if (next.pendingDuel) return { kind: 'duel' };
+  const outcome = checkOutcome(next);
+  return outcome ? outcomeScreen(outcome, next) : { kind: 'main' };
 }
 
 export function newGame(scenario: Scenario, playerFactionId: string, seed: number): void {
@@ -228,6 +249,18 @@ export function advanceDays(days: number): void {
     }));
     return;
   }
+  // A duel set-piece was armed mid-advance (a story event's apply set
+  // pendingDuel) and froze the tick — same freeze mechanism as
+  // pendingStoryEvent, honored before defaulting to main. Commit the frozen
+  // state and route to the real-time duel screen for the fight.
+  if (next.pendingDuel) {
+    gameStore.setState((s) => ({
+      ...s,
+      game: next,
+      ui: { ...s.ui, screen: { kind: 'duel' } },
+    }));
+    return;
+  }
   const digest = extractDigest(logLenBefore, next.log);
   const outcome = checkOutcome(next);
   gameStore.setState((s) => ({
@@ -269,16 +302,45 @@ export function resolveStoryChoice(eventId: string, choiceId: string): void {
     ],
   };
   const digest = extractDigest(logLenBefore, next.log);
-  const outcome = checkOutcome(next);
+  const screen = routeAfterResolution(next);
   gameStore.setState((s) => ({
     ...s,
     game: next,
     // Only the main-screen branch carries the turn digest: a chapterComplete /
-    // gameOver outcome supersedes the "Objective complete" toast.
-    ui: outcome
-      ? { ...s.ui, screen: outcomeScreen(outcome, next) }
-      : { ...s.ui, screen: { kind: 'main' }, turnDigest: digest },
+    // gameOver (or a newly-armed story/duel) screen supersedes the "Objective
+    // complete" toast.
+    ui: screen.kind === 'main'
+      ? { ...s.ui, screen, turnDigest: digest }
+      : { ...s.ui, screen },
   }));
+}
+
+// Resolve a real-time duel back into the campaign. Applies the set-piece's
+// win/lose transform, records the result for aftermath branching, clears the
+// pause, then routes exactly like resolveStoryChoice (objectives → newly-pending
+// story event → outcome). A loss never dead-ends: routing falls through to the
+// aftermath story event / main screen, not gameOver (unless the campaign itself
+// is already lost by its own rules). Deterministic — no wall-clock, no RNG.
+export function resolveDuel(outcome: DuelOutcome): void {
+  gameStore.setState((s) => {
+    const game = s.game;
+    if (!game?.pendingDuel) return s;
+    const duelId = game.pendingDuel.duelId;
+    const sp = findSetpiece(duelId);
+    // Carry-forward: old saves hydrate with duelResults === undefined (JSON
+    // cast), so read the map defensively even though the type says required.
+    let next: GameState = {
+      ...game,
+      duelResults: { ...(game.duelResults ?? {}), [duelId]: outcome },
+      pendingDuel: undefined,
+    };
+    if (sp) next = outcome === 'win' ? sp.onWin(next) : sp.onLose(next);
+    // Mirror resolveStoryChoice: reflect any objective the duel satisfied
+    // before routing so a duel-completing objective wins in the same beat.
+    next = evaluateObjectives(next);
+    const screen = routeAfterResolution(next);
+    return { ...s, game: next, ui: { ...s.ui, screen } };
+  });
 }
 
 // Legacy: synchronously apply a command. Kept for places that still
@@ -470,12 +532,15 @@ export function loadGame(snapshot: { game: GameState; locale?: Locale }): void {
       locale: snapshot.locale ?? s.ui.locale,
     },
   }));
-  // If the restored game was mid-battle or mid-story-event, resume that screen.
+  // If the restored game was mid-battle, mid-story-event, or mid-duel, resume
+  // that screen.
   const restored = gameStore.getState().game;
   if (restored?.pendingBattle) {
     enterPendingBattle();
   } else if (restored?.pendingStoryEvent) {
     setScreen({ kind: 'story', eventId: restored.pendingStoryEvent.eventId });
+  } else if (restored?.pendingDuel) {
+    setScreen({ kind: 'duel' });
   }
 }
 
